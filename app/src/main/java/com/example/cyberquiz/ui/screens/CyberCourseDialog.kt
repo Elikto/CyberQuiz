@@ -38,6 +38,7 @@ internal fun CyberCourseDialog(
     onDismiss: () -> Unit
 ) {
     val course = remember(term, category) { buildCyberCourse(term, category) }
+    val extra = remember(term, category) { buildCyberCourseExtra(term, category) }
     val uriHandler = LocalUriHandler.current
 
     Dialog(onDismissRequest = onDismiss) {
@@ -83,7 +84,7 @@ internal fun CyberCourseDialog(
 
             CourseSectionTitle("3 · COMMENT ÇA MARCHE ?")
             CourseTextCard(
-                title = "Sans jargon inutile",
+                title = "D'abord l'idée générale",
                 body = course.deepDive.details,
                 accent = CoursePurple
             )
@@ -91,7 +92,16 @@ internal fun CyberCourseDialog(
             CourseSectionTitle("SCHÉMA · CE QUI SE PASSE")
             CourseFlowSchema(course.deepDive.schema)
 
-            CourseSectionTitle("4 · EXEMPLE DANS LA VRAIE VIE")
+            CourseSectionTitle("4 · ÉTAPE PAR ÉTAPE")
+            TextBlock(
+                "Ici, on reprend la même notion plus lentement. Chaque ligne correspond à une étape. Tu peux les lire une par une sans avoir besoin de connaître les mots techniques à l'avance."
+            )
+            CourseNumberedCard(extra.stepByStep, CoursePurple)
+
+            CourseSectionTitle(extra.secondSchemaTitle)
+            CourseFlowSchema(extra.secondSchema, strong = true)
+
+            CourseSectionTitle("5 · EXEMPLE DANS LA VRAIE VIE")
             CourseTextCard(
                 title = "Situation concrète",
                 body = course.deepDive.example,
@@ -108,13 +118,29 @@ internal fun CyberCourseDialog(
             CourseSectionTitle("DESSIN MENTAL")
             ConceptMapCourse(term)
 
-            CourseSectionTitle("5 · VOIR ÇA SUR UN VRAI ORDINATEUR")
+            CourseSectionTitle("6 · VOIR ÇA SUR UN VRAI ORDINATEUR")
             TerminalCourseCard(
                 title = course.deepDive.demoTitle,
                 command = course.deepDive.demo,
                 expectedTitle = course.expectedOutputTitle,
                 expected = course.expectedOutput
             )
+
+            CourseSectionTitle("CE QU'ON CONFOND SOUVENT")
+            CourseBulletCard(extra.commonMistakes, CourseOrange)
+
+            CourseSectionTitle("POURQUOI C'EST IMPORTANT EN CYBERSÉCURITÉ ?")
+            CourseTextCard(
+                title = "Le lien avec la sécurité",
+                body = extra.securityWhy,
+                accent = CourseGreen
+            )
+
+            CourseSectionTitle("PETIT LEXIQUE")
+            TextBlock(
+                "Tu n'as pas besoin d'apprendre ces mots par cœur tout de suite. Le lexique sert simplement à éviter qu'un nouveau terme bloque ta compréhension du cours."
+            )
+            CourseBulletCard(extra.glossary, CourseCyan)
 
             CourseSectionTitle("EST-CE QUE TU AS COMPRIS ?")
             CourseBulletCard(course.checkpoints, CourseGreen)
@@ -272,6 +298,45 @@ private fun CourseBulletCard(items: List<String>, accent: Color) {
                         .background(accent, CircleShape)
                 )
                 Spacer(Modifier.width(9.dp))
+                androidx.compose.material3.Text(
+                    item,
+                    color = Color(0xFFD5DEF4),
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CourseNumberedCard(items: List<String>, accent: Color) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF08152B), RoundedCornerShape(18.dp))
+            .border(1.dp, accent.copy(alpha = .30f), RoundedCornerShape(18.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items.forEachIndexed { index, item ->
+            Row(verticalAlignment = Alignment.Top) {
+                Box(
+                    Modifier
+                        .size(27.dp)
+                        .background(accent.copy(alpha = .13f), CircleShape)
+                        .border(1.dp, accent.copy(alpha = .45f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.Text(
+                        (index + 1).toString(),
+                        color = accent,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
                 androidx.compose.material3.Text(
                     item,
                     color = Color(0xFFD5DEF4),
