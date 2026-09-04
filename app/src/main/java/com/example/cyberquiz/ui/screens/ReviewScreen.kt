@@ -38,13 +38,22 @@ private val ReviewMuted = Color(0xFF9FAED3)
 fun ReviewScreen(
     vm: QuizViewModel,
     onBack: () -> Unit,
-    onPractice: (ReviewItemEntity) -> Unit
+    onPractice: (ReviewItemEntity) -> Unit,
+    highlightedConcept: String? = null
 ) {
     val items by vm.reviewItems.collectAsState()
     var courseTerm by remember { mutableStateOf<String?>(null) }
     var courseCategory by remember { mutableStateOf("") }
 
-    val active = items.filterNot { it.mastered }
+    val activeRaw = items.filterNot { it.mastered }
+    val highlightedItem = highlightedConcept?.let { concept ->
+        activeRaw.firstOrNull { it.concept.equals(concept, ignoreCase = true) }
+    }
+    val active = if (highlightedItem == null) {
+        activeRaw
+    } else {
+        listOf(highlightedItem) + activeRaw.filterNot { it.id == highlightedItem.id }
+    }
     val mastered = items.filter { it.mastered }
 
     Column(
@@ -76,6 +85,10 @@ fun ReviewScreen(
             lineHeight = 19.sp
         )
 
+        if (highlightedItem != null) {
+            SelectedFromStatsBanner()
+        }
+
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ReviewSummaryCard(
                 value = active.size.toString(),
@@ -97,8 +110,10 @@ fun ReviewScreen(
             if (active.isNotEmpty()) {
                 SectionTitleReview("PRIORITÉ · À RETRAVAILLER")
                 active.forEach { item ->
+                    val isHighlighted = highlightedItem?.id == item.id
                     ReviewItemCard(
                         item = item,
+                        highlighted = isHighlighted,
                         onCourse = if (hasCyberExpertCourse(item.concept)) {
                             {
                                 courseTerm = item.concept
@@ -117,6 +132,7 @@ fun ReviewScreen(
                 mastered.forEach { item ->
                     ReviewItemCard(
                         item = item,
+                        highlighted = false,
                         onCourse = if (hasCyberExpertCourse(item.concept)) {
                             {
                                 courseTerm = item.concept
@@ -140,6 +156,48 @@ fun ReviewScreen(
             category = courseCategory,
             onDismiss = { courseTerm = null }
         )
+    }
+}
+
+@Composable
+private fun SelectedFromStatsBanner() {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.horizontalGradient(
+                    listOf(ReviewPurple.copy(alpha = .15f), ReviewBlue.copy(alpha = .10f))
+                ),
+                RoundedCornerShape(17.dp)
+            )
+            .border(1.2.dp, ReviewPurple.copy(alpha = .70f), RoundedCornerShape(17.dp))
+            .padding(horizontal = 13.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(32.dp)
+                .background(ReviewPurple.copy(alpha = .16f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("↳", color = ReviewCyan, fontSize = 16.sp, fontWeight = FontWeight.Black)
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                "QUESTION SÉLECTIONNÉE DEPUIS STATISTIQUES",
+                color = ReviewCyan,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.1.sp
+            )
+            Text(
+                "La question concernée est placée juste en dessous et mise en surbrillance.",
+                color = Color(0xFFD2DCF4),
+                fontSize = 10.sp,
+                lineHeight = 15.sp
+            )
+        }
     }
 }
 
@@ -218,23 +276,55 @@ private fun SectionTitleReview(text: String) {
 @Composable
 private fun ReviewItemCard(
     item: ReviewItemEntity,
+    highlighted: Boolean,
     onCourse: (() -> Unit)?,
     onPractice: () -> Unit
 ) {
-    val accent = if (item.mastered) ReviewGreen else ReviewOrange
+    val accent = when {
+        highlighted -> ReviewPurple
+        item.mastered -> ReviewGreen
+        else -> ReviewOrange
+    }
+    val borderWidth = if (highlighted) 2.dp else 1.2.dp
+
     Column(
         Modifier
             .fillMaxWidth()
             .background(
                 Brush.linearGradient(
-                    listOf(accent.copy(alpha = .08f), Color(0xFF081226), Color(0xFF071022))
+                    if (highlighted) {
+                        listOf(
+                            ReviewPurple.copy(alpha = .18f),
+                            ReviewBlue.copy(alpha = .09f),
+                            Color(0xFF071022)
+                        )
+                    } else {
+                        listOf(accent.copy(alpha = .08f), Color(0xFF081226), Color(0xFF071022))
+                    }
                 ),
                 RoundedCornerShape(21.dp)
             )
-            .border(1.2.dp, accent.copy(alpha = .55f), RoundedCornerShape(21.dp))
+            .border(borderWidth, accent.copy(alpha = if (highlighted) .95f else .55f), RoundedCornerShape(21.dp))
             .padding(15.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        if (highlighted) {
+            Box(
+                Modifier
+                    .background(ReviewPurple.copy(alpha = .17f), RoundedCornerShape(50.dp))
+                    .border(1.dp, ReviewCyan.copy(alpha = .65f), RoundedCornerShape(50.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Text(
+                    "SÉLECTIONNÉE DEPUIS STATISTIQUES",
+                    color = ReviewCyan,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.sp
+                )
+            }
+        }
+
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
@@ -278,9 +368,10 @@ private fun ReviewItemCard(
 
         Text(
             item.question,
-            color = Color(0xFFD2DCF4),
-            fontSize = 12.sp,
-            lineHeight = 18.sp
+            color = if (highlighted) ReviewText else Color(0xFFD2DCF4),
+            fontSize = if (highlighted) 13.sp else 12.sp,
+            lineHeight = 18.sp,
+            fontWeight = if (highlighted) FontWeight.SemiBold else FontWeight.Normal
         )
 
         if (!item.mastered && item.correctAfterWrongCount == 0) {
@@ -309,7 +400,7 @@ private fun ReviewItemCard(
             }
             SmallReviewButton(
                 text = "Me retester",
-                accent = ReviewPurple,
+                accent = if (highlighted) ReviewPurple else ReviewPurple,
                 modifier = Modifier.weight(1f),
                 onClick = onPractice
             )
