@@ -192,54 +192,54 @@ private fun ThemeTitleV4(category: String, difficulty: String) {
 @Composable
 private fun QuizStatsRowV4(number: Int, xp: Int, streak: Int) {
     Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        OldStyleStatCardV4(
-            label = "QUESTION",
-            value = number.toString().padStart(2, '0'),
-            accent = Q4Purple,
-            modifier = Modifier.weight(1f)
-        )
-        OldStyleStatCardV4(
-            label = "XP",
-            value = xp.toString(),
-            accent = Q4Cyan,
-            modifier = Modifier.weight(1f)
-        )
-        OldStyleStatCardV4(
-            label = "🔥 SÉRIE",
-            value = streak.toString(),
-            accent = Color(0xFFFFA83A),
-            modifier = Modifier.weight(1f)
+        QuestionBadgeV4(number)
+        Spacer(Modifier.weight(1f))
+        CompactMetricV4(text = "$xp XP", accent = Q4Cyan)
+        Spacer(Modifier.width(8.dp))
+        CompactMetricV4(text = "🔥 $streak", accent = Color(0xFFFFA83A))
+    }
+}
+
+@Composable
+private fun QuestionBadgeV4(number: Int) {
+    Box(
+        modifier = Modifier
+            .background(
+                Brush.horizontalGradient(listOf(Color(0xFF4C167D), Color(0xFF172659))),
+                RoundedCornerShape(50.dp)
+            )
+            .padding(horizontal = 13.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "QUESTION ${number.toString().padStart(2, '0')}",
+            color = Q4Text,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = 1.1.sp,
+            maxLines = 1
         )
     }
 }
 
 @Composable
-private fun OldStyleStatCardV4(
-    label: String,
-    value: String,
-    accent: Color,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .height(52.dp)
-            .background(Color(0xFF0B1730), RoundedCornerShape(14.dp))
-            .border(1.dp, accent.copy(alpha = .72f), RoundedCornerShape(14.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+private fun CompactMetricV4(text: String, accent: Color) {
+    Box(
+        modifier = Modifier
+            .background(accent.copy(alpha = .10f), RoundedCornerShape(50.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
     ) {
         Text(
-            label,
-            color = accent,
-            fontSize = 9.sp,
+            text = text,
+            color = if (accent == Q4Cyan) Q4Cyan else Q4Text,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1
         )
-        Text(value, color = Q4Text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -438,7 +438,11 @@ private fun FinishedQuizCardV4(
         }
         PrimaryButtonV4("Rejouer", true, onReplay)
         Box(
-            Modifier.fillMaxWidth().height(48.dp).border(1.dp, Color(0xFF42547D), RoundedCornerShape(16.dp)).clickable(onClick = onBack),
+            Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .border(1.dp, Color(0xFF42547D), RoundedCornerShape(16.dp))
+                .clickable(onClick = onBack),
             contentAlignment = Alignment.Center
         ) {
             Text("Retour", color = Q4Muted, fontWeight = FontWeight.Bold)
