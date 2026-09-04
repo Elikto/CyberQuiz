@@ -68,12 +68,16 @@ fun ReviewScreen(
     val mastered = items.filter { it.mastered }
 
     var highlightedCardY by remember(highlightedItem?.id) { mutableStateOf<Int?>(null) }
+    var highlightPulseReady by remember(highlightedItem?.id) { mutableStateOf(false) }
 
     LaunchedEffect(highlightedItem?.id, highlightedCardY) {
         val cardY = highlightedCardY ?: return@LaunchedEffect
         if (highlightedItem == null) return@LaunchedEffect
+        highlightPulseReady = false
         delay(120)
         scrollState.animateScrollTo(cardY.coerceAtLeast(0))
+        delay(100)
+        highlightPulseReady = true
     }
 
     Column(
@@ -134,6 +138,7 @@ fun ReviewScreen(
                     ReviewItemCard(
                         item = item,
                         highlighted = isHighlighted,
+                        flashHighlight = isHighlighted && highlightPulseReady,
                         modifier = if (isHighlighted) {
                             Modifier.onGloballyPositioned { coordinates ->
                                 highlightedCardY = (
@@ -162,6 +167,7 @@ fun ReviewScreen(
                     ReviewItemCard(
                         item = item,
                         highlighted = false,
+                        flashHighlight = false,
                         onCourse = if (hasCyberExpertCourse(item.concept)) {
                             {
                                 courseTerm = item.concept
@@ -176,7 +182,7 @@ fun ReviewScreen(
             }
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(if (highlightedItem != null) 520.dp else 8.dp))
     }
 
     courseTerm?.let { term ->
@@ -299,6 +305,7 @@ private fun SectionTitleReview(text: String) {
 private fun ReviewItemCard(
     item: ReviewItemEntity,
     highlighted: Boolean,
+    flashHighlight: Boolean,
     modifier: Modifier = Modifier,
     onCourse: (() -> Unit)?,
     onPractice: () -> Unit
@@ -311,8 +318,8 @@ private fun ReviewItemCard(
     val borderWidth = if (highlighted) 2.dp else 1.2.dp
     val glow = remember(item.id) { Animatable(0f) }
 
-    LaunchedEffect(highlighted) {
-        if (highlighted) {
+    LaunchedEffect(flashHighlight) {
+        if (flashHighlight) {
             glow.snapTo(0f)
             repeat(2) {
                 glow.animateTo(1f, animationSpec = tween(durationMillis = 240))
