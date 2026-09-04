@@ -184,7 +184,7 @@ private fun QuizTopBarV8(category: String, onQuit: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(bottom = 6.dp),
+            .padding(bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
