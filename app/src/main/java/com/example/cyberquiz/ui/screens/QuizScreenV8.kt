@@ -50,6 +50,7 @@ fun QuizScreenV8(vm: QuizViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsState()
     val result by vm.result.collectAsState()
     val progress by vm.progress.collectAsState()
+    val reviewMode by vm.reviewMode.collectAsState()
     var selected by remember { mutableStateOf<Int?>(null) }
     var showLearnMore by remember { mutableStateOf(false) }
 
@@ -135,10 +136,18 @@ fun QuizScreenV8(vm: QuizViewModel, onBack: () -> Unit) {
                         onLearnMore = { showLearnMore = true }
                     )
 
-                    PrimaryButtonV8("Question suivante", true) {
-                        selected = null
-                        showLearnMore = false
-                        vm.nextQuestion()
+                    if (reviewMode) {
+                        PrimaryButtonV8("Retour aux notions à revoir", true) {
+                            selected = null
+                            showLearnMore = false
+                            onBack()
+                        }
+                    } else {
+                        PrimaryButtonV8("Question suivante", true) {
+                            selected = null
+                            showLearnMore = false
+                            vm.nextQuestion()
+                        }
                     }
 
                     if (showLearnMore) {
