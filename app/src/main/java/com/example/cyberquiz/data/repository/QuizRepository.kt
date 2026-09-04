@@ -9,7 +9,9 @@ import com.example.cyberquiz.model.NutritionCategory
 import kotlinx.coroutines.flow.Flow
 
 class QuizRepository(private val dao: QuizDao) {
-    fun progress(): Flow<ProgressEntity?> = dao.progress()
+    fun progress(quizType: String): Flow<ProgressEntity?> = dao.progress(quizType)
+
+    suspend fun progressSnapshot(quizType: String): ProgressEntity? = dao.progressSnapshot(quizType)
 
     suspend fun init() {
         if (dao.questionCount(CYBERSECURITY) == 0) {
@@ -18,8 +20,14 @@ class QuizRepository(private val dao: QuizDao) {
         if (dao.questionCount(NUTRITION) == 0) {
             dao.insertAll(nutritionQuestions())
         }
-        if (dao.progressSnapshot() == null) {
-            dao.insertProgress(ProgressEntity())
+
+        ensureProgress(CYBERSECURITY, 1)
+        ensureProgress(NUTRITION, 2)
+    }
+
+    private suspend fun ensureProgress(quizType: String, id: Int) {
+        if (dao.progressSnapshot(quizType) == null) {
+            dao.insertProgress(ProgressEntity(id = id, quizType = quizType))
         }
     }
 
@@ -110,19 +118,15 @@ class QuizRepository(private val dao: QuizDao) {
         nutrition(NutritionCategory.MACRONUTRIENTS, Difficulty.EASY, "Combien d'énergie fournissent environ 1 g de glucides ?", "2 kcal", "4 kcal", "7 kcal", "9 kcal", 1, "Les glucides fournissent environ 4 kcal par gramme."),
         nutrition(NutritionCategory.MACRONUTRIENTS, Difficulty.EASY, "Combien d'énergie fournissent environ 1 g de protéines ?", "4 kcal", "6 kcal", "7 kcal", "9 kcal", 0, "Les protéines fournissent environ 4 kcal par gramme."),
         nutrition(NutritionCategory.MACRONUTRIENTS, Difficulty.EASY, "Quel macronutriment est le plus énergétique par gramme ?", "Les protéines", "Les glucides", "Les lipides", "L'eau", 2, "Les lipides fournissent environ 9 kcal par gramme, contre environ 4 kcal pour les protéines et les glucides."),
-
         nutrition(NutritionCategory.MICRONUTRIENTS, Difficulty.EASY, "La vitamine C appartient à quelle grande famille ?", "Vitamines hydrosolubles", "Vitamines liposolubles", "Minéraux", "Macronutriments", 0, "La vitamine C est une vitamine hydrosoluble."),
         nutrition(NutritionCategory.MICRONUTRIENTS, Difficulty.MEDIUM, "Quelle vitamine contribue notamment à l'absorption normale du calcium ?", "Vitamine A", "Vitamine C", "Vitamine D", "Vitamine K uniquement", 2, "La vitamine D participe à l'absorption et à l'utilisation normales du calcium et du phosphore."),
         nutrition(NutritionCategory.MICRONUTRIENTS, Difficulty.EASY, "Quel minéral est un composant important de l'hémoglobine ?", "Fer", "Sodium", "Potassium", "Iode", 0, "Le fer entre dans la composition de l'hémoglobine, qui transporte l'oxygène dans le sang."),
-
         nutrition(NutritionCategory.HYDRATION, Difficulty.EASY, "Quel composé constitue la base de l'hydratation du corps ?", "L'eau", "Les protéines", "Les fibres", "Le cholestérol", 0, "L'eau est essentielle au fonctionnement normal de l'organisme et constitue la base de l'hydratation."),
         nutrition(NutritionCategory.HYDRATION, Difficulty.EASY, "L'eau pure fournit combien de kilocalories ?", "0 kcal", "2 kcal", "4 kcal", "9 kcal", 0, "L'eau pure n'apporte pas d'énergie et fournit 0 kcal."),
         nutrition(NutritionCategory.HYDRATION, Difficulty.MEDIUM, "Les besoins en eau sont-ils identiques pour tout le monde ?", "Oui, toujours", "Non, ils varient selon plusieurs facteurs", "Uniquement selon l'âge", "Uniquement selon la taille", 1, "Les besoins hydriques varient notamment selon l'activité, la température, l'alimentation et les caractéristiques individuelles."),
-
         nutrition(NutritionCategory.BALANCE, Difficulty.EASY, "Quel groupe d'aliments est généralement une bonne source de fibres ?", "Fruits, légumes et légumineuses", "Beurre et huiles", "Sucre et confiseries", "Sel", 0, "Les fruits, légumes, légumineuses et céréales complètes sont des sources courantes de fibres alimentaires."),
         nutrition(NutritionCategory.BALANCE, Difficulty.EASY, "Les sucres ajoutés sont-ils indispensables au fonctionnement de l'organisme ?", "Oui", "Non", "Seulement le soir", "Seulement après le sport", 1, "Les sucres ajoutés ne sont pas indispensables ; les glucides peuvent provenir de nombreux aliments sans ajout de sucre."),
         nutrition(NutritionCategory.BALANCE, Difficulty.MEDIUM, "Quel choix apporte généralement davantage de fibres ?", "Pain complet", "Pain blanc très raffiné", "Sucre blanc", "Huile végétale", 0, "Les produits céréaliers complets conservent davantage de fibres que leurs équivalents très raffinés."),
-
         nutrition(NutritionCategory.DIGESTION, Difficulty.EASY, "Dans quelle partie du tube digestif a lieu l'essentiel de l'absorption des nutriments ?", "L'œsophage", "L'estomac", "L'intestin grêle", "Le côlon uniquement", 2, "L'intestin grêle est le principal site d'absorption de la majorité des nutriments."),
         nutrition(NutritionCategory.DIGESTION, Difficulty.EASY, "Quel est le rôle général des enzymes digestives ?", "Décomposer les nutriments en molécules plus simples", "Produire de l'oxygène", "Créer des vitamines artificielles", "Bloquer toute absorption", 0, "Les enzymes digestives facilitent la décomposition des aliments en molécules pouvant être absorbées."),
         nutrition(NutritionCategory.DIGESTION, Difficulty.MEDIUM, "Quel organe produit la bile ?", "Le pancréas", "Le foie", "L'estomac", "L'intestin grêle", 1, "La bile est produite par le foie et participe notamment à la digestion des lipides.")
