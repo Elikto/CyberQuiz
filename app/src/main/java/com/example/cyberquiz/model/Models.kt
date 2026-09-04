@@ -6,4 +6,12 @@ enum class Category(val label: String) {
     PENTEST("Pentest"), AD("Active Directory"), CLOUD("Cloud Security"), MOBILE("Mobile Security"), SYSTEM("Sécurité système")
 }
 
+enum class NutritionCategory(val label: String) {
+    MACRONUTRIENTS("Macronutriments"),
+    MICRONUTRIENTS("Micronutriments"),
+    HYDRATION("Hydratation"),
+    BALANCE("Équilibre alimentaire"),
+    DIGESTION("Digestion")
+}
+
 enum class Difficulty { EASY, MEDIUM, HARD }
