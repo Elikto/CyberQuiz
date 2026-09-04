@@ -24,6 +24,10 @@ class QuizRepository(private val dao: QuizDao) {
             dao.insertAll(nutritionQuestions())
         }
 
+        // Met aussi à jour les formulations déjà enregistrées sur les téléphones
+        // qui avaient installé une version précédente de la banque Cyber.
+        applyCyberWordingFixes(dao)
+
         ensureProgress(CYBERSECURITY, 1)
         ensureProgress(NUTRITION, 2)
     }
@@ -107,10 +111,10 @@ class QuizRepository(private val dao: QuizDao) {
         cyber(Category.WEB, Difficulty.EASY, "Quelle attaque injecte du code SQL dans une requête ?", "XSS", "CSRF", "SQL injection", "SSRF", 2, "L'injection SQL manipule une requête SQL via des entrées contrôlées par l'utilisateur."),
         cyber(Category.WEB, Difficulty.MEDIUM, "Que protège principalement l'attribut HttpOnly d'un cookie ?", "Les requêtes DNS", "L'accès JavaScript au cookie", "Le chiffrement TLS", "Le cache navigateur", 1, "HttpOnly empêche l'accès au cookie via JavaScript côté client."),
         cyber(Category.CRYPTO, Difficulty.EASY, "Lequel est un algorithme de chiffrement symétrique ?", "RSA", "AES", "ECDSA", "SHA-256", 1, "AES est un chiffrement symétrique ; RSA et ECDSA sont asymétriques, SHA-256 est un hash."),
-        cyber(Category.CRYPTO, Difficulty.MEDIUM, "À quoi sert principalement une fonction de hachage cryptographique ?", "Réversibilité", "Compression", "Intégrité et empreinte", "Attribution d'une IP", 2, "Un hash produit une empreinte déterministe difficile à inverser et utile pour vérifier l'intégrité."),
+        cyber(Category.CRYPTO, Difficulty.MEDIUM, "À quoi sert principalement une fonction de hachage cryptographique ?", "Réversibilité", "Compression", "Intégrité et empreinte", "Attribution d'une IP", 2, "Une fonction de hachage produit une empreinte difficile à inverser et utile pour vérifier l'intégrité d'une donnée."),
         cyber(Category.MALWARE, Difficulty.EASY, "Quel type de malware chiffre les fichiers et demande une rançon ?", "Spyware", "Ransomware", "Rootkit", "Adware", 1, "Un ransomware bloque ou chiffre des données pour extorquer une rançon."),
         cyber(Category.SOCIAL, Difficulty.EASY, "Quel est le but classique du phishing ?", "Optimiser un routeur", "Tromper une victime pour obtenir une information", "Scanner un disque", "Compresser des fichiers", 1, "Le phishing repose sur l'ingénierie sociale pour obtenir des informations ou pousser à une action."),
-        cyber(Category.FORENSICS, Difficulty.MEDIUM, "Pourquoi préserver une image disque originale en forensic ?", "Pour accélérer Internet", "Pour conserver l'intégrité de la preuve", "Pour supprimer les métadonnées", "Pour chiffrer le disque", 1, "La conservation d'un original et l'utilisation de copies de travail permettent de préserver la preuve."),
+        cyber(Category.FORENSICS, Difficulty.MEDIUM, "Pourquoi faut-il préserver l'image disque originale lors d'une investigation numérique ?", "Pour accélérer Internet", "Pour conserver l'intégrité de la preuve", "Pour supprimer les métadonnées", "Pour chiffrer le disque", 1, "On conserve l'original intact et on travaille sur une copie. Cela permet de montrer que la preuve d'origine n'a pas été modifiée pendant l'analyse."),
         cyber(Category.PENTEST, Difficulty.EASY, "Quel outil est couramment utilisé pour découvrir des services réseau ?", "Nmap", "Git", "Docker", "Gradle", 0, "Nmap sert notamment à découvrir des hôtes, ports et services réseau."),
         cyber(Category.AD, Difficulty.MEDIUM, "Quel service est central dans un domaine Active Directory ?", "DNS uniquement", "Kerberos", "FTP", "SMTP", 1, "Kerberos est un protocole d'authentification majeur utilisé par Active Directory."),
         cyber(Category.CLOUD, Difficulty.EASY, "Que signifie MFA ?", "Managed File Access", "Multi-Factor Authentication", "Main Firewall Access", "Memory Forensics Analysis", 1, "MFA combine plusieurs facteurs d'authentification indépendants."),
