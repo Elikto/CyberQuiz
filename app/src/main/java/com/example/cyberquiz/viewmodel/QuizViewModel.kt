@@ -9,6 +9,7 @@ import com.example.cyberquiz.data.database.CyberQuizDatabase
 import com.example.cyberquiz.data.database.ProgressEntity
 import com.example.cyberquiz.data.database.QuestionEntity
 import com.example.cyberquiz.data.database.ReviewItemEntity
+import com.example.cyberquiz.data.database.ReviewItemWithQuestion
 import com.example.cyberquiz.data.repository.QuizRepository
 import com.example.cyberquiz.model.Category
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -57,6 +58,14 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
     val reviewItems: StateFlow<List<ReviewItemEntity>> = _activeQuizType
         .flatMapLatest { quizType -> dao.reviewItems(quizType) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = emptyList()
+        )
+
+    val reviewItemsWithQuestions: StateFlow<List<ReviewItemWithQuestion>> = _activeQuizType
+        .flatMapLatest { quizType -> dao.reviewItemsWithQuestions(quizType) }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
