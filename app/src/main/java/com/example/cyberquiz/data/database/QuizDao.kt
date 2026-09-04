@@ -2,6 +2,7 @@ package com.example.cyberquiz.data.database
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
@@ -28,17 +29,18 @@ interface QuizDao {
     @Insert
     suspend fun insertAll(questions: List<QuestionEntity>)
 
-    @Query("SELECT * FROM progress WHERE id = 1")
-    fun progress(): Flow<ProgressEntity?>
+    @Query("SELECT * FROM progress WHERE quizType = :quizType LIMIT 1")
+    fun progress(quizType: String): Flow<ProgressEntity?>
 
-    @Query("SELECT * FROM progress WHERE id = 1 LIMIT 1")
-    suspend fun progressSnapshot(): ProgressEntity?
+    @Query("SELECT * FROM progress WHERE quizType = :quizType LIMIT 1")
+    suspend fun progressSnapshot(quizType: String): ProgressEntity?
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertProgress(progress: ProgressEntity)
 
-    @Query("UPDATE progress SET xp=:xp, level=:level, answered=:answered, correct=:correct, streak=:streak, bestStreak=:bestStreak, totalResponseMs=:totalResponseMs WHERE id=1")
+    @Query("UPDATE progress SET xp=:xp, level=:level, answered=:answered, correct=:correct, streak=:streak, bestStreak=:bestStreak, totalResponseMs=:totalResponseMs WHERE quizType=:quizType")
     suspend fun updateProgress(
+        quizType: String,
         xp: Int,
         level: Int,
         answered: Int,
