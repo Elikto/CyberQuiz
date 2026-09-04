@@ -20,6 +20,9 @@ interface QuizDao {
     @Query("SELECT COUNT(*) FROM questions WHERE quizType = :quizType")
     suspend fun questionCount(quizType: String): Int
 
+    @Query("SELECT COUNT(*) FROM questions WHERE quizType = :quizType AND source = :source")
+    suspend fun questionCountBySource(quizType: String, source: String): Int
+
     @Query("UPDATE questions SET seen = 0 WHERE quizType = :quizType")
     suspend fun resetSeen(quizType: String)
 
