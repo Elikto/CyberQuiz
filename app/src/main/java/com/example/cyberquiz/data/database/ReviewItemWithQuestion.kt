@@ -10,5 +10,5 @@ data class ReviewItemWithQuestion(
         parentColumn = "questionId",
         entityColumn = "id"
     )
-    val question: QuestionEntity?
+    val question: QuestionEntity
 )
