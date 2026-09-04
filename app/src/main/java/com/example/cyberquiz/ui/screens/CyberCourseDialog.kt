@@ -58,38 +58,57 @@ internal fun CyberCourseDialog(
         ) {
             CourseHeader(course.title, course.subtitle, onDismiss)
 
-            CourseSectionTitle("OBJECTIFS DU COURS")
+            BeginnerMemoryCard(course.memorySentence)
+
+            CourseSectionTitle(course.simpleSchemaTitle)
+            CourseFlowSchema(course.simpleSchema, strong = true)
+
+            CourseSectionTitle("CE QUE TU VAS COMPRENDRE")
             CourseBulletCard(course.objectives, CourseCyan)
 
-            CourseSectionTitle("1 · REPARTIR DE ZÉRO")
+            CourseSectionTitle("1 · C'EST QUOI ?")
             CourseTextCard(
-                title = "Définition",
+                title = "Définition simple",
                 body = course.deepDive.definition,
                 accent = CourseCyan
             )
 
-            CourseSectionTitle("2 · À QUOI ÇA SERT VRAIMENT ?")
+            CourseSectionTitle("2 · À QUOI ÇA SERT ?")
             CourseTextCard(
-                title = "Mission",
+                title = "Son rôle",
                 body = course.deepDive.action,
                 accent = CourseBlue
             )
             CourseBulletCard(course.deepDive.actions, CourseBlue)
 
-            CourseSectionTitle("3 · COMMENT ÇA FONCTIONNE ?")
+            CourseSectionTitle("3 · COMMENT ÇA MARCHE ?")
             CourseTextCard(
-                title = "Fonctionnement étape par étape",
+                title = "Sans jargon inutile",
                 body = course.deepDive.details,
                 accent = CoursePurple
             )
 
-            CourseSectionTitle("4 · EXEMPLE CONCRET")
+            CourseSectionTitle("SCHÉMA · CE QUI SE PASSE")
+            CourseFlowSchema(course.deepDive.schema)
+
+            CourseSectionTitle("4 · EXEMPLE DANS LA VRAIE VIE")
             CourseTextCard(
-                title = "Dans la vraie vie",
+                title = "Situation concrète",
                 body = course.deepDive.example,
                 accent = CourseGreen
             )
 
+            CourseSectionTitle("UNE IMAGE POUR LE RETENIR")
+            CourseTextCard(
+                title = "Analogie du quotidien",
+                body = course.deepDive.analogy,
+                accent = CourseOrange
+            )
+
+            CourseSectionTitle("DESSIN MENTAL")
+            ConceptMapCourse(term)
+
+            CourseSectionTitle("5 · VOIR ÇA SUR UN VRAI ORDINATEUR")
             TerminalCourseCard(
                 title = course.deepDive.demoTitle,
                 command = course.deepDive.demo,
@@ -97,26 +116,16 @@ internal fun CyberCourseDialog(
                 expected = course.expectedOutput
             )
 
-            CourseSectionTitle("5 · ANALOGIE DU QUOTIDIEN")
-            CourseTextCard(
-                title = "Une autre manière de le visualiser",
-                body = course.deepDive.analogy,
-                accent = CourseOrange
-            )
-
-            CourseSectionTitle("6 · DESSIN MENTAL")
-            ConceptMapCourse(term)
-
-            CourseSectionTitle("7 · SCHÉMA DE FONCTIONNEMENT")
-            CourseFlowSchema(course.deepDive.schema)
-
-            CourseSectionTitle("8 · VÉRIFIE QUE TU AS COMPRIS")
+            CourseSectionTitle("EST-CE QUE TU AS COMPRIS ?")
             CourseBulletCard(course.checkpoints, CourseGreen)
 
-            CourseSectionTitle("9 · VIDÉOS EN FRANÇAIS")
+            CourseSectionTitle("POUR ALLER UN PEU PLUS LOIN · OPTIONNEL")
+            OptionalAdvancedCard(course.advancedNote)
+
+            CourseSectionTitle("VIDÉOS EN FRANÇAIS")
             if (course.videos.isEmpty()) {
                 TextBlock(
-                    "Je n'ai pas encore associé de vidéo vérifiée à cette notion. Tu peux lancer directement une recherche YouTube en français depuis le bouton ci-dessous."
+                    "Je n'ai pas encore associé une vidéo précise à cette notion. Le bouton ci-dessous lance une recherche YouTube en français avec des mots simples."
                 )
             } else {
                 course.videos.forEach { video ->
@@ -187,6 +196,38 @@ private fun CourseHeader(title: String, subtitle: String, onDismiss: () -> Unit)
 }
 
 @Composable
+private fun BeginnerMemoryCard(text: String) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.horizontalGradient(
+                    listOf(CourseGreen.copy(alpha = .14f), CourseBlue.copy(alpha = .10f))
+                ),
+                RoundedCornerShape(20.dp)
+            )
+            .border(1.2.dp, CourseGreen.copy(alpha = .55f), RoundedCornerShape(20.dp))
+            .padding(15.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        androidx.compose.material3.Text(
+            "À RETENIR EN 20 SECONDES",
+            color = CourseGreen,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = 1.3.sp
+        )
+        androidx.compose.material3.Text(
+            text,
+            color = CourseText,
+            fontSize = 15.sp,
+            lineHeight = 22.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
 private fun CourseSectionTitle(text: String) {
     androidx.compose.material3.Text(
         text,
@@ -244,6 +285,31 @@ private fun CourseBulletCard(items: List<String>, accent: Color) {
 }
 
 @Composable
+private fun OptionalAdvancedCard(text: String) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(CourseOrange.copy(alpha = .055f), RoundedCornerShape(18.dp))
+            .border(1.dp, CourseOrange.copy(alpha = .24f), RoundedCornerShape(18.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        androidx.compose.material3.Text(
+            "Tu peux ignorer cette partie au début",
+            color = CourseOrange,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Black
+        )
+        androidx.compose.material3.Text(
+            text,
+            color = Color(0xFFD7E0F5),
+            fontSize = 11.sp,
+            lineHeight = 18.sp
+        )
+    }
+}
+
+@Composable
 private fun TerminalCourseCard(
     title: String,
     command: String,
@@ -296,7 +362,7 @@ private fun ConceptMapCourse(term: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        SmallConceptBox("ENTRÉE / BESOIN", CourseBlue)
+        SmallConceptBox("J'AI UN BESOIN", CourseBlue)
         androidx.compose.material3.Text("↓", color = CourseCyan, fontSize = 18.sp, fontWeight = FontWeight.Black)
         Box(
             Modifier
@@ -310,8 +376,8 @@ private fun ConceptMapCourse(term: String) {
         }
         androidx.compose.material3.Text("↓", color = CourseCyan, fontSize = 18.sp, fontWeight = FontWeight.Black)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallConceptBox("ACTIONS", CourseGreen, Modifier.weight(1f))
-            SmallConceptBox("RÉSULTAT", CourseOrange, Modifier.weight(1f))
+            SmallConceptBox("IL FAIT SON TRAVAIL", CourseGreen, Modifier.weight(1f))
+            SmallConceptBox("J'OBTIENS UN RÉSULTAT", CourseOrange, Modifier.weight(1f))
         }
     }
 }
@@ -330,12 +396,13 @@ private fun SmallConceptBox(text: String, accent: Color, modifier: Modifier = Mo
 }
 
 @Composable
-private fun CourseFlowSchema(steps: List<String>) {
+private fun CourseFlowSchema(steps: List<String>, strong: Boolean = false) {
+    val border = if (strong) CourseGreen else CourseBlue
     Column(
         Modifier
             .fillMaxWidth()
             .background(Color(0xFF061225), RoundedCornerShape(18.dp))
-            .border(1.dp, CourseBlue.copy(alpha = .30f), RoundedCornerShape(18.dp))
+            .border(1.dp, border.copy(alpha = if (strong) .50f else .30f), RoundedCornerShape(18.dp))
             .padding(13.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -344,14 +411,27 @@ private fun CourseFlowSchema(steps: List<String>) {
                 Modifier
                     .fillMaxWidth()
                     .background(
-                        Brush.horizontalGradient(listOf(CoursePurple.copy(alpha = .10f), CourseBlue.copy(alpha = .10f))),
+                        Brush.horizontalGradient(
+                            if (strong) {
+                                listOf(CourseGreen.copy(alpha = .09f), CourseBlue.copy(alpha = .09f))
+                            } else {
+                                listOf(CoursePurple.copy(alpha = .10f), CourseBlue.copy(alpha = .10f))
+                            }
+                        ),
                         RoundedCornerShape(13.dp)
                     )
-                    .border(1.dp, CourseBlue.copy(alpha = .28f), RoundedCornerShape(13.dp))
+                    .border(1.dp, border.copy(alpha = .28f), RoundedCornerShape(13.dp))
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 contentAlignment = Alignment.Center
             ) {
-                androidx.compose.material3.Text(step, color = CourseText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+                androidx.compose.material3.Text(
+                    step,
+                    color = CourseText,
+                    fontSize = if (strong) 13.sp else 12.sp,
+                    fontWeight = if (strong) FontWeight.Bold else FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 18.sp
+                )
             }
             if (index < steps.lastIndex) {
                 androidx.compose.material3.Text("↓", color = CourseCyan, fontSize = 20.sp, fontWeight = FontWeight.Black)
