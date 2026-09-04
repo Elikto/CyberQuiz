@@ -68,8 +68,6 @@ fun QuizScreenV8(vm: QuizViewModel, onBack: () -> Unit) {
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        QuizHeaderV8(onBack)
-
         when (val s = state) {
             QuizUiState.Loading -> Box(
                 Modifier.fillMaxWidth().height(360.dp),
@@ -94,8 +92,8 @@ fun QuizScreenV8(vm: QuizViewModel, onBack: () -> Unit) {
                 val q = s.question
                 val answers = listOf(q.answerA, q.answerB, q.answerC, q.answerD)
 
-                ThemeTitleV8(q.category, q.difficulty)
-                QuizStatsRowV8(s.number, progress.xp, progress.streak)
+                QuizTopBarV8(q.category, q.difficulty, onBack)
+                QuizStatsRowV8(s.number, progress.xp, progress.streak, progress.level)
                 QuestionCardV8(q.question)
 
                 Text(
@@ -170,54 +168,57 @@ fun QuizScreenV8(vm: QuizViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun QuizHeaderV8(onBack: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier
-                .size(44.dp)
-                .background(Color(0xFF101A34), CircleShape)
-                .border(1.2.dp, Color(0xFF718CE2), CircleShape)
-                .clickable(onClick = onBack),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("‹", color = Q8Text, fontSize = 34.sp, fontWeight = FontWeight.Light)
-        }
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text("Cyber", color = Q8Text, fontSize = 23.sp, fontWeight = FontWeight.Black)
-                Text("Quiz", color = Q8Purple, fontSize = 23.sp, fontWeight = FontWeight.Black)
-            }
-            Text("MODE QUIZ", color = Q8Muted, fontSize = 9.sp, letterSpacing = 1.8.sp)
-        }
-    }
-}
-
-@Composable
-private fun ThemeTitleV8(category: String, difficulty: String) {
+private fun QuizTopBarV8(category: String, difficulty: String, onQuit: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(top = 2.dp),
+        Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text("THÈME", color = Q8Muted, fontSize = 9.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(1.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "THÈME : ",
+                    color = Q8Muted,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.1.sp,
+                    maxLines = 1
+                )
+                Text(
+                    category.uppercase(),
+                    color = Q8Blue,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Black,
+                    maxLines = 1
+                )
+            }
+            Spacer(Modifier.height(5.dp))
+            DifficultyChipV8(difficulty)
+        }
+
+        Spacer(Modifier.width(12.dp))
+
+        Box(
+            Modifier
+                .height(38.dp)
+                .background(Q8Red.copy(alpha = .08f), RoundedCornerShape(14.dp))
+                .border(1.dp, Q8Red.copy(alpha = .68f), RoundedCornerShape(14.dp))
+                .clickable(onClick = onQuit)
+                .padding(horizontal = 14.dp),
+            contentAlignment = Alignment.Center
+        ) {
             Text(
-                category.uppercase(),
-                color = Q8Blue,
-                fontSize = 19.sp,
-                lineHeight = 22.sp,
+                "QUITTER",
+                color = Q8Red,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Black,
-                letterSpacing = .35.sp
+                letterSpacing = 1.1.sp
             )
         }
-        Spacer(Modifier.width(8.dp))
-        DifficultyChipV8(difficulty)
     }
 }
 
 @Composable
-private fun QuizStatsRowV8(number: Int, xp: Int, streak: Int) {
+private fun QuizStatsRowV8(number: Int, xp: Int, streak: Int, level: Int) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier
@@ -225,7 +226,7 @@ private fun QuizStatsRowV8(number: Int, xp: Int, streak: Int) {
                     Brush.horizontalGradient(listOf(Color(0xFF4C167D), Color(0xFF172659))),
                     RoundedCornerShape(50.dp)
                 )
-                .padding(horizontal = 13.dp, vertical = 8.dp),
+                .padding(horizontal = 11.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -239,8 +240,10 @@ private fun QuizStatsRowV8(number: Int, xp: Int, streak: Int) {
         }
         Spacer(Modifier.weight(1f))
         CompactMetricV8("$xp XP", Q8Cyan)
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(5.dp))
         CompactMetricV8("🔥 $streak", Q8Orange)
+        Spacer(Modifier.width(5.dp))
+        CompactMetricV8("NIV. $level", Q8Purple)
     }
 }
 
@@ -249,13 +252,13 @@ private fun CompactMetricV8(text: String, accent: Color) {
     Box(
         Modifier
             .background(accent.copy(alpha = .10f), RoundedCornerShape(50.dp))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text,
             color = if (accent == Q8Cyan) Q8Cyan else Q8Text,
-            fontSize = 12.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1
         )
