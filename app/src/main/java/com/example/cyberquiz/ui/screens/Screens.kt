@@ -5,13 +5,23 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,15 +30,27 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cyberquiz.model.Category
-import com.example.cyberquiz.ui.components.*
-import com.example.cyberquiz.ui.theme.*
-import com.example.cyberquiz.viewmodel.*
+import com.example.cyberquiz.ui.components.AnswerButton
+import com.example.cyberquiz.ui.components.NeonCard
+import com.example.cyberquiz.ui.components.PrimaryButton
+import com.example.cyberquiz.ui.components.SectionTitle
+import com.example.cyberquiz.ui.theme.CyberBackground
+import com.example.cyberquiz.ui.theme.CyberBlue
+import com.example.cyberquiz.ui.theme.CyberGreen
+import com.example.cyberquiz.ui.theme.CyberMuted
+import com.example.cyberquiz.ui.theme.CyberPurple
+import com.example.cyberquiz.ui.theme.CyberRed
+import com.example.cyberquiz.ui.theme.CyberSurface
+import com.example.cyberquiz.ui.theme.CyberText
+import com.example.cyberquiz.viewmodel.QuizUiState
+import com.example.cyberquiz.viewmodel.QuizViewModel
 
 @Composable
 fun HomeScreen(
@@ -38,9 +60,9 @@ fun HomeScreen(
     onCategories: () -> Unit
 ) {
     val p by vm.progress.collectAsState()
-    val xpInLevel = p.xp % 100
-    val xpProgress = xpInLevel / 100f
-    val accuracy = if (p.answered == 0) 0 else p.correct * 100 / p.answered
+    val xpTarget = (p.level * 100).coerceAtLeast(100)
+    val xpProgress = (p.xp.toFloat() / xpTarget).coerceIn(0f, 1f)
+    val accuracy = if (p.answered == 0) 0 else (p.correct * 100 / p.answered)
     val titleLevel = when {
         p.level >= 15 -> "Architecte Sécurité"
         p.level >= 10 -> "Hacker Éthique"
@@ -54,8 +76,9 @@ fun HomeScreen(
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        Color(0xFF020612),
-                        Color(0xFF071020),
+                        Color(0xFF040814),
+                        Color(0xFF060B1A),
+                        CyberBackground,
                         Color(0xFF040814)
                     )
                 )
@@ -63,7 +86,7 @@ fun HomeScreen(
             .verticalScroll(rememberScrollState())
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(horizontal = 18.dp, vertical = 12.dp),
+            .padding(horizontal = 18.dp, vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
@@ -71,192 +94,235 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            RoundTopIcon("⚙")
-            RoundTopIcon("◎")
+            TopIconButton("⚙")
+            TopIconButton("◯")
         }
 
-        Spacer(Modifier.height(6.dp))
-
-        NeonShieldLogo()
-
         Spacer(Modifier.height(8.dp))
+        HeroShieldSection()
+        Spacer(Modifier.height(2.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.Bottom) {
             Text(
                 text = "Cyber",
                 color = Color.White,
-                fontSize = 40.sp,
+                fontSize = 42.sp,
                 fontWeight = FontWeight.Black
             )
             Text(
                 text = "Quiz",
-                color = Color(0xFFB64DFF),
-                fontSize = 40.sp,
+                color = Color(0xFFE14EFF),
+                fontSize = 42.sp,
                 fontWeight = FontWeight.Black
             )
         }
-
         Text(
             text = "APPRENDS  ·  JOUE  ·  SÉCURISE",
-            color = Color(0xFF9EADE3),
-            fontSize = 11.sp,
+            color = Color(0xFFAFB8E8),
+            fontSize = 12.sp,
             letterSpacing = 2.2.sp
         )
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(22.dp))
 
         LevelProgressCard(
             level = p.level,
-            title = titleLevel,
-            xpInLevel = xpInLevel,
+            levelTitle = titleLevel,
+            currentXp = p.xp,
+            targetXp = xpTarget,
             progress = xpProgress
         )
 
         Spacer(Modifier.height(18.dp))
 
         Text(
-            text = "« La cybersécurité d’aujourd’hui\nconstruit un meilleur demain »",
-            color = Color(0xFFB8C0DF),
+            text = "« La cybersécurité d'aujourd'hui\nconstruit un meilleur demain »",
+            color = Color(0xFFC9D0F3),
             textAlign = TextAlign.Center,
-            fontSize = 15.sp,
-            lineHeight = 21.sp
+            fontSize = 16.sp,
+            lineHeight = 24.sp,
+            modifier = Modifier.padding(horizontal = 12.dp)
         )
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(22.dp))
 
-        MockupMenuButton(
+        MenuActionCard(
             title = "Commencer",
             subtitle = "Lancer un nouveau quiz",
-            symbol = "▶",
-            borderColor = Color(0xFFE35DFF),
-            startColor = Color(0xFF49108E),
-            endColor = Color(0xFF180C43),
+            accent = Color(0xFFD652FF),
+            accentDark = Color(0xFF381160),
+            iconKind = HomeIconKind.Play,
             onClick = onQuiz
         )
 
-        Spacer(Modifier.height(11.dp))
+        Spacer(Modifier.height(12.dp))
 
-        MockupMenuButton(
+        MenuActionCard(
             title = "Statistiques",
             subtitle = "Suis ta progression",
-            symbol = "▥",
-            borderColor = Color(0xFF1EB5FF),
-            startColor = Color(0xFF073B8E),
-            endColor = Color(0xFF061B43),
+            accent = Color(0xFF18BFFF),
+            accentDark = Color(0xFF072B5B),
+            iconKind = HomeIconKind.Bars,
             onClick = onStats
         )
 
-        Spacer(Modifier.height(11.dp))
+        Spacer(Modifier.height(12.dp))
 
-        MockupMenuButton(
+        MenuActionCard(
             title = "Catégories",
             subtitle = "Choisis ton thème",
-            symbol = "▦",
-            borderColor = Color(0xFF20E9E1),
-            startColor = Color(0xFF07545C),
-            endColor = Color(0xFF06272F),
+            accent = Color(0xFF19F2E5),
+            accentDark = Color(0xFF06393B),
+            iconKind = HomeIconKind.Grid,
             onClick = onCategories
         )
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(18.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            MockupStatCard("🔥", p.streak.toString(), "Série en cours", Modifier.weight(1f))
-            MockupStatCard("★", p.xp.toString(), "Points totaux", Modifier.weight(1f))
-            MockupStatCard("▥", p.level.toString(), "Niveau actuel", Modifier.weight(1f))
-            MockupStatCard("🏆", "$accuracy%", "Réussite", Modifier.weight(1f))
+            StatMiniCard("🔥", p.streak.toString(), "Série en cours", Modifier.weight(1f), Color(0xFFFFA61A))
+            StatMiniCard("★", p.xp.toString(), "Points totaux", Modifier.weight(1f), Color(0xFFD64CFF))
+            StatMiniCard("▥", p.level.toString(), "Niveau actuel", Modifier.weight(1f), Color(0xFF1AC3FF))
+            StatMiniCard("🏆", "$accuracy%", "Réussite", Modifier.weight(1f), Color(0xFFFFCC33))
         }
 
-        Spacer(Modifier.height(12.dp))
-
-        CyberGlobeFooter()
-
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(20.dp))
+        GlobeFooter()
+        Spacer(Modifier.height(6.dp))
     }
 }
 
 @Composable
-private fun RoundTopIcon(symbol: String) {
+private fun TopIconButton(symbol: String) {
     Box(
         modifier = Modifier
-            .size(40.dp)
-            .background(Color(0xFF0B1327), CircleShape)
-            .border(1.dp, Color(0xFF6E83CC).copy(alpha = 0.65f), CircleShape),
+            .size(44.dp)
+            .background(Color(0xFF0B132A).copy(alpha = 0.9f), CircleShape)
+            .border(1.dp, Color(0xFF8FA6FF).copy(alpha = 0.5f), CircleShape),
         contentAlignment = Alignment.Center
     ) {
-        Text(symbol, color = Color(0xFFC6D3FF), fontSize = 20.sp)
+        Text(symbol, color = Color(0xFFDCE3FF), fontSize = 24.sp)
     }
 }
 
 @Composable
-private fun NeonShieldLogo() {
+private fun HeroShieldSection() {
     Box(
         modifier = Modifier
-            .size(width = 176.dp, height = 164.dp)
-            .background(
-                Brush.radialGradient(
-                    listOf(
-                        Color(0xFF7C2CFF).copy(alpha = 0.24f),
-                        Color(0xFF00C8FF).copy(alpha = 0.10f),
-                        Color.Transparent
-                    )
-                )
-            ),
+            .fillMaxWidth()
+            .height(178.dp),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(Modifier.size(138.dp)) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            val shield = Path().apply {
-                moveTo(w * 0.50f, h * 0.05f)
-                lineTo(w * 0.87f, h * 0.23f)
-                lineTo(w * 0.82f, h * 0.66f)
-                cubicTo(w * 0.78f, h * 0.84f, w * 0.62f, h * 0.94f, w * 0.50f, h * 0.99f)
-                cubicTo(w * 0.38f, h * 0.94f, w * 0.22f, h * 0.84f, w * 0.18f, h * 0.66f)
-                lineTo(w * 0.13f, h * 0.23f)
-                close()
-            }
-            drawPath(
-                path = shield,
-                brush = Brush.linearGradient(
-                    listOf(Color(0xFFEB59FF), Color(0xFF28D5FF))
+            val centerX = w / 2f
+            val centerY = h / 2.2f
+
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF8B2DFF).copy(alpha = 0.34f), Color.Transparent),
+                    center = Offset(centerX, centerY),
+                    radius = 140f
                 ),
-                style = Stroke(width = 6f)
+                radius = 140f,
+                center = Offset(centerX, centerY)
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF00C8FF).copy(alpha = 0.18f), Color.Transparent),
+                    center = Offset(centerX, centerY),
+                    radius = 180f
+                ),
+                radius = 180f,
+                center = Offset(centerX, centerY)
             )
 
-            val inner = Path().apply {
-                moveTo(w * 0.50f, h * 0.14f)
-                lineTo(w * 0.78f, h * 0.28f)
-                lineTo(w * 0.74f, h * 0.62f)
-                cubicTo(w * 0.70f, h * 0.76f, w * 0.58f, h * 0.85f, w * 0.50f, h * 0.89f)
-                cubicTo(w * 0.42f, h * 0.85f, w * 0.30f, h * 0.76f, w * 0.26f, h * 0.62f)
-                lineTo(w * 0.22f, h * 0.28f)
+            val circuitYs = listOf(h * 0.38f, h * 0.50f, h * 0.63f)
+            circuitYs.forEachIndexed { index, y ->
+                val offset = index * 18f
+                drawLine(
+                    color = if (index % 2 == 0) Color(0xFF11C7FF) else Color(0xFFB546FF),
+                    start = Offset(centerX - 95f, y),
+                    end = Offset(40f + offset, y),
+                    strokeWidth = 3f,
+                    cap = StrokeCap.Round
+                )
+                drawLine(
+                    color = if (index % 2 == 0) Color(0xFF11C7FF) else Color(0xFFB546FF),
+                    start = Offset(centerX + 95f, y),
+                    end = Offset(w - 40f - offset, y),
+                    strokeWidth = 3f,
+                    cap = StrokeCap.Round
+                )
+                drawCircle(
+                    color = if (index % 2 == 0) Color(0xFF11C7FF) else Color(0xFFB546FF),
+                    radius = 5f,
+                    center = Offset(40f + offset, y)
+                )
+                drawCircle(
+                    color = if (index % 2 == 0) Color(0xFF11C7FF) else Color(0xFFB546FF),
+                    radius = 5f,
+                    center = Offset(w - 40f - offset, y)
+                )
+            }
+
+            val outer = Path().apply {
+                moveTo(centerX, 14f)
+                lineTo(centerX + 78f, 52f)
+                lineTo(centerX + 70f, 118f)
+                quadraticBezierTo(centerX + 58f, 150f, centerX, 175f)
+                quadraticBezierTo(centerX - 58f, 150f, centerX - 70f, 118f)
+                lineTo(centerX - 78f, 52f)
                 close()
             }
-            drawPath(inner, color = Color(0xFF287DFF), style = Stroke(width = 3f))
+            val inner = Path().apply {
+                moveTo(centerX, 28f)
+                lineTo(centerX + 58f, 58f)
+                lineTo(centerX + 51f, 108f)
+                quadraticBezierTo(centerX + 42f, 132f, centerX, 149f)
+                quadraticBezierTo(centerX - 42f, 132f, centerX - 51f, 108f)
+                lineTo(centerX - 58f, 58f)
+                close()
+            }
+
+            drawPath(
+                path = outer,
+                brush = Brush.linearGradient(
+                    listOf(Color(0xFFE866FF), Color(0xFF37CFFF), Color(0xFF00B5FF))
+                ),
+                style = Stroke(width = 7f)
+            )
+            drawPath(
+                path = inner,
+                color = Color(0xFF56C8FF),
+                style = Stroke(width = 3.5f)
+            )
 
             drawArc(
-                color = Color(0xFFE35DFF),
+                color = Color(0xFFD980FF),
                 startAngle = 180f,
                 sweepAngle = 180f,
                 useCenter = false,
-                topLeft = Offset(w * 0.37f, h * 0.32f),
-                size = Size(w * 0.26f, h * 0.28f),
-                style = Stroke(width = 7f)
+                topLeft = Offset(centerX - 24f, 56f),
+                size = Size(48f, 52f),
+                style = Stroke(width = 8f)
             )
             drawRoundRect(
-                brush = Brush.linearGradient(listOf(Color(0xFFA53DFF), Color(0xFF21C8FF))),
-                topLeft = Offset(w * 0.34f, h * 0.47f),
-                size = Size(w * 0.32f, h * 0.28f),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(12f, 12f)
+                brush = Brush.verticalGradient(listOf(Color(0xFFB05CFF), Color(0xFF508DFF))),
+                topLeft = Offset(centerX - 30f, 80f),
+                size = Size(60f, 58f)
             )
-            drawCircle(
-                color = Color(0xFF06152B),
-                radius = w * 0.035f,
-                center = Offset(w * 0.50f, h * 0.59f)
+            drawCircle(Color(0xFF0D1732), radius = 10f, center = Offset(centerX, 108f))
+            drawLine(
+                color = Color(0xFF0D1732),
+                start = Offset(centerX, 116f),
+                end = Offset(centerX, 128f),
+                strokeWidth = 5f,
+                cap = StrokeCap.Round
             )
         }
     }
@@ -265,173 +331,258 @@ private fun NeonShieldLogo() {
 @Composable
 private fun LevelProgressCard(
     level: Int,
-    title: String,
-    xpInLevel: Int,
+    levelTitle: String,
+    currentXp: Int,
+    targetXp: Int,
     progress: Float
 ) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(
                 Brush.horizontalGradient(
-                    listOf(Color(0xFF141440), Color(0xFF071B37))
-                ),
-                RoundedCornerShape(24.dp)
-            )
-            .border(1.4.dp, Color(0xFF368BFF), RoundedCornerShape(24.dp))
-            .padding(16.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(82.dp)
-                    .background(
-                        Brush.linearGradient(listOf(Color(0xFF5928B9), Color(0xFF163C89))),
-                        RoundedCornerShape(24.dp)
+                    listOf(
+                        Color(0xFF0B1430),
+                        Color(0xFF07152E),
+                        Color(0xFF061024)
                     )
-                    .border(1.4.dp, Color(0xFFC05CFF), RoundedCornerShape(24.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("NIV.", color = Color(0xFFD8DBFF), fontSize = 11.sp)
-                    Text(level.toString(), color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Black)
-                }
+                ),
+                RoundedCornerShape(26.dp)
+            )
+            .border(1.5.dp, Color(0xFF2AAEFF), RoundedCornerShape(26.dp))
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        HexLevelBadge(level = level)
+        Spacer(Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(levelTitle, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "$currentXp / $targetXp XP",
+                color = Color(0xFF21E3FF),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(12.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(20.dp)),
+                color = CyberPurple,
+                trackColor = Color(0xFF223A67)
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        BarsMiniIcon()
+    }
+}
+
+@Composable
+private fun HexLevelBadge(level: Int) {
+    Box(
+        modifier = Modifier.size(104.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val path = Path().apply {
+                moveTo(w * 0.50f, h * 0.06f)
+                lineTo(w * 0.84f, h * 0.26f)
+                lineTo(w * 0.84f, h * 0.74f)
+                lineTo(w * 0.50f, h * 0.94f)
+                lineTo(w * 0.16f, h * 0.74f)
+                lineTo(w * 0.16f, h * 0.26f)
+                close()
             }
-
-            Spacer(Modifier.width(15.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text(
-                    "$xpInLevel / 100 XP",
-                    color = Color(0xFF1CE2FF),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(10.dp))
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(50)),
-                    color = Color(0xFFA434FF),
-                    trackColor = Color(0xFF22345C)
-                )
-            }
-
-            Spacer(Modifier.width(8.dp))
-            Text("▁▃▅", color = Color(0xFF36A1FF), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            drawPath(
+                path = path,
+                brush = Brush.linearGradient(
+                    listOf(Color(0xFFE163FF), Color(0xFF00CFFF))
+                ),
+                style = Stroke(width = 6f)
+            )
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("NIV.", color = Color(0xFFE8ECFF), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text(level.toString(), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
         }
     }
 }
 
 @Composable
-private fun MockupMenuButton(
+private fun BarsMiniIcon() {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.Bottom,
+        modifier = Modifier.height(42.dp)
+    ) {
+        Box(Modifier.width(8.dp).height(16.dp).background(Color(0xFF52C8FF), RoundedCornerShape(3.dp)))
+        Box(Modifier.width(8.dp).height(24.dp).background(Color(0xFF52C8FF), RoundedCornerShape(3.dp)))
+        Box(Modifier.width(8.dp).height(34.dp).background(Color(0xFF52C8FF), RoundedCornerShape(3.dp)))
+    }
+}
+
+private enum class HomeIconKind { Play, Bars, Grid }
+
+@Composable
+private fun MenuActionCard(
     title: String,
     subtitle: String,
-    symbol: String,
-    borderColor: Color,
-    startColor: Color,
-    endColor: Color,
+    accent: Color,
+    accentDark: Color,
+    iconKind: HomeIconKind,
     onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(84.dp)
+            .height(92.dp)
             .background(
-                Brush.horizontalGradient(listOf(startColor, endColor)),
-                RoundedCornerShape(22.dp)
+                Brush.horizontalGradient(
+                    listOf(
+                        accentDark,
+                        accent.copy(alpha = 0.18f),
+                        Color(0xFF081327)
+                    )
+                ),
+                RoundedCornerShape(24.dp)
             )
-            .border(1.6.dp, borderColor, RoundedCornerShape(22.dp))
+            .border(2.dp, accent, RoundedCornerShape(24.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 17.dp),
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(50.dp)
-                .background(Color.White.copy(alpha = 0.055f), RoundedCornerShape(14.dp)),
+                .width(76.dp)
+                .fillMaxHeight(),
             contentAlignment = Alignment.Center
         ) {
-            Text(symbol, color = borderColor, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+            HomeActionIcon(iconKind = iconKind, accent = accent)
         }
-
-        Spacer(Modifier.width(15.dp))
-
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(1.dp)
+                .background(accent.copy(alpha = 0.22f))
+        )
+        Spacer(Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = Color(0xFFCBD4F6), fontSize = 13.sp)
+            Text(subtitle, color = Color(0xFFCBD4F8), fontSize = 13.sp)
         }
-
-        Text("›", color = Color.White, fontSize = 34.sp)
+        Text("›", color = Color.White, fontSize = 36.sp)
     }
 }
 
 @Composable
-private fun MockupStatCard(
+private fun HomeActionIcon(iconKind: HomeIconKind, accent: Color) {
+    Canvas(modifier = Modifier.size(34.dp)) {
+        when (iconKind) {
+            HomeIconKind.Play -> {
+                val path = Path().apply {
+                    moveTo(size.width * 0.25f, size.height * 0.15f)
+                    lineTo(size.width * 0.80f, size.height * 0.50f)
+                    lineTo(size.width * 0.25f, size.height * 0.85f)
+                    close()
+                }
+                drawPath(path, color = Color.White)
+            }
+            HomeIconKind.Bars -> {
+                val barW = size.width * 0.18f
+                drawRoundRect(accent, topLeft = Offset(size.width * 0.08f, size.height * 0.52f), size = Size(barW, size.height * 0.28f))
+                drawRoundRect(accent, topLeft = Offset(size.width * 0.40f, size.height * 0.35f), size = Size(barW, size.height * 0.45f))
+                drawRoundRect(accent, topLeft = Offset(size.width * 0.72f, size.height * 0.16f), size = Size(barW, size.height * 0.64f))
+            }
+            HomeIconKind.Grid -> {
+                val cell = size.width * 0.28f
+                val gap = size.width * 0.12f
+                val xs = listOf(0f, cell + gap)
+                val ys = listOf(0f, cell + gap)
+                xs.forEach { x ->
+                    ys.forEach { y ->
+                        drawRoundRect(accent, topLeft = Offset(x, y), size = Size(cell, cell))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatMiniCard(
     symbol: String,
     value: String,
     label: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    accent: Color
 ) {
     Column(
         modifier = modifier
-            .height(106.dp)
-            .background(Color(0xFF081229), RoundedCornerShape(17.dp))
-            .border(1.dp, Color(0xFF214894), RoundedCornerShape(17.dp))
-            .padding(horizontal = 5.dp, vertical = 10.dp),
+            .height(108.dp)
+            .background(Color(0xFF071123).copy(alpha = 0.96f), RoundedCornerShape(18.dp))
+            .border(1.dp, Color(0xFF214B85), RoundedCornerShape(18.dp))
+            .padding(horizontal = 4.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(symbol, fontSize = 18.sp)
-        Text(value, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        Text(label, color = Color(0xFF9EA9CE), fontSize = 9.sp, textAlign = TextAlign.Center, lineHeight = 12.sp)
+        Text(symbol, color = accent, fontSize = 22.sp)
+        Spacer(Modifier.height(4.dp))
+        Text(value, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(2.dp))
+        Text(label, color = Color(0xFFC9D0F3), fontSize = 9.sp, textAlign = TextAlign.Center, lineHeight = 11.sp)
     }
 }
 
 @Composable
-private fun CyberGlobeFooter() {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
+private fun GlobeFooter() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(155.dp),
+        contentAlignment = Alignment.BottomCenter
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-                .background(
-                    Brush.radialGradient(
-                        listOf(
-                            Color(0xFF006CFF).copy(alpha = 0.25f),
-                            Color(0xFF5D24FF).copy(alpha = 0.09f),
-                            Color.Transparent
-                        )
-                    )
-                ),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            Canvas(Modifier.size(width = 260.dp, height = 105.dp)) {
-                val stroke = Stroke(width = 2f)
-                val c = Color(0xFF147CFF).copy(alpha = 0.75f)
-                drawArc(c, 180f, 180f, false, style = stroke)
-                drawArc(c, 195f, 150f, false, topLeft = Offset(size.width * .18f, 7f), size = Size(size.width * .64f, size.height * .86f), style = stroke)
-                drawArc(c, 205f, 130f, false, topLeft = Offset(size.width * .34f, 10f), size = Size(size.width * .32f, size.height * .80f), style = stroke)
-                repeat(4) { i ->
-                    val y = size.height * (0.42f + i * 0.11f)
-                    drawLine(c, Offset(size.width * .10f, y), Offset(size.width * .90f, y), strokeWidth = 1.2f)
-                }
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val arcTop = h * 0.35f
+            val arcSize = Size(w * 1.1f, h * 1.25f)
+            val arcLeft = -w * 0.05f
+
+            for (i in 0..4) {
+                drawArc(
+                    color = if (i == 0) Color(0xFF2AC6FF) else Color(0xFF315D9B),
+                    startAngle = 200f,
+                    sweepAngle = 140f,
+                    useCenter = false,
+                    topLeft = Offset(arcLeft, arcTop + i * 10f),
+                    size = Size(arcSize.width, arcSize.height - i * 22f),
+                    style = Stroke(width = if (i == 0) 3f else 1.5f)
+                )
+            }
+
+            val centerX = w / 2f
+            for (i in -3..3) {
+                drawLine(
+                    color = Color(0xFF2E5A93),
+                    start = Offset(centerX + i * 28f, h * 0.62f),
+                    end = Offset(centerX + i * 18f, h * 0.98f),
+                    strokeWidth = 1.4f
+                )
             }
         }
 
         Text(
             text = "UN MONDE PLUS SÛR\nCOMMENCE PAR TOI",
-            color = Color(0xFFB9C6EE),
+            color = Color(0xFFD6DCF8),
             textAlign = TextAlign.Center,
-            fontSize = 10.sp,
-            letterSpacing = 2.2.sp,
-            lineHeight = 16.sp
+            fontSize = 12.sp,
+            letterSpacing = 3.sp,
+            lineHeight = 20.sp,
+            modifier = Modifier.padding(bottom = 8.dp)
         )
     }
 }
@@ -456,7 +607,7 @@ fun QuizScreen(vm: QuizViewModel, onHome: () -> Unit) {
         }
 
         when (state) {
-            QuizUiState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+            QuizUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
 
@@ -528,7 +679,7 @@ fun StatisticsScreen(vm: QuizViewModel, onBack: () -> Unit) {
             Text("$rate%", style = MaterialTheme.typography.displaySmall, color = CyberPurple)
             LinearProgressIndicator(
                 progress = { rate / 100f },
-                Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 color = CyberPurple,
                 trackColor = CyberSurface
             )
