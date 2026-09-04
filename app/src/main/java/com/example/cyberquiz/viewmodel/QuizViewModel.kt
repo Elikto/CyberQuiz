@@ -125,23 +125,48 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val p = repo.progressSnapshot(currentQuizType) ?: emptyProgress(currentQuizType)
             val ok = index == current.correctIndex
-            val newStreak = if (ok) p.streak + 1 else 0
-            val best = maxOf(p.bestStreak, newStreak)
-            val gainedXp = if (ok) {
-                10 + when (current.difficulty) {
+            val isReview = _reviewMode.value
+            val concept = correctAnswer(current).trim()
+            val reviewItemBefore = if (
+                isReview && currentQuizType == CYBERSECURITY && concept.isNotBlank()
+            ) {
+                dao.reviewItemSnapshot(CYBERSECURITY, concept)
+            } else {
+                null
+            }
+
+            // Un retest est un exercice de révision séparé : il ne doit pas permettre
+            // de farmer l'XP, la série ou les statistiques globales.
+            // Le bonus de 5 XP n'est accordé qu'à la toute première réussite après l'erreur.
+            val firstReviewSuccess = isReview &&
+                ok &&
+                reviewItemBefore != null &&
+                reviewItemBefore.correctAfterWrongCount == 0
+
+            val gainedXp = when {
+                isReview -> if (firstReviewSuccess) 5 else 0
+                ok -> 10 + when (current.difficulty) {
                     "HARD" -> 10
                     "MEDIUM" -> 5
                     else -> 0
                 }
+                else -> 0
+            }
+
+            val newStreak = if (isReview) {
+                p.streak
+            } else if (ok) {
+                p.streak + 1
             } else {
                 0
             }
+            val best = if (isReview) p.bestStreak else maxOf(p.bestStreak, newStreak)
             val newXp = p.xp + gainedXp
             val newLevel = (newXp / 100) + 1
-            val newAnswered = p.answered + 1
-            val newCorrect = p.correct + if (ok) 1 else 0
+            val newAnswered = if (isReview) p.answered else p.answered + 1
+            val newCorrect = if (isReview) p.correct else p.correct + if (ok) 1 else 0
 
-            if (!_reviewMode.value) {
+            if (!isReview) {
                 repo.markSeen(current.id)
             }
 
