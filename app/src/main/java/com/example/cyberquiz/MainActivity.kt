@@ -67,6 +67,7 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
     var screen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
     var previousScreen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
     var selectedQuizTypeName by rememberSaveable { mutableStateOf(storedQuizTypeName) }
+    var highlightedReviewConcept by rememberSaveable { mutableStateOf<String?>(null) }
 
     val selectedQuizType = QuizType.entries.firstOrNull { it.name == selectedQuizTypeName }
         ?: QuizType.CYBERSECURITY
@@ -116,6 +117,7 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
             },
             onReview = {
                 if (selectedQuizType == QuizType.CYBERSECURITY) {
+                    highlightedReviewConcept = null
                     navigateTo(AppScreen.REVIEW)
                 }
             },
@@ -132,7 +134,11 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
             if (selectedQuizType == QuizType.CYBERSECURITY) {
                 StatisticsScreenV3(
                     vm = vm,
-                    onBack = { goBack() }
+                    onBack = { goBack() },
+                    onReviewConcept = { concept ->
+                        highlightedReviewConcept = concept
+                        navigateTo(AppScreen.REVIEW)
+                    }
                 )
             } else {
                 StatisticsScreenV2(
@@ -151,6 +157,7 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
 
         AppScreen.REVIEW -> ReviewScreen(
             vm = vm,
+            highlightedConcept = highlightedReviewConcept,
             onBack = { goBack() },
             onPractice = { item ->
                 vm.startReviewQuestion(item.quizType, item.questionId)
