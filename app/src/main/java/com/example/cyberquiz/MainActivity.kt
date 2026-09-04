@@ -2,6 +2,7 @@ package com.example.cyberquiz
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
@@ -45,12 +46,30 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun CyberQuizApp(
-    vm: QuizViewModel = viewModel()
-) {
+private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
     var screen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
+    var previousScreen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
     var selectedQuizTypeName by rememberSaveable { mutableStateOf(QuizType.CYBERSECURITY.name) }
     val selectedQuizType = QuizType.valueOf(selectedQuizTypeName)
+
+    fun navigateTo(destination: AppScreen) {
+        if (destination != screen) {
+            previousScreen = screen
+            screen = destination
+        }
+    }
+
+    fun goBack() {
+        if (screen != AppScreen.HOME) {
+            val destination = previousScreen
+            screen = destination
+            previousScreen = AppScreen.HOME
+        }
+    }
+
+    BackHandler(enabled = screen != AppScreen.HOME) {
+        goBack()
+    }
 
     when (screen) {
         AppScreen.HOME -> HomeScreenV2(
@@ -59,66 +78,52 @@ private fun CyberQuizApp(
             onQuiz = {
                 if (selectedQuizType.available) {
                     vm.start()
-                    screen = AppScreen.QUIZ
+                    navigateTo(AppScreen.QUIZ)
                 } else {
-                    screen = AppScreen.UNAVAILABLE_QUIZ
+                    navigateTo(AppScreen.UNAVAILABLE_QUIZ)
                 }
             },
-            onStats = {
-                screen = AppScreen.STATS
-            },
+            onStats = { navigateTo(AppScreen.STATS) },
             onCategories = {
                 if (selectedQuizType.available) {
-                    screen = AppScreen.CATEGORIES
+                    navigateTo(AppScreen.CATEGORIES)
                 } else {
-                    screen = AppScreen.UNAVAILABLE_QUIZ
+                    navigateTo(AppScreen.UNAVAILABLE_QUIZ)
                 }
             },
-            onProfile = {
-                screen = AppScreen.PROFILE
-            },
-            onSettings = {
-                screen = AppScreen.SETTINGS
-            }
+            onProfile = { navigateTo(AppScreen.PROFILE) },
+            onSettings = { navigateTo(AppScreen.SETTINGS) }
         )
 
         AppScreen.QUIZ -> QuizScreen(
             vm = vm,
-            onHome = {
-                screen = AppScreen.HOME
-            }
+            onHome = { goBack() }
         )
 
         AppScreen.STATS -> StatisticsScreen(
             vm = vm,
-            onBack = {
-                screen = AppScreen.HOME
-            }
+            onBack = { goBack() }
         )
 
         AppScreen.CATEGORIES -> CategoriesScreen(
             vm = vm,
-            onBack = {
-                screen = AppScreen.HOME
-            },
-            onHome = {
-                screen = AppScreen.QUIZ
-            }
+            onBack = { goBack() },
+            onHome = { navigateTo(AppScreen.QUIZ) }
         )
 
         AppScreen.PROFILE -> ProfileScreen(
             selectedQuizType = selectedQuizType,
             onQuizTypeSelected = { selectedQuizTypeName = it.name },
-            onBack = { screen = AppScreen.HOME }
+            onBack = { goBack() }
         )
 
         AppScreen.SETTINGS -> SettingsScreen(
-            onBack = { screen = AppScreen.HOME }
+            onBack = { goBack() }
         )
 
         AppScreen.UNAVAILABLE_QUIZ -> QuizUnavailableScreen(
             quizType = selectedQuizType,
-            onBack = { screen = AppScreen.HOME }
+            onBack = { goBack() }
         )
     }
 }
