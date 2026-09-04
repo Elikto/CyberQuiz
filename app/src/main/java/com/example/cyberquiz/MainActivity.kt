@@ -14,14 +14,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.cyberquiz.ui.screens.CategoriesScreenV2
+import com.example.cyberquiz.ui.screens.CategoriesScreenV3
 import com.example.cyberquiz.ui.screens.HomeScreenV2
-import com.example.cyberquiz.ui.screens.ProfileScreenV2
+import com.example.cyberquiz.ui.screens.ProfileScreenV3
 import com.example.cyberquiz.ui.screens.QuizScreenV4
 import com.example.cyberquiz.ui.screens.QuizType
 import com.example.cyberquiz.ui.screens.QuizUnavailableScreen
 import com.example.cyberquiz.ui.screens.SettingsScreenV2
 import com.example.cyberquiz.ui.screens.StatisticsScreenV2
+import com.example.cyberquiz.ui.screens.isPlayableNow
 import com.example.cyberquiz.ui.theme.CyberQuizTheme
 import com.example.cyberquiz.viewmodel.QuizViewModel
 
@@ -90,8 +91,8 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
             vm = vm,
             selectedQuizType = selectedQuizType,
             onQuiz = {
-                if (selectedQuizType.available) {
-                    vm.start()
+                if (selectedQuizType.isPlayableNow()) {
+                    vm.start(quizType = selectedQuizType.name)
                     navigateTo(AppScreen.QUIZ)
                 } else {
                     navigateTo(AppScreen.UNAVAILABLE_QUIZ)
@@ -99,7 +100,7 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
             },
             onStats = { navigateTo(AppScreen.STATS) },
             onCategories = {
-                if (selectedQuizType.available) {
+                if (selectedQuizType.isPlayableNow()) {
                     navigateTo(AppScreen.CATEGORIES)
                 } else {
                     navigateTo(AppScreen.UNAVAILABLE_QUIZ)
@@ -119,13 +120,14 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
             onBack = { goBack() }
         )
 
-        AppScreen.CATEGORIES -> CategoriesScreenV2(
+        AppScreen.CATEGORIES -> CategoriesScreenV3(
             vm = vm,
+            selectedQuizType = selectedQuizType,
             onBack = { goBack() },
             onQuiz = { navigateTo(AppScreen.QUIZ) }
         )
 
-        AppScreen.PROFILE -> ProfileScreenV2(
+        AppScreen.PROFILE -> ProfileScreenV3(
             selectedQuizType = selectedQuizType,
             onQuizTypeSelected = { type ->
                 selectedQuizTypeName = type.name
