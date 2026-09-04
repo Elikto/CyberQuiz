@@ -35,6 +35,30 @@ interface QuizDao {
     @Insert
     suspend fun insertAll(questions: List<QuestionEntity>)
 
+    @Query(
+        "UPDATE questions SET question=:newQuestion, answerA=:answerA, answerB=:answerB, answerC=:answerC, answerD=:answerD, explanation=:explanation WHERE quizType=:quizType AND question=:oldQuestion"
+    )
+    suspend fun rewriteQuestion(
+        quizType: String,
+        oldQuestion: String,
+        newQuestion: String,
+        answerA: String,
+        answerB: String,
+        answerC: String,
+        answerD: String,
+        explanation: String
+    )
+
+    @Query(
+        "UPDATE review_items SET question=:newQuestion, concept=:newCorrectAnswer, correctAnswer=:newCorrectAnswer WHERE quizType=:quizType AND question=:oldQuestion"
+    )
+    suspend fun rewriteReviewItem(
+        quizType: String,
+        oldQuestion: String,
+        newQuestion: String,
+        newCorrectAnswer: String
+    )
+
     @Query("SELECT * FROM progress WHERE quizType = :quizType LIMIT 1")
     fun progress(quizType: String): Flow<ProgressEntity?>
 
