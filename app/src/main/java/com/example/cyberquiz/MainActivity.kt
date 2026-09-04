@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -15,13 +16,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cyberquiz.ui.screens.CategoriesScreenV3
-import com.example.cyberquiz.ui.screens.HomeScreenV2
 import com.example.cyberquiz.ui.screens.ProfileScreenV3
 import com.example.cyberquiz.ui.screens.QuizScreenV4
 import com.example.cyberquiz.ui.screens.QuizType
 import com.example.cyberquiz.ui.screens.QuizUnavailableScreen
 import com.example.cyberquiz.ui.screens.SettingsScreenV2
 import com.example.cyberquiz.ui.screens.StatisticsScreenV2
+import com.example.cyberquiz.ui.screens.UniverseHomeScreen
 import com.example.cyberquiz.ui.screens.isPlayableNow
 import com.example.cyberquiz.ui.theme.CyberQuizTheme
 import com.example.cyberquiz.viewmodel.QuizViewModel
@@ -67,6 +68,10 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
     val selectedQuizType = QuizType.entries.firstOrNull { it.name == selectedQuizTypeName }
         ?: QuizType.CYBERSECURITY
 
+    LaunchedEffect(selectedQuizType.name) {
+        vm.selectQuizType(selectedQuizType.name)
+    }
+
     fun navigateTo(destination: AppScreen) {
         if (destination != screen) {
             previousScreen = screen
@@ -87,7 +92,7 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
     }
 
     when (screen) {
-        AppScreen.HOME -> HomeScreenV2(
+        AppScreen.HOME -> UniverseHomeScreen(
             vm = vm,
             selectedQuizType = selectedQuizType,
             onQuiz = {
