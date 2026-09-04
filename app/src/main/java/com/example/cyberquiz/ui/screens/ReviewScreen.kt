@@ -86,12 +86,12 @@ fun ReviewScreen(
             .filterNotNull()
             .first()
 
-        delay(90)
+        delay(20)
         scrollState.animateScrollTo(
             value = cardY.coerceIn(0, scrollState.maxValue),
-            animationSpec = tween(durationMillis = 650)
+            animationSpec = tween(durationMillis = 420)
         )
-        delay(130)
+        delay(25)
         highlightPulseReady = true
     }
 
@@ -338,8 +338,8 @@ private fun ReviewItemCard(
         if (flashHighlight) {
             glow.snapTo(0f)
             repeat(2) {
-                glow.animateTo(1f, animationSpec = tween(durationMillis = 220))
-                glow.animateTo(0f, animationSpec = tween(durationMillis = 300))
+                glow.animateTo(1f, animationSpec = tween(durationMillis = 480))
+                glow.animateTo(0f, animationSpec = tween(durationMillis = 620))
             }
         } else {
             glow.snapTo(0f)
