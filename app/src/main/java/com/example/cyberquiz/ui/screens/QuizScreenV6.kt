@@ -415,7 +415,7 @@ private fun ExplanationCardV6(
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text("En savoir plus", color = Q6Cyan, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text("Définitions · analyse · explication détaillée · schéma", color = Q6Muted, fontSize = 10.sp)
+                Text("Comprendre tous les choix puis approfondir celui que tu veux", color = Q6Muted, fontSize = 10.sp)
             }
             Text("›", color = Q6Cyan, fontSize = 23.sp)
         }
@@ -434,9 +434,6 @@ private fun DetailedLearnMoreDialogV6(
     var selectedChoice by remember(question) { mutableStateOf<Int?>(null) }
     val correctAnswer = answers.getOrElse(correctIndex) { "Réponse correcte" }
     val correctLetter = ('A'.code + correctIndex).toChar().toString()
-    val lesson = remember(question, category, answers, correctIndex, explanation) {
-        buildCyberDetailedLesson(question, category, answers, correctIndex, explanation)
-    }
 
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -461,7 +458,7 @@ private fun DetailedLearnMoreDialogV6(
                 }
                 Spacer(Modifier.width(11.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Comprendre la notion", color = Q6Text, fontSize = 19.sp, fontWeight = FontWeight.Black)
+                    Text("Comprendre tous les choix", color = Q6Text, fontSize = 19.sp, fontWeight = FontWeight.Black)
                     Text(category.uppercase(), color = Q6Blue, fontSize = 9.sp, letterSpacing = 1.4.sp, fontWeight = FontWeight.Bold)
                 }
                 Box(
@@ -499,7 +496,7 @@ private fun DetailedLearnMoreDialogV6(
 
             LearnSectionTitleV6("COMPRENDRE CHAQUE PROPOSITION")
             Text(
-                "Chaque choix est une notion à connaître, même lorsqu'il n'est pas la bonne réponse.",
+                "D'abord, voici un résumé rapide de chaque terme : ce qu'il signifie et à quoi il sert.",
                 color = Q6Muted,
                 fontSize = 12.sp,
                 lineHeight = 17.sp
@@ -513,9 +510,9 @@ private fun DetailedLearnMoreDialogV6(
                 )
             }
 
-            LearnSectionTitleV6("ANALYSER UN CHOIX")
+            LearnSectionTitleV6("ANALYSER UNE RÉPONSE")
             Text(
-                "Choisis A, B, C ou D pour comprendre pourquoi cette proposition répond — ou non — à l'énoncé.",
+                "Choisis ensuite A, B, C ou D. L'explication détaillée apparaîtra uniquement pour le choix que tu veux approfondir.",
                 color = Q6Muted,
                 fontSize = 12.sp,
                 lineHeight = 17.sp
@@ -528,61 +525,67 @@ private fun DetailedLearnMoreDialogV6(
                 ChoiceInspectButtonV6(3, selectedChoice, correctIndex, Modifier.weight(1f)) { selectedChoice = 3 }
             }
 
-            selectedChoice?.let { index ->
-                val chosen = answers.getOrElse(index) { "" }
-                val isCorrect = index == correctIndex
-                val accent = if (isCorrect) Q6Green else Q6Red
-                val letter = ('A'.code + index).toChar().toString()
-
-                Column(
+            if (selectedChoice == null) {
+                Box(
                     Modifier
                         .fillMaxWidth()
-                        .background(accent.copy(alpha = .08f), RoundedCornerShape(18.dp))
-                        .border(1.dp, accent.copy(alpha = .48f), RoundedCornerShape(18.dp))
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(7.dp)
+                        .background(Q6Blue.copy(alpha = .06f), RoundedCornerShape(16.dp))
+                        .border(1.dp, Q6Blue.copy(alpha = .25f), RoundedCornerShape(16.dp))
+                        .padding(14.dp)
                 ) {
                     Text(
-                        if (isCorrect) "$letter · Cette proposition répond exactement à la question" else "$letter · Cette proposition ne répond pas exactement à la question",
-                        color = accent,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text("« $chosen »", color = Q6Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        explainCyberChoice(chosen, category),
-                        color = Color(0xFFD3DCF4),
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp
-                    )
-                    Text(
-                        if (isCorrect) {
-                            "Dans cet énoncé, c'est précisément cette fonction qui est demandée. $explanation"
-                        } else {
-                            "Le terme est réel et peut appartenir au même domaine, mais sa fonction ne correspond pas au rôle précis demandé ici. La bonne réponse est « $correctAnswer »."
-                        },
-                        color = Color(0xFFB8C6E9),
+                        "Sélectionne un choix ci-dessus pour afficher sa définition complète, son fonctionnement, un exemple, un schéma et la conclusion pour cette question.",
+                        color = Color(0xFFC8D4F2),
                         fontSize = 12.sp,
                         lineHeight = 18.sp
                     )
                 }
             }
 
-            LearnSectionTitleV6("EXPLICATION DÉTAILLÉE")
-            DetailedLessonCardV6(lesson)
+            selectedChoice?.let { index ->
+                val chosen = answers.getOrElse(index) { "" }
+                val isCorrect = index == correctIndex
+                val letter = ('A'.code + index).toChar().toString()
+                val deepDive = remember(chosen, category) {
+                    buildCyberChoiceDeepDive(chosen, category)
+                }
 
-            LearnSectionTitleV6("SCHÉMA SIMPLIFIÉ")
-            Text(
-                "Le schéma montre le raisonnement général du domaine. Il est volontairement simplifié pour faciliter la mémorisation.",
-                color = Q6Muted,
-                fontSize = 11.sp,
-                lineHeight = 16.sp
-            )
-            LearningSchemaV6(lesson.schema)
+                LearnSectionTitleV6("EXPLICATION DÉTAILLÉE · CHOIX $letter")
+                DetailedChoiceCardV6(chosen, deepDive)
+
+                LearnSectionTitleV6("SCHÉMA · $chosen")
+                Text(
+                    "Ce schéma simplifie le fonctionnement pour t'aider à visualiser l'enchaînement.",
+                    color = Q6Muted,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp
+                )
+                LearningSchemaV6(deepDive.schema)
+
+                LearnSectionTitleV6("CONCLUSION POUR CETTE QUESTION")
+                val conclusionAccent = if (isCorrect) Q6Green else Q6Orange
+                Text(
+                    buildCyberChoiceConclusion(
+                        chosen = chosen,
+                        category = category,
+                        correctAnswer = correctAnswer,
+                        isCorrect = isCorrect,
+                        explanation = explanation
+                    ),
+                    color = Color(0xFFD7E0F7),
+                    fontSize = 12.sp,
+                    lineHeight = 19.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(conclusionAccent.copy(alpha = .08f), RoundedCornerShape(17.dp))
+                        .border(1.dp, conclusionAccent.copy(alpha = .32f), RoundedCornerShape(17.dp))
+                        .padding(14.dp)
+                )
+            }
 
             LearnSectionTitleV6("À RETENIR")
             Text(
-                lesson.takeaway,
+                "Tu n'as pas besoin de mémoriser seulement la bonne réponse : l'objectif est de savoir dire en une phrase à quoi sert chacun des quatre choix. Si deux termes te paraissent proches, ouvre leur analyse l'un après l'autre et compare leurs fonctions.",
                 color = Color(0xFFC9D4F3),
                 fontSize = 12.sp,
                 lineHeight = 18.sp,
@@ -631,7 +634,7 @@ private fun ChoiceDefinitionCardV6(index: Int, answer: String, category: String,
             if (correct) Text("BONNE", color = Q6Green, fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
         }
         Text(
-            explainCyberChoice(answer, category),
+            summarizeCyberChoice(answer, category),
             color = Color(0xFFC9D4F0),
             fontSize = 11.sp,
             lineHeight = 17.sp
@@ -668,7 +671,7 @@ private fun ChoiceInspectButtonV6(
 }
 
 @Composable
-private fun DetailedLessonCardV6(lesson: CyberDetailedLesson) {
+private fun DetailedChoiceCardV6(term: String, lesson: CyberChoiceDeepDive) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -677,10 +680,11 @@ private fun DetailedLessonCardV6(lesson: CyberDetailedLesson) {
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        LessonParagraphV6("1 · LA NOTION", lesson.concept, Q6Cyan)
-        LessonParagraphV6("2 · COMMENT ÇA FONCTIONNE", lesson.mechanism, Q6Blue)
-        LessonParagraphV6("3 · EXEMPLE CONCRET", lesson.example, Q6Green)
-        LessonParagraphV6("4 · LE PIÈGE À ÉVITER", lesson.confusion, Q6Orange)
+        Text(term, color = Q6Text, fontSize = 17.sp, fontWeight = FontWeight.Black)
+        LessonParagraphV6("1 · DÉFINITION", lesson.definition, Q6Cyan)
+        LessonParagraphV6("2 · À QUOI ÇA SERT ?", lesson.action, Q6Blue)
+        LessonParagraphV6("3 · COMMENT ÇA FONCTIONNE ?", lesson.details, Q6Purple)
+        LessonParagraphV6("4 · EXEMPLE CONCRET", lesson.example, Q6Green)
     }
 }
 
