@@ -1,5 +1,7 @@
 package com.example.cyberquiz.ui.screens
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,14 +20,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cyberquiz.data.database.ReviewItemEntity
 import com.example.cyberquiz.viewmodel.QuizViewModel
+import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 private val ReviewPurple = Color(0xFFD652FF)
 private val ReviewBlue = Color(0xFF19BFFF)
@@ -42,6 +52,7 @@ fun ReviewScreen(
     highlightedConcept: String? = null
 ) {
     val items by vm.reviewItems.collectAsState()
+    val scrollState = rememberScrollState()
     var courseTerm by remember { mutableStateOf<String?>(null) }
     var courseCategory by remember { mutableStateOf("") }
 
@@ -56,6 +67,15 @@ fun ReviewScreen(
     }
     val mastered = items.filter { it.mastered }
 
+    var highlightedCardY by remember(highlightedItem?.id) { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(highlightedItem?.id, highlightedCardY) {
+        val cardY = highlightedCardY ?: return@LaunchedEffect
+        if (highlightedItem == null) return@LaunchedEffect
+        delay(120)
+        scrollState.animateScrollTo(cardY.coerceAtLeast(0))
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -66,7 +86,7 @@ fun ReviewScreen(
             )
             .statusBarsPadding()
             .navigationBarsPadding()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
@@ -114,6 +134,15 @@ fun ReviewScreen(
                     ReviewItemCard(
                         item = item,
                         highlighted = isHighlighted,
+                        modifier = if (isHighlighted) {
+                            Modifier.onGloballyPositioned { coordinates ->
+                                highlightedCardY = (
+                                    coordinates.positionInParent().y + scrollState.value
+                                ).roundToInt()
+                            }
+                        } else {
+                            Modifier
+                        },
                         onCourse = if (hasCyberExpertCourse(item.concept)) {
                             {
                                 courseTerm = item.concept
@@ -183,21 +212,14 @@ private fun SelectedFromStatsBanner() {
             Text("↳", color = ReviewCyan, fontSize = 16.sp, fontWeight = FontWeight.Black)
         }
         Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                "QUESTION SÉLECTIONNÉE DEPUIS STATISTIQUES",
-                color = ReviewCyan,
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 1.1.sp
-            )
-            Text(
-                "La question concernée est placée juste en dessous et mise en surbrillance.",
-                color = Color(0xFFD2DCF4),
-                fontSize = 10.sp,
-                lineHeight = 15.sp
-            )
-        }
+        Text(
+            "QUESTION SÉLECTIONNÉE DEPUIS STATISTIQUES",
+            color = ReviewCyan,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = 1.1.sp,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
@@ -277,6 +299,7 @@ private fun SectionTitleReview(text: String) {
 private fun ReviewItemCard(
     item: ReviewItemEntity,
     highlighted: Boolean,
+    modifier: Modifier = Modifier,
     onCourse: (() -> Unit)?,
     onPractice: () -> Unit
 ) {
@@ -286,10 +309,50 @@ private fun ReviewItemCard(
         else -> ReviewOrange
     }
     val borderWidth = if (highlighted) 2.dp else 1.2.dp
+    val glow = remember(item.id) { Animatable(0f) }
+
+    LaunchedEffect(highlighted) {
+        if (highlighted) {
+            glow.snapTo(0f)
+            repeat(2) {
+                glow.animateTo(1f, animationSpec = tween(durationMillis = 240))
+                glow.animateTo(0f, animationSpec = tween(durationMillis = 280))
+            }
+        } else {
+            glow.snapTo(0f)
+        }
+    }
 
     Column(
-        Modifier
+        modifier
             .fillMaxWidth()
+            .drawWithContent {
+                drawContent()
+                if (highlighted && glow.value > 0f) {
+                    val radius = 21.dp.toPx()
+                    val pulse = glow.value.coerceIn(0f, 1f)
+                    drawRoundRect(
+                        color = Color.White.copy(alpha = 0.16f * pulse),
+                        topLeft = androidx.compose.ui.geometry.Offset(3.dp.toPx(), 3.dp.toPx()),
+                        size = androidx.compose.ui.geometry.Size(
+                            size.width - 6.dp.toPx(),
+                            size.height - 6.dp.toPx()
+                        ),
+                        cornerRadius = CornerRadius(radius, radius),
+                        style = Stroke(width = 7.dp.toPx())
+                    )
+                    drawRoundRect(
+                        color = Color.White.copy(alpha = 0.90f * pulse),
+                        topLeft = androidx.compose.ui.geometry.Offset(1.5.dp.toPx(), 1.5.dp.toPx()),
+                        size = androidx.compose.ui.geometry.Size(
+                            size.width - 3.dp.toPx(),
+                            size.height - 3.dp.toPx()
+                        ),
+                        cornerRadius = CornerRadius(radius, radius),
+                        style = Stroke(width = 1.5.dp.toPx())
+                    )
+                }
+            }
             .background(
                 Brush.linearGradient(
                     if (highlighted) {
@@ -400,7 +463,7 @@ private fun ReviewItemCard(
             }
             SmallReviewButton(
                 text = "Me retester",
-                accent = if (highlighted) ReviewPurple else ReviewPurple,
+                accent = ReviewPurple,
                 modifier = Modifier.weight(1f),
                 onClick = onPractice
             )
