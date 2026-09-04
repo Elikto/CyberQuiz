@@ -8,6 +8,7 @@ import com.example.cyberquiz.data.database.ProgressEntity
 import com.example.cyberquiz.data.database.QuestionEntity
 import com.example.cyberquiz.data.repository.QuizRepository
 import com.example.cyberquiz.model.Category
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,7 @@ data class AnswerResult(
     val question: QuestionEntity
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class QuizViewModel(app: Application) : AndroidViewModel(app) {
     private val dao = CyberQuizDatabase.get(app).quizDao()
     private val repo = QuizRepository(dao)
