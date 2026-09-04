@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +35,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.cyberquiz.ui.theme.CyberBackground
 import com.example.cyberquiz.viewmodel.QuizUiState
 import com.example.cyberquiz.viewmodel.QuizViewModel
+import kotlinx.coroutines.delay
 
 private val Q8Purple = Color(0xFFD652FF)
 private val Q8Blue = Color(0xFF19BFFF)
@@ -51,8 +53,18 @@ fun QuizScreenV8(vm: QuizViewModel, onBack: () -> Unit) {
     val result by vm.result.collectAsState()
     val progress by vm.progress.collectAsState()
     val reviewMode by vm.reviewMode.collectAsState()
+    val scrollState = rememberScrollState()
     var selected by remember { mutableStateOf<Int?>(null) }
     var showLearnMore by remember { mutableStateOf(false) }
+
+    LaunchedEffect(result) {
+        if (result != null) {
+            delay(90)
+            scrollState.animateScrollTo(scrollState.maxValue)
+        } else {
+            scrollState.scrollTo(0)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -64,7 +76,7 @@ fun QuizScreenV8(vm: QuizViewModel, onBack: () -> Unit) {
             )
             .statusBarsPadding()
             .navigationBarsPadding()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
@@ -170,7 +182,9 @@ fun QuizScreenV8(vm: QuizViewModel, onBack: () -> Unit) {
 @Composable
 private fun QuizTopBarV8(category: String, onQuit: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth(),
+        Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
