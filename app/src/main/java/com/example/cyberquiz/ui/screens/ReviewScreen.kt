@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cyberquiz.data.database.ReviewItemEntity
+import com.example.cyberquiz.data.database.ReviewItemWithQuestion
 import com.example.cyberquiz.viewmodel.QuizViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
@@ -56,29 +57,26 @@ fun ReviewScreen(
     onPractice: (ReviewItemEntity) -> Unit,
     highlightedConcept: String? = null
 ) {
-    val items by vm.reviewItems.collectAsState()
+    val items by vm.reviewItemsWithQuestions.collectAsState()
     val scrollState = rememberScrollState()
     var courseTerm by remember { mutableStateOf<String?>(null) }
     var courseCategory by remember { mutableStateOf("") }
 
-    val activeRaw = items.filterNot { it.mastered }
+    val activeRaw = items.filterNot { it.review.mastered }
     val highlightedItem = highlightedConcept?.let { concept ->
-        activeRaw.firstOrNull { it.concept.equals(concept, ignoreCase = true) }
+        activeRaw.firstOrNull { it.review.concept.equals(concept, ignoreCase = true) }
     }
     val active = if (highlightedItem == null) {
         activeRaw
     } else {
-        listOf(highlightedItem) + activeRaw.filterNot { it.id == highlightedItem.id }
+        listOf(highlightedItem) + activeRaw.filterNot { it.review.id == highlightedItem.review.id }
     }
-    val mastered = items.filter { it.mastered }
+    val mastered = items.filter { it.review.mastered }
 
-    var highlightedCardY by remember(highlightedItem?.id) { mutableStateOf<Int?>(null) }
-    var highlightPulseReady by remember(highlightedItem?.id) { mutableStateOf(false) }
+    var highlightedCardY by remember(highlightedItem?.review?.id) { mutableStateOf<Int?>(null) }
+    var highlightPulseReady by remember(highlightedItem?.review?.id) { mutableStateOf(false) }
 
-    // Un seul déplacement automatique par ouverture depuis Statistiques.
-    // La position est capturée une fois puis le scroll n'est plus jamais relancé,
-    // ce qui laisse ensuite le contrôle total au geste de l'utilisateur.
-    LaunchedEffect(highlightedItem?.id) {
+    LaunchedEffect(highlightedItem?.review?.id) {
         if (highlightedItem == null) return@LaunchedEffect
         highlightPulseReady = false
 
@@ -122,6 +120,13 @@ fun ReviewScreen(
             fontSize = 13.sp,
             lineHeight = 19.sp
         )
+        Text(
+            "Premier retest réussi : +5 XP une seule fois par notion. Les retests suivants ne donnent plus d'XP.",
+            color = ReviewGreen,
+            fontSize = 10.sp,
+            lineHeight = 15.sp,
+            fontWeight = FontWeight.SemiBold
+        )
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ReviewSummaryCard(
@@ -144,7 +149,7 @@ fun ReviewScreen(
             if (active.isNotEmpty()) {
                 SectionTitleReview("PRIORITÉ · À RETRAVAILLER")
                 active.forEach { item ->
-                    val isHighlighted = highlightedItem?.id == item.id
+                    val isHighlighted = highlightedItem?.review?.id == item.review.id
                     ReviewItemCard(
                         item = item,
                         highlighted = isHighlighted,
@@ -158,15 +163,15 @@ fun ReviewScreen(
                         } else {
                             Modifier
                         },
-                        onCourse = if (hasCyberExpertCourse(item.concept)) {
+                        onCourse = if (hasCyberExpertCourse(item.review.concept)) {
                             {
-                                courseTerm = item.concept
-                                courseCategory = item.category
+                                courseTerm = item.review.concept
+                                courseCategory = item.review.category
                             }
                         } else {
                             null
                         },
-                        onPractice = { onPractice(item) }
+                        onPractice = { onPractice(item.review) }
                     )
                 }
             }
@@ -178,21 +183,20 @@ fun ReviewScreen(
                         item = item,
                         highlighted = false,
                         flashHighlight = false,
-                        onCourse = if (hasCyberExpertCourse(item.concept)) {
+                        onCourse = if (hasCyberExpertCourse(item.review.concept)) {
                             {
-                                courseTerm = item.concept
-                                courseCategory = item.category
+                                courseTerm = item.review.concept
+                                courseCategory = item.review.category
                             }
                         } else {
                             null
                         },
-                        onPractice = { onPractice(item) }
+                        onPractice = { onPractice(item.review) }
                     )
                 }
             }
         }
 
-        // Permet de placer réellement la carte sélectionnée en haut même si la liste est courte.
         Spacer(Modifier.height(if (highlightedItem != null) 720.dp else 8.dp))
     }
 
@@ -279,20 +283,22 @@ private fun SectionTitleReview(text: String) {
 
 @Composable
 private fun ReviewItemCard(
-    item: ReviewItemEntity,
+    item: ReviewItemWithQuestion,
     highlighted: Boolean,
     flashHighlight: Boolean,
     modifier: Modifier = Modifier,
     onCourse: (() -> Unit)?,
     onPractice: () -> Unit
 ) {
+    val review = item.review
+    val question = item.question
     val accent = when {
         highlighted -> ReviewPurple
-        item.mastered -> ReviewGreen
+        review.mastered -> ReviewGreen
         else -> ReviewOrange
     }
     val borderWidth = if (highlighted) 2.dp else 1.2.dp
-    val glow = remember(item.id) { Animatable(0f) }
+    val glow = remember(review.id) { Animatable(0f) }
 
     LaunchedEffect(flashHighlight) {
         if (flashHighlight) {
@@ -388,68 +394,64 @@ private fun ReviewItemCard(
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.Top) {
                 Box(
                     Modifier
                         .size(38.dp)
                         .background(accent.copy(alpha = .13f), RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(if (item.mastered) "✓" else "!", color = accent, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                    Text(if (review.mastered) "✓" else "!", color = accent, fontSize = 18.sp, fontWeight = FontWeight.Black)
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        if (item.mastered) "Question maîtrisée" else "Question à retravailler",
+                        question?.question ?: review.question,
                         color = ReviewText,
-                        fontSize = 17.sp,
+                        fontSize = 15.sp,
+                        lineHeight = 20.sp,
                         fontWeight = FontWeight.Black
                     )
+                    Spacer(Modifier.height(5.dp))
                     Text(
-                        "${item.category.uppercase()} · ${difficultyLabel(item.difficulty)}",
+                        "${review.category.uppercase()} · ${difficultyLabel(review.difficulty)}",
                         color = ReviewBlue,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.1.sp
                     )
                 }
+                Spacer(Modifier.width(8.dp))
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        if (item.mastered) "MAÎTRISÉ" else "À REVOIR",
+                        if (review.mastered) "MAÎTRISÉ" else "À REVOIR",
                         color = accent,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 1.sp
                     )
                     Text(
-                        "${item.wrongCount} erreur${if (item.wrongCount > 1) "s" else ""}",
+                        "${review.wrongCount} erreur${if (review.wrongCount > 1) "s" else ""}",
                         color = ReviewMuted,
                         fontSize = 10.sp
                     )
                 }
             }
 
-            Text(
-                item.question,
-                color = if (highlighted) ReviewText else Color(0xFFD2DCF4),
-                fontSize = if (highlighted) 13.sp else 12.sp,
-                lineHeight = 18.sp,
-                fontWeight = if (highlighted) FontWeight.SemiBold else FontWeight.Normal
-            )
-
-            if (!item.mastered && item.correctAfterWrongCount == 0) {
-                Text(
-                    "Premier retest réussi : +5 XP. Les essais suivants ne donnent plus d'XP.",
-                    color = ReviewGreen,
-                    fontSize = 10.sp,
-                    lineHeight = 15.sp
-                )
-            } else {
-                Text(
-                    "Révision sans bonus XP.",
-                    color = ReviewMuted,
-                    fontSize = 10.sp
-                )
+            question?.let { quizQuestion ->
+                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text(
+                        "CHOIX POSSIBLES",
+                        color = ReviewMuted,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.2.sp
+                    )
+                    ReviewAnswerChoice("A", quizQuestion.answerA, highlighted)
+                    ReviewAnswerChoice("B", quizQuestion.answerB, highlighted)
+                    ReviewAnswerChoice("C", quizQuestion.answerC, highlighted)
+                    ReviewAnswerChoice("D", quizQuestion.answerD, highlighted)
+                }
             }
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -469,6 +471,42 @@ private fun ReviewItemCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ReviewAnswerChoice(letter: String, text: String, highlighted: Boolean) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(
+                if (highlighted) ReviewPurple.copy(alpha = .07f) else Color(0xFF09162D),
+                RoundedCornerShape(13.dp)
+            )
+            .border(
+                1.dp,
+                if (highlighted) ReviewPurple.copy(alpha = .28f) else Color(0xFF263B64),
+                RoundedCornerShape(13.dp)
+            )
+            .padding(horizontal = 11.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(25.dp)
+                .background(ReviewBlue.copy(alpha = .13f), RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(letter, color = ReviewCyan, fontSize = 10.sp, fontWeight = FontWeight.Black)
+        }
+        Spacer(Modifier.width(9.dp))
+        Text(
+            text,
+            color = Color(0xFFD7E0F5),
+            fontSize = 11.sp,
+            lineHeight = 16.sp,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
