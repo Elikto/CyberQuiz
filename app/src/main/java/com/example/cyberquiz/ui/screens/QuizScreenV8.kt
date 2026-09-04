@@ -588,7 +588,7 @@ private fun DetailedLearnMoreDialogV8(
 
             LearnSectionTitleV8("À RETENIR")
             Text(
-                "Le but est de comprendre les quatre notions. Si l'explication détaillée d'un terme ne suffit pas, ouvre son cours expert pour repartir de zéro et aller jusqu'au fonctionnement réseau réel.",
+                "Le but est de comprendre les quatre notions. Si l'explication détaillée d'un terme ne suffit pas, ouvre son cours pour repartir de zéro et mieux comprendre la notion.",
                 color = Color(0xFFC9D4F3),
                 fontSize = 12.sp,
                 lineHeight = 18.sp,
@@ -637,11 +637,11 @@ private fun OpenExpertCourseButtonV8(term: String, onClick: () -> Unit) {
     ) {
         Text("TOUJOURS PAS COMPRIS ?", color = Q8Muted, fontSize = 8.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.Black)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Ouvrir le cours expert · $term", color = Q8Cyan, fontSize = 14.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
+            Text("Ouvrir le cours · $term", color = Q8Cyan, fontSize = 14.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
             Text("›", color = Q8Cyan, fontSize = 24.sp)
         }
         Text(
-            "Repartir de zéro, comprendre le protocole en profondeur, lire de vraies commandes et relier la notion à la cybersécurité.",
+            "Repartir de zéro avec une explication simple, des schémas et des exemples concrets.",
             color = Color(0xFFC5D2ED),
             fontSize = 10.sp,
             lineHeight = 15.sp
