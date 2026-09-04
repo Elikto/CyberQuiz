@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -82,6 +83,10 @@ interface QuizDao {
 
     @Query("SELECT * FROM review_items WHERE quizType = :quizType ORDER BY mastered ASC, wrongCount DESC, lastWrongAt DESC")
     fun reviewItems(quizType: String): Flow<List<ReviewItemEntity>>
+
+    @Transaction
+    @Query("SELECT * FROM review_items WHERE quizType = :quizType ORDER BY mastered ASC, wrongCount DESC, lastWrongAt DESC")
+    fun reviewItemsWithQuestions(quizType: String): Flow<List<ReviewItemWithQuestion>>
 
     @Query("SELECT * FROM review_items WHERE quizType = :quizType AND concept = :concept LIMIT 1")
     suspend fun reviewItemSnapshot(quizType: String, concept: String): ReviewItemEntity?
