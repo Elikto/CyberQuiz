@@ -9,8 +9,12 @@ import com.example.cyberquiz.data.database.QuestionEntity
 import com.example.cyberquiz.data.repository.QuizRepository
 import com.example.cyberquiz.model.Category
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 sealed interface QuizUiState {
@@ -27,13 +31,24 @@ data class AnswerResult(
 )
 
 class QuizViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = QuizRepository(CyberQuizDatabase.get(app).quizDao())
+    private val dao = CyberQuizDatabase.get(app).quizDao()
+    private val repo = QuizRepository(dao)
 
     private val _state = MutableStateFlow<QuizUiState>(QuizUiState.Loading)
     val state: StateFlow<QuizUiState> = _state.asStateFlow()
 
-    private val _progress = MutableStateFlow(ProgressEntity())
-    val progress: StateFlow<ProgressEntity> = _progress.asStateFlow()
+    private val _activeQuizType = MutableStateFlow(CYBERSECURITY)
+    val progress: StateFlow<ProgressEntity> = _activeQuizType
+        .flatMapLatest { quizType ->
+            repo.progress(quizType).map { stored ->
+                stored ?: emptyProgress(quizType)
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = emptyProgress(CYBERSECURITY)
+        )
 
     private val _result = MutableStateFlow<AnswerResult?>(null)
     val result: StateFlow<AnswerResult?> = _result.asStateFlow()
@@ -45,17 +60,18 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     init {
         viewModelScope.launch {
             repo.init()
-            launch {
-                repo.progress().collect { progress ->
-                    if (progress != null) _progress.value = progress
-                }
-            }
             loadNext()
         }
     }
 
-    fun start(category: Category? = null, quizType: String = CYBERSECURITY) {
+    fun selectQuizType(quizType: String) {
         currentQuizType = quizType
+        currentCategory = null
+        _activeQuizType.value = quizType
+    }
+
+    fun start(category: Category? = null, quizType: String = CYBERSECURITY) {
+        selectQuizType(quizType)
         currentCategory = category?.label
         questionNumber = 0
         _result.value = null
@@ -64,7 +80,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun startCategory(quizType: String, category: String) {
-        currentQuizType = quizType
+        selectQuizType(quizType)
         currentCategory = category
         questionNumber = 0
         _result.value = null
@@ -77,11 +93,11 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         if (_result.value != null) return
 
         viewModelScope.launch {
-            val p = _progress.value
+            val p = repo.progressSnapshot(currentQuizType) ?: emptyProgress(currentQuizType)
             val ok = index == current.correctIndex
             val newStreak = if (ok) p.streak + 1 else 0
             val best = maxOf(p.bestStreak, newStreak)
-            val xp = if (ok) {
+            val gainedXp = if (ok) {
                 10 + when (current.difficulty) {
                     "HARD" -> 10
                     "MEDIUM" -> 5
@@ -90,22 +106,23 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 0
             }
-            val newXp = p.xp + xp
+            val newXp = p.xp + gainedXp
             val newLevel = (newXp / 100) + 1
             val newAnswered = p.answered + 1
             val newCorrect = p.correct + if (ok) 1 else 0
 
             repo.markSeen(current.id)
-            CyberQuizDatabase.get(getApplication()).quizDao().updateProgress(
-                newXp,
-                newLevel,
-                newAnswered,
-                newCorrect,
-                newStreak,
-                best,
-                p.totalResponseMs
+            dao.updateProgress(
+                quizType = currentQuizType,
+                xp = newXp,
+                level = newLevel,
+                answered = newAnswered,
+                correct = newCorrect,
+                streak = newStreak,
+                bestStreak = best,
+                totalResponseMs = p.totalResponseMs
             )
-            _result.value = AnswerResult(ok, xp, current.explanation, current)
+            _result.value = AnswerResult(ok, gainedXp, current.explanation, current)
         }
     }
 
@@ -125,7 +142,16 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private fun emptyProgress(quizType: String): ProgressEntity = ProgressEntity(
+        id = when (quizType) {
+            NUTRITION -> 2
+            else -> 1
+        },
+        quizType = quizType
+    )
+
     companion object {
         private const val CYBERSECURITY = "CYBERSECURITY"
+        private const val NUTRITION = "NUTRITION"
     }
 }
