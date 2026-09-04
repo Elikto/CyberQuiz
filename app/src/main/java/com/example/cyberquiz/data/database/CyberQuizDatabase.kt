@@ -8,8 +8,14 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [QuestionEntity::class, ProgressEntity::class, ReviewItemEntity::class],
-    version = 4,
+    entities = [
+        QuestionEntity::class,
+        ProgressEntity::class,
+        ReviewItemEntity::class,
+        CategoryProgressEntity::class,
+        ConceptProgressEntity::class
+    ],
+    version = 5,
     exportSchema = true
 )
 abstract class CyberQuizDatabase : RoomDatabase() {
@@ -61,13 +67,45 @@ abstract class CyberQuizDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS category_progress (
+                        quizType TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        answered INTEGER NOT NULL,
+                        correct INTEGER NOT NULL,
+                        lastAnsweredAt INTEGER NOT NULL,
+                        PRIMARY KEY(quizType, category)
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS concept_progress (
+                        quizType TEXT NOT NULL,
+                        concept TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        attempts INTEGER NOT NULL,
+                        correct INTEGER NOT NULL,
+                        reviewMastered INTEGER NOT NULL,
+                        lastResultCorrect INTEGER NOT NULL,
+                        lastAnsweredAt INTEGER NOT NULL,
+                        PRIMARY KEY(quizType, concept)
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun get(context: Context): CyberQuizDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context,
                 CyberQuizDatabase::class.java,
                 "cyberquiz.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
                 .also { INSTANCE = it }
         }
