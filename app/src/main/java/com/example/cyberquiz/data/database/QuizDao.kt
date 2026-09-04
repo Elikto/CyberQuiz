@@ -151,4 +151,13 @@ interface QuizDao {
         concept: String,
         timestamp: Long
     )
+
+    @Query(
+        "UPDATE concept_progress SET reviewMastered=0, lastResultCorrect=0, lastAnsweredAt=:timestamp WHERE quizType=:quizType AND concept=:concept"
+    )
+    suspend fun markConceptNeedsReview(
+        quizType: String,
+        concept: String,
+        timestamp: Long
+    )
 }
