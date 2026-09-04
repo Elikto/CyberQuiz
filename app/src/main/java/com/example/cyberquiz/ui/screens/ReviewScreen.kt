@@ -70,7 +70,7 @@ fun ReviewScreen(
             fontWeight = FontWeight.Black
         )
         Text(
-            "CyberQuiz mémorise les notions que tu rates. Une bonne réponse plus tard les passe en maîtrisées, mais elles restent visibles pour que tu puisses les réviser.",
+            "CyberQuiz mémorise les questions que tu rates sans afficher leur réponse. Tu peux te retester à l'aveugle ou choisir de réviser la notion avant.",
             color = ReviewMuted,
             fontSize = 13.sp,
             lineHeight = 19.sp
@@ -195,7 +195,7 @@ private fun EmptyReviewCard() {
         Text("✓", color = ReviewGreen, fontSize = 34.sp, fontWeight = FontWeight.Black)
         Text("Rien à revoir pour l'instant", color = ReviewText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Text(
-            "Les notions apparaîtront ici automatiquement dès qu'une question Cyber sera ratée.",
+            "Les questions apparaîtront ici automatiquement dès qu'une question Cyber sera ratée.",
             color = ReviewMuted,
             fontSize = 12.sp,
             lineHeight = 18.sp,
@@ -246,8 +246,19 @@ private fun ReviewItemCard(
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(item.concept, color = ReviewText, fontSize = 17.sp, fontWeight = FontWeight.Black)
-                Text(item.category.uppercase(), color = ReviewBlue, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
+                Text(
+                    if (item.mastered) "Question maîtrisée" else "Question à retravailler",
+                    color = ReviewText,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Black
+                )
+                Text(
+                    "${item.category.uppercase()} · ${difficultyLabel(item.difficulty)}",
+                    color = ReviewBlue,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.1.sp
+                )
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
@@ -272,10 +283,25 @@ private fun ReviewItemCard(
             lineHeight = 18.sp
         )
 
+        if (!item.mastered && item.correctAfterWrongCount == 0) {
+            Text(
+                "Premier retest réussi : +5 XP. Les essais suivants ne donnent plus d'XP.",
+                color = ReviewGreen,
+                fontSize = 10.sp,
+                lineHeight = 15.sp
+            )
+        } else {
+            Text(
+                "Révision sans bonus XP.",
+                color = ReviewMuted,
+                fontSize = 10.sp
+            )
+        }
+
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (onCourse != null) {
                 SmallReviewButton(
-                    text = "Ouvrir le cours",
+                    text = "Réviser la notion",
                     accent = ReviewCyan,
                     modifier = Modifier.weight(1f),
                     onClick = onCourse
@@ -289,6 +315,12 @@ private fun ReviewItemCard(
             )
         }
     }
+}
+
+private fun difficultyLabel(difficulty: String): String = when (difficulty.uppercase()) {
+    "HARD" -> "DIFFICILE"
+    "MEDIUM" -> "MOYEN"
+    else -> "FACILE"
 }
 
 @Composable
