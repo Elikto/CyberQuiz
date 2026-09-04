@@ -294,7 +294,7 @@ private fun QuestionCardV8(question: String) {
                 RoundedCornerShape(24.dp)
             )
             .border(1.3.dp, Color(0xFF3A71D8), RoundedCornerShape(24.dp))
-            .padding(horizontal = 20.dp, vertical = 24.dp)
+            .padding(horizontal = 20.dp, vertical = 18.dp)
     ) {
         Canvas(Modifier.matchParentSize()) {
             val c = Q8Blue.copy(alpha = .10f)
@@ -307,8 +307,8 @@ private fun QuestionCardV8(question: String) {
         Text(
             question,
             color = Q8Text,
-            fontSize = 21.sp,
-            lineHeight = 29.sp,
+            fontSize = 19.sp,
+            lineHeight = 25.sp,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
