@@ -1,5 +1,6 @@
 package com.example.cyberquiz
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -8,8 +9,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cyberquiz.ui.screens.CategoriesScreenV2
 import com.example.cyberquiz.ui.screens.HomeScreenV2
@@ -47,10 +50,21 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
+    val context = LocalContext.current
+    val preferences = remember(context) {
+        context.getSharedPreferences("cyberquiz_preferences", Context.MODE_PRIVATE)
+    }
+    val storedQuizTypeName = remember {
+        preferences.getString("selected_quiz_type", QuizType.CYBERSECURITY.name)
+            ?: QuizType.CYBERSECURITY.name
+    }
+
     var screen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
     var previousScreen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
-    var selectedQuizTypeName by rememberSaveable { mutableStateOf(QuizType.CYBERSECURITY.name) }
-    val selectedQuizType = QuizType.valueOf(selectedQuizTypeName)
+    var selectedQuizTypeName by rememberSaveable { mutableStateOf(storedQuizTypeName) }
+
+    val selectedQuizType = QuizType.entries.firstOrNull { it.name == selectedQuizTypeName }
+        ?: QuizType.CYBERSECURITY
 
     fun navigateTo(destination: AppScreen) {
         if (destination != screen) {
@@ -113,7 +127,12 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
 
         AppScreen.PROFILE -> ProfileScreenV2(
             selectedQuizType = selectedQuizType,
-            onQuizTypeSelected = { selectedQuizTypeName = it.name },
+            onQuizTypeSelected = { type ->
+                selectedQuizTypeName = type.name
+                preferences.edit()
+                    .putString("selected_quiz_type", type.name)
+                    .apply()
+            },
             onBack = { goBack() }
         )
 
