@@ -3,6 +3,8 @@ package com.example.cyberquiz.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.cyberquiz.data.database.CategoryProgressEntity
+import com.example.cyberquiz.data.database.ConceptProgressEntity
 import com.example.cyberquiz.data.database.CyberQuizDatabase
 import com.example.cyberquiz.data.database.ProgressEntity
 import com.example.cyberquiz.data.database.QuestionEntity
@@ -55,6 +57,22 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
     val reviewItems: StateFlow<List<ReviewItemEntity>> = _activeQuizType
         .flatMapLatest { quizType -> dao.reviewItems(quizType) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = emptyList()
+        )
+
+    val categoryProgress: StateFlow<List<CategoryProgressEntity>> = _activeQuizType
+        .flatMapLatest { quizType -> dao.categoryProgress(quizType) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = emptyList()
+        )
+
+    val conceptProgress: StateFlow<List<ConceptProgressEntity>> = _activeQuizType
+        .flatMapLatest { quizType -> dao.conceptProgress(quizType) }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
@@ -135,9 +153,6 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                 null
             }
 
-            // Un retest est un exercice de révision séparé : il ne doit pas permettre
-            // de farmer l'XP, la série ou les statistiques globales.
-            // Le bonus de 5 XP n'est accordé qu'à la toute première réussite après l'erreur.
             val firstReviewSuccess = isReview &&
                 ok &&
                 reviewItemBefore != null &&
@@ -171,6 +186,11 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             if (currentQuizType == CYBERSECURITY) {
+                if (isReview) {
+                    recordConceptReviewResult(current, ok)
+                } else {
+                    recordLearningProgress(current, ok)
+                }
                 recordReviewResult(current, ok)
             }
 
@@ -196,6 +216,65 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         viewModelScope.launch { loadNext() }
+    }
+
+    private suspend fun recordLearningProgress(question: QuestionEntity, correct: Boolean) {
+        val now = System.currentTimeMillis()
+        val concept = correctAnswer(question).trim()
+
+        dao.insertCategoryProgress(
+            CategoryProgressEntity(
+                quizType = CYBERSECURITY,
+                category = question.category
+            )
+        )
+        dao.incrementCategoryProgress(
+            quizType = CYBERSECURITY,
+            category = question.category,
+            correctIncrement = if (correct) 1 else 0,
+            timestamp = now
+        )
+
+        if (concept.isBlank()) return
+        val previousReview = dao.reviewItemSnapshot(CYBERSECURITY, concept)
+        val keepReviewMastered = correct && previousReview?.mastered == true
+
+        dao.insertConceptProgress(
+            ConceptProgressEntity(
+                quizType = CYBERSECURITY,
+                concept = concept,
+                category = question.category
+            )
+        )
+        dao.incrementConceptProgress(
+            quizType = CYBERSECURITY,
+            concept = concept,
+            category = question.category,
+            correctIncrement = if (correct) 1 else 0,
+            reviewMastered = keepReviewMastered,
+            lastResultCorrect = correct,
+            timestamp = now
+        )
+    }
+
+    private suspend fun recordConceptReviewResult(question: QuestionEntity, correct: Boolean) {
+        val concept = correctAnswer(question).trim()
+        if (concept.isBlank()) return
+        val now = System.currentTimeMillis()
+
+        dao.insertConceptProgress(
+            ConceptProgressEntity(
+                quizType = CYBERSECURITY,
+                concept = concept,
+                category = question.category
+            )
+        )
+
+        if (correct) {
+            dao.markConceptMasteredByReview(CYBERSECURITY, concept, now)
+        } else {
+            dao.markConceptNeedsReview(CYBERSECURITY, concept, now)
+        }
     }
 
     private suspend fun recordReviewResult(question: QuestionEntity, correct: Boolean) {
