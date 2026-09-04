@@ -14,7 +14,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cyberquiz.ui.screens.CategoriesScreen
 import com.example.cyberquiz.ui.screens.HomeScreenV2
 import com.example.cyberquiz.ui.screens.ProfileScreen
-import com.example.cyberquiz.ui.screens.QuizScreenV3
+import com.example.cyberquiz.ui.screens.QuizScreenV4
 import com.example.cyberquiz.ui.screens.QuizType
 import com.example.cyberquiz.ui.screens.QuizUnavailableScreen
 import com.example.cyberquiz.ui.screens.SettingsScreen
@@ -95,7 +95,7 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
             onSettings = { navigateTo(AppScreen.SETTINGS) }
         )
 
-        AppScreen.QUIZ -> QuizScreenV3(
+        AppScreen.QUIZ -> QuizScreenV4(
             vm = vm,
             onBack = { goBack() }
         )
