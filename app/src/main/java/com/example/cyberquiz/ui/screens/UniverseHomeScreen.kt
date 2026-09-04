@@ -43,6 +43,7 @@ fun UniverseHomeScreen(
     onQuiz: () -> Unit,
     onStats: () -> Unit,
     onCategories: () -> Unit,
+    onReview: () -> Unit,
     onProfile: () -> Unit,
     onSettings: () -> Unit
 ) {
@@ -53,6 +54,7 @@ fun UniverseHomeScreen(
             onQuiz = onQuiz,
             onStats = onStats,
             onCategories = onCategories,
+            onReview = onReview,
             onProfile = onProfile,
             onSettings = onSettings
         )
