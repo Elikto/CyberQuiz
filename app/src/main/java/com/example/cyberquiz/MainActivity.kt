@@ -22,6 +22,7 @@ import com.example.cyberquiz.ui.screens.QuizType
 import com.example.cyberquiz.ui.screens.QuizUnavailableScreen
 import com.example.cyberquiz.ui.screens.ReviewScreen
 import com.example.cyberquiz.ui.screens.SettingsScreenV2
+import com.example.cyberquiz.ui.screens.StatisticsScreenV2
 import com.example.cyberquiz.ui.screens.StatisticsScreenV3
 import com.example.cyberquiz.ui.screens.UniverseHomeScreen
 import com.example.cyberquiz.ui.screens.isPlayableNow
@@ -127,10 +128,19 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
             onBack = { goBack() }
         )
 
-        AppScreen.STATS -> StatisticsScreenV3(
-            vm = vm,
-            onBack = { goBack() }
-        )
+        AppScreen.STATS -> {
+            if (selectedQuizType == QuizType.CYBERSECURITY) {
+                StatisticsScreenV3(
+                    vm = vm,
+                    onBack = { goBack() }
+                )
+            } else {
+                StatisticsScreenV2(
+                    vm = vm,
+                    onBack = { goBack() }
+                )
+            }
+        }
 
         AppScreen.CATEGORIES -> CategoriesScreenV3(
             vm = vm,
