@@ -165,6 +165,11 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
     fun nextQuestion() {
         _result.value = null
+        if (_reviewMode.value) {
+            reviewQuestionId = null
+            _state.value = QuizUiState.Finished
+            return
+        }
         viewModelScope.launch { loadNext() }
     }
 
