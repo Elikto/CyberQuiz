@@ -337,8 +337,8 @@ private fun ReviewItemCard(
         if (flashHighlight) {
             glow.snapTo(0f)
             repeat(2) {
-                glow.animateTo(1f, animationSpec = tween(durationMillis = 430))
-                glow.animateTo(0f, animationSpec = tween(durationMillis = 260))
+                glow.animateTo(1f, animationSpec = tween(durationMillis = 450))
+                glow.animateTo(0f, animationSpec = tween(durationMillis = 280))
             }
         } else {
             glow.snapTo(0f)
