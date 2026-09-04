@@ -11,14 +11,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.cyberquiz.ui.screens.CategoriesScreen
+import com.example.cyberquiz.ui.screens.CategoriesScreenV2
 import com.example.cyberquiz.ui.screens.HomeScreenV2
-import com.example.cyberquiz.ui.screens.ProfileScreen
+import com.example.cyberquiz.ui.screens.ProfileScreenV2
 import com.example.cyberquiz.ui.screens.QuizScreenV4
 import com.example.cyberquiz.ui.screens.QuizType
 import com.example.cyberquiz.ui.screens.QuizUnavailableScreen
-import com.example.cyberquiz.ui.screens.SettingsScreen
-import com.example.cyberquiz.ui.screens.StatisticsScreen
+import com.example.cyberquiz.ui.screens.SettingsScreenV2
+import com.example.cyberquiz.ui.screens.StatisticsScreenV2
 import com.example.cyberquiz.ui.theme.CyberQuizTheme
 import com.example.cyberquiz.viewmodel.QuizViewModel
 
@@ -100,24 +100,24 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
             onBack = { goBack() }
         )
 
-        AppScreen.STATS -> StatisticsScreen(
+        AppScreen.STATS -> StatisticsScreenV2(
             vm = vm,
             onBack = { goBack() }
         )
 
-        AppScreen.CATEGORIES -> CategoriesScreen(
+        AppScreen.CATEGORIES -> CategoriesScreenV2(
             vm = vm,
             onBack = { goBack() },
-            onHome = { navigateTo(AppScreen.QUIZ) }
+            onQuiz = { navigateTo(AppScreen.QUIZ) }
         )
 
-        AppScreen.PROFILE -> ProfileScreen(
+        AppScreen.PROFILE -> ProfileScreenV2(
             selectedQuizType = selectedQuizType,
             onQuizTypeSelected = { selectedQuizTypeName = it.name },
             onBack = { goBack() }
         )
 
-        AppScreen.SETTINGS -> SettingsScreen(
+        AppScreen.SETTINGS -> SettingsScreenV2(
             onBack = { goBack() }
         )
 
