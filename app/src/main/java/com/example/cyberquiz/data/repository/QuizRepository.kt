@@ -17,6 +17,9 @@ class QuizRepository(private val dao: QuizDao) {
         if (dao.questionCount(CYBERSECURITY) == 0) {
             dao.insertAll(cybersecurityQuestions())
         }
+        if (dao.questionCountBySource(CYBERSECURITY, CYBER_EXPANSION_SOURCE) == 0) {
+            dao.insertAll(cyberExpansionQuestions())
+        }
         if (dao.questionCount(NUTRITION) == 0) {
             dao.insertAll(nutritionQuestions())
         }
