@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.cyberquiz.data.database.CyberQuizDatabase
 import com.example.cyberquiz.data.database.ProgressEntity
 import com.example.cyberquiz.data.database.QuestionEntity
+import com.example.cyberquiz.data.database.ReviewItemEntity
 import com.example.cyberquiz.data.repository.QuizRepository
 import com.example.cyberquiz.model.Category
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -52,12 +53,24 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             initialValue = emptyProgress(CYBERSECURITY)
         )
 
+    val reviewItems: StateFlow<List<ReviewItemEntity>> = _activeQuizType
+        .flatMapLatest { quizType -> dao.reviewItems(quizType) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = emptyList()
+        )
+
     private val _result = MutableStateFlow<AnswerResult?>(null)
     val result: StateFlow<AnswerResult?> = _result.asStateFlow()
+
+    private val _reviewMode = MutableStateFlow(false)
+    val reviewMode: StateFlow<Boolean> = _reviewMode.asStateFlow()
 
     private var currentQuizType = CYBERSECURITY
     private var currentCategory: String? = null
     private var questionNumber = 0
+    private var reviewQuestionId: Long? = null
 
     init {
         viewModelScope.launch {
@@ -76,6 +89,8 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         selectQuizType(quizType)
         currentCategory = category?.label
         questionNumber = 0
+        reviewQuestionId = null
+        _reviewMode.value = false
         _result.value = null
         _state.value = QuizUiState.Loading
         viewModelScope.launch { loadNext() }
@@ -85,6 +100,19 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         selectQuizType(quizType)
         currentCategory = category
         questionNumber = 0
+        reviewQuestionId = null
+        _reviewMode.value = false
+        _result.value = null
+        _state.value = QuizUiState.Loading
+        viewModelScope.launch { loadNext() }
+    }
+
+    fun startReviewQuestion(quizType: String, questionId: Long) {
+        selectQuizType(quizType)
+        currentCategory = null
+        questionNumber = 0
+        reviewQuestionId = questionId
+        _reviewMode.value = true
         _result.value = null
         _state.value = QuizUiState.Loading
         viewModelScope.launch { loadNext() }
@@ -113,7 +141,14 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             val newAnswered = p.answered + 1
             val newCorrect = p.correct + if (ok) 1 else 0
 
-            repo.markSeen(current.id)
+            if (!_reviewMode.value) {
+                repo.markSeen(current.id)
+            }
+
+            if (currentQuizType == CYBERSECURITY) {
+                recordReviewResult(current, ok)
+            }
+
             dao.updateProgress(
                 quizType = currentQuizType,
                 xp = newXp,
@@ -133,7 +168,68 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { loadNext() }
     }
 
+    private suspend fun recordReviewResult(question: QuestionEntity, correct: Boolean) {
+        val concept = correctAnswer(question).trim()
+        if (concept.isBlank()) return
+
+        if (correct) {
+            dao.recordReviewCorrect(CYBERSECURITY, concept)
+            return
+        }
+
+        val existing = dao.reviewItemSnapshot(CYBERSECURITY, concept)
+        val now = System.currentTimeMillis()
+        if (existing == null) {
+            dao.insertReviewItem(
+                ReviewItemEntity(
+                    quizType = CYBERSECURITY,
+                    concept = concept,
+                    category = question.category,
+                    difficulty = question.difficulty,
+                    questionId = question.id,
+                    question = question.question,
+                    correctAnswer = concept,
+                    wrongCount = 1,
+                    correctAfterWrongCount = 0,
+                    mastered = false,
+                    lastWrongAt = now
+                )
+            )
+        } else {
+            dao.recordReviewWrong(
+                quizType = CYBERSECURITY,
+                concept = concept,
+                category = question.category,
+                difficulty = question.difficulty,
+                questionId = question.id,
+                question = question.question,
+                correctAnswer = concept,
+                lastWrongAt = now
+            )
+        }
+    }
+
+    private fun correctAnswer(question: QuestionEntity): String = when (question.correctIndex) {
+        0 -> question.answerA
+        1 -> question.answerB
+        2 -> question.answerC
+        3 -> question.answerD
+        else -> ""
+    }
+
     private suspend fun loadNext() {
+        if (_reviewMode.value) {
+            val id = reviewQuestionId
+            val question = if (id == null) null else dao.questionById(id)
+            if (question == null) {
+                _state.value = QuizUiState.Finished
+            } else {
+                questionNumber = 1
+                _state.value = QuizUiState.Ready(question, questionNumber)
+            }
+            return
+        }
+
         val question = repo.next(currentQuizType, currentCategory)
         if (question == null) {
             repo.resetSeen(currentQuizType, currentCategory)
