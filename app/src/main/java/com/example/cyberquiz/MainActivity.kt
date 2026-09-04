@@ -20,6 +20,7 @@ import com.example.cyberquiz.ui.screens.ProfileScreenV3
 import com.example.cyberquiz.ui.screens.QuizScreenV8
 import com.example.cyberquiz.ui.screens.QuizType
 import com.example.cyberquiz.ui.screens.QuizUnavailableScreen
+import com.example.cyberquiz.ui.screens.ReviewScreen
 import com.example.cyberquiz.ui.screens.SettingsScreenV2
 import com.example.cyberquiz.ui.screens.StatisticsScreenV2
 import com.example.cyberquiz.ui.screens.UniverseHomeScreen
@@ -32,6 +33,7 @@ enum class AppScreen {
     QUIZ,
     STATS,
     CATEGORIES,
+    REVIEW,
     PROFILE,
     SETTINGS,
     UNAVAILABLE_QUIZ
@@ -111,6 +113,11 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                     navigateTo(AppScreen.UNAVAILABLE_QUIZ)
                 }
             },
+            onReview = {
+                if (selectedQuizType == QuizType.CYBERSECURITY) {
+                    navigateTo(AppScreen.REVIEW)
+                }
+            },
             onProfile = { navigateTo(AppScreen.PROFILE) },
             onSettings = { navigateTo(AppScreen.SETTINGS) }
         )
@@ -130,6 +137,15 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
             selectedQuizType = selectedQuizType,
             onBack = { goBack() },
             onQuiz = { navigateTo(AppScreen.QUIZ) }
+        )
+
+        AppScreen.REVIEW -> ReviewScreen(
+            vm = vm,
+            onBack = { goBack() },
+            onPractice = { item ->
+                vm.startReviewQuestion(item.quizType, item.questionId)
+                navigateTo(AppScreen.QUIZ)
+            }
         )
 
         AppScreen.PROFILE -> ProfileScreenV3(
