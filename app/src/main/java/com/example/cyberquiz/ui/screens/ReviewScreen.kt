@@ -406,7 +406,7 @@ private fun ReviewItemCard(
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        question?.question ?: review.question,
+                        question.question,
                         color = ReviewText,
                         fontSize = 15.sp,
                         lineHeight = 20.sp,
@@ -438,20 +438,18 @@ private fun ReviewItemCard(
                 }
             }
 
-            question?.let { quizQuestion ->
-                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Text(
-                        "CHOIX POSSIBLES",
-                        color = ReviewMuted,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 1.2.sp
-                    )
-                    ReviewAnswerChoice("A", quizQuestion.answerA, highlighted)
-                    ReviewAnswerChoice("B", quizQuestion.answerB, highlighted)
-                    ReviewAnswerChoice("C", quizQuestion.answerC, highlighted)
-                    ReviewAnswerChoice("D", quizQuestion.answerD, highlighted)
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text(
+                    "CHOIX POSSIBLES",
+                    color = ReviewMuted,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.2.sp
+                )
+                ReviewAnswerChoice("A", question.answerA, highlighted)
+                ReviewAnswerChoice("B", question.answerB, highlighted)
+                ReviewAnswerChoice("C", question.answerC, highlighted)
+                ReviewAnswerChoice("D", question.answerD, highlighted)
             }
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
