@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -534,7 +535,7 @@ private fun DetailedLearnMoreDialogV6(
                         .padding(14.dp)
                 ) {
                     Text(
-                        "Sélectionne un choix ci-dessus pour afficher sa définition complète, son fonctionnement, un exemple, un schéma et la conclusion pour cette question.",
+                        "Sélectionne un choix ci-dessus pour afficher sa définition complète, ses actions, son fonctionnement, un exemple réel, une commande ou un extrait de code, une analogie, un schéma et la conclusion.",
                         color = Color(0xFFC8D4F2),
                         fontSize = 12.sp,
                         lineHeight = 18.sp
@@ -555,7 +556,7 @@ private fun DetailedLearnMoreDialogV6(
 
                 LearnSectionTitleV6("SCHÉMA · $chosen")
                 Text(
-                    "Ce schéma simplifie le fonctionnement pour t'aider à visualiser l'enchaînement.",
+                    "Lis le schéma du haut vers le bas : chaque bloc représente une étape ou une action réellement liée à la notion.",
                     color = Q6Muted,
                     fontSize = 11.sp,
                     lineHeight = 16.sp
@@ -585,7 +586,7 @@ private fun DetailedLearnMoreDialogV6(
 
             LearnSectionTitleV6("À RETENIR")
             Text(
-                "Tu n'as pas besoin de mémoriser seulement la bonne réponse : l'objectif est de savoir dire en une phrase à quoi sert chacun des quatre choix. Si deux termes te paraissent proches, ouvre leur analyse l'un après l'autre et compare leurs fonctions.",
+                "Le but n'est pas de retenir uniquement la bonne lettre. À la fin, tu dois pouvoir dire avec tes propres mots ce que fait chacun des quatre choix, puis expliquer pourquoi sa fonction correspond — ou non — au verbe précis de la question.",
                 color = Color(0xFFC9D4F3),
                 fontSize = 12.sp,
                 lineHeight = 18.sp,
@@ -683,8 +684,75 @@ private fun DetailedChoiceCardV6(term: String, lesson: CyberChoiceDeepDive) {
         Text(term, color = Q6Text, fontSize = 17.sp, fontWeight = FontWeight.Black)
         LessonParagraphV6("1 · DÉFINITION", lesson.definition, Q6Cyan)
         LessonParagraphV6("2 · À QUOI ÇA SERT ?", lesson.action, Q6Blue)
+        ActionListV6(lesson.actions)
         LessonParagraphV6("3 · COMMENT ÇA FONCTIONNE ?", lesson.details, Q6Purple)
         LessonParagraphV6("4 · EXEMPLE CONCRET", lesson.example, Q6Green)
+        CodeDemoCardV6(lesson.demoTitle, lesson.demo)
+        AnalogyCardV6(lesson.analogy)
+    }
+}
+
+@Composable
+private fun ActionListV6(actions: List<String>) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Q6Blue.copy(alpha = .055f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text("ACTIONS CONCRÈTES", color = Q6Blue, fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
+        actions.forEach { action ->
+            Row(verticalAlignment = Alignment.Top) {
+                Text("•", color = Q6Cyan, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                Spacer(Modifier.width(7.dp))
+                Text(action, color = Color(0xFFD3DCF4), fontSize = 11.sp, lineHeight = 17.sp, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CodeDemoCardV6(title: String, code: String) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF030812), RoundedCornerShape(15.dp))
+            .border(1.dp, Q6Green.copy(alpha = .35f), RoundedCornerShape(15.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("●", color = Q6Red, fontSize = 8.sp)
+            Spacer(Modifier.width(4.dp))
+            Text("●", color = Q6Orange, fontSize = 8.sp)
+            Spacer(Modifier.width(4.dp))
+            Text("●", color = Q6Green, fontSize = 8.sp)
+            Spacer(Modifier.width(9.dp))
+            Text(title, color = Q6Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
+        }
+        Text(
+            code,
+            color = Color(0xFFB8F7DA),
+            fontSize = 11.sp,
+            lineHeight = 17.sp,
+            fontFamily = FontFamily.Monospace
+        )
+    }
+}
+
+@Composable
+private fun AnalogyCardV6(text: String) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Q6Orange.copy(alpha = .06f), RoundedCornerShape(15.dp))
+            .border(1.dp, Q6Orange.copy(alpha = .28f), RoundedCornerShape(15.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text("💡 ANALOGIE POUR MÉMORISER", color = Q6Orange, fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+        Text(text, color = Color(0xFFD9E0F4), fontSize = 11.sp, lineHeight = 17.sp)
     }
 }
 
