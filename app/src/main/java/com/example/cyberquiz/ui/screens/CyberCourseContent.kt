@@ -22,613 +22,477 @@ internal data class CyberCourse(
     val videoSearchQuery: String
 )
 
-internal fun hasCyberExpertCourse(term: String): Boolean = canonicalCourseKey(term) != null
+private val courseAliases = mapOf(
+    // Réseaux
+    "DNS" to "DNS",
+    "53" to "DNS",
+    "RÉSOUDRE UN NOM DE DOMAINE" to "DNS",
+    "RESOUDRE UN NOM DE DOMAINE" to "DNS",
+    "DHCP" to "DHCP",
+    "ARP" to "ARP",
+    "ASSOCIER UNE ADRESSE IP À UNE ADRESSE MAC" to "ARP",
+    "ASSOCIER UNE ADRESSE IP A UNE ADRESSE MAC" to "ARP",
+    "ICMP" to "ICMP",
+    "HTTPS" to "HTTPS",
+    "443" to "HTTPS",
+    "SSH" to "SSH",
+    "FTP" to "FTP",
+    "21" to "FTP",
+    "8080" to "HTTP_8080",
 
-private fun canonicalCourseKey(term: String): String? {
-    val key = term.trim().uppercase()
-    return when (key) {
-        "DNS", "53", "RÉSOUDRE UN NOM DE DOMAINE", "RESOUDRE UN NOM DE DOMAINE" -> "DNS"
-        "DHCP" -> "DHCP"
-        "ARP", "ASSOCIER UNE ADRESSE IP À UNE ADRESSE MAC", "ASSOCIER UNE ADRESSE IP A UNE ADRESSE MAC" -> "ARP"
-        "ICMP" -> "ICMP"
-        "HTTPS", "443" -> "HTTPS"
-        "SSH" -> "SSH"
-        "21", "FTP" -> "FTP"
-        "8080" -> "HTTP_8080"
-        else -> null
-    }
-}
+    // Linux
+    "CD" to "CD",
+    "PWD" to "PWD",
+    "LS" to "LS",
+    "WHOAMI" to "WHOAMI",
+    "SUDO" to "SUDO",
+    "GREP" to "GREP",
+    "NANO" to "NANO",
+
+    // Windows
+    "BITLOCKER" to "BITLOCKER",
+    "DEFRAG" to "DEFRAG",
+    "NOTEPAD" to "NOTEPAD",
+    "TASK SCHEDULER" to "TASK_SCHEDULER",
+
+    // Cryptographie
+    "AES" to "AES",
+    "RSA" to "RSA",
+    "ECDSA" to "ECDSA",
+    "SHA-256" to "SHA256",
+    "LA CLÉ PUBLIQUE" to "PUBLIC_KEY",
+    "LA CLE PUBLIQUE" to "PUBLIC_KEY",
+    "CLÉ PUBLIQUE" to "PUBLIC_KEY",
+    "CLE PUBLIQUE" to "PUBLIC_KEY",
+    "LA CLÉ PRIVÉE" to "PRIVATE_KEY",
+    "LA CLE PRIVEE" to "PRIVATE_KEY",
+    "CLÉ PRIVÉE" to "PRIVATE_KEY",
+    "CLE PRIVEE" to "PRIVATE_KEY",
+    "LE MOT DE PASSE MAÎTRE" to "MASTER_PASSWORD",
+    "LE MOT DE PASSE MAITRE" to "MASTER_PASSWORD",
+    "LE SEL DU DISQUE" to "SALT",
+
+    // Web
+    "XSS" to "XSS",
+    "CSRF" to "CSRF",
+    "SQL INJECTION" to "SQL_INJECTION",
+    "SSRF" to "SSRF",
+    "DNSSEC" to "DNSSEC",
+    "NAT" to "NAT",
+
+    // Malware / protection
+    "SPYWARE" to "SPYWARE",
+    "RANSOMWARE" to "RANSOMWARE",
+    "ROOTKIT" to "ROOTKIT",
+    "ADWARE" to "ADWARE",
+    "CHEVAL DE TROIE" to "TROJAN",
+    "PARE-FEU" to "FIREWALL",
+    "HYPERVISEUR" to "HYPERVISOR",
+    "PROXY INVERSE" to "REVERSE_PROXY",
+
+    // Ingénierie sociale
+    "PHISHING" to "PHISHING",
+    "TROMPER UNE VICTIME POUR OBTENIR UNE INFORMATION" to "PHISHING",
+    "VISHING" to "VISHING",
+    "SMURFING" to "SMURFING",
+    "HASHING" to "HASHING",
+    "HARDENING" to "HARDENING",
+
+    // OSINT
+    "OSINT" to "OSINT",
+    "OPEN SOURCE INTELLIGENCE" to "OSINT",
+
+    // Pentest / outils
+    "NMAP" to "NMAP",
+    "GIT" to "GIT",
+    "DOCKER" to "DOCKER",
+    "GRADLE" to "GRADLE",
+    "LE PÉRIMÈTRE ET L'AUTORISATION DU TEST" to "PENTEST_SCOPE",
+    "LE PERIMETRE ET L'AUTORISATION DU TEST" to "PENTEST_SCOPE",
+
+    // Authentification / cloud / AD / mobile / système
+    "MFA" to "MFA",
+    "MULTI-FACTOR AUTHENTICATION" to "MFA",
+    "POUR VÉRIFIER SON INTÉGRITÉ" to "INTEGRITY_HASH",
+    "POUR VERIFIER SON INTEGRITE" to "INTEGRITY_HASH",
+    "IL FOURNIT NOTAMMENT L'AUTHENTIFICATION ET LES SERVICES D'ANNUAIRE DU DOMAINE" to "DOMAIN_CONTROLLER",
+    "LA RÉPARTITION DES RESPONSABILITÉS DE SÉCURITÉ ENTRE LE FOURNISSEUR ET LE CLIENT" to "SHARED_RESPONSIBILITY",
+    "LA REPARTITION DES RESPONSABILITES DE SECURITE ENTRE LE FOURNISSEUR ET LE CLIENT" to "SHARED_RESPONSIBILITY",
+    "N'ACCORDER QUE LES PERMISSIONS NÉCESSAIRES" to "LEAST_PRIVILEGE",
+    "N'ACCORDER QUE LES PERMISSIONS NECESSAIRES" to "LEAST_PRIVILEGE",
+    "POUR CORRIGER NOTAMMENT DES VULNÉRABILITÉS CONNUES" to "SECURITY_PATCHES",
+    "POUR CORRIGER NOTAMMENT DES VULNERABILITES CONNUES" to "SECURITY_PATCHES"
+)
+
+private fun normalizeCourseTerm(term: String): String = term.trim().uppercase()
+
+private fun resolveCourseKey(term: String): String? = courseAliases[normalizeCourseTerm(term)]
+
+internal fun hasCyberExpertCourse(term: String): Boolean = resolveCourseKey(term) != null
 
 internal fun buildCyberCourse(term: String, category: String): CyberCourse {
     val original = term.trim()
-    val key = canonicalCourseKey(original) ?: original.uppercase()
-
-    val deepDive = when (key) {
-        "DNS" -> dnsBeginnerCourse()
-        "DHCP" -> dhcpBeginnerCourse()
-        "ARP" -> arpBeginnerCourse()
-        "ICMP" -> icmpBeginnerCourse()
-        "HTTPS" -> httpsBeginnerCourse()
-        "SSH" -> sshBeginnerCourse()
-        "FTP" -> ftpBeginnerCourse()
-        "HTTP_8080" -> http8080BeginnerCourse()
-        else -> buildCyberChoiceDeepDive(original, category)
-    }
-
-    val displayName = when (key) {
-        "HTTP_8080" -> "Port 8080"
-        "FTP" -> if (original == "21") "Port 21 / FTP" else "FTP"
-        "DNS" -> if (original == "53") "Port 53 / DNS" else "DNS"
-        "HTTPS" -> if (original == "443") "Port 443 / HTTPS" else "HTTPS"
-        else -> key
-    }
-
-    val memorySentence = when (key) {
-        "DNS" -> "DNS transforme un nom facile à retenir, comme example.com, en une adresse que l'ordinateur peut utiliser."
-        "DHCP" -> "DHCP donne automatiquement à ton appareil les réglages réseau dont il a besoin pour communiquer."
-        "ARP" -> "ARP aide ton ordinateur à trouver, sur le réseau local, quel appareil correspond à une adresse IP."
-        "ICMP" -> "ICMP sert surtout à envoyer des messages de contrôle et de diagnostic, comme ceux utilisés par ping."
-        "HTTPS" -> "HTTPS protège les échanges entre ton navigateur et un site Web afin qu'ils ne circulent pas en clair."
-        "SSH" -> "SSH permet de contrôler un autre ordinateur à distance dans une connexion protégée."
-        "FTP" -> "FTP sert à transférer des fichiers entre un client et un serveur."
-        "HTTP_8080" -> "8080 est simplement un numéro de porte réseau souvent utilisé par un service Web."
-        else -> "Cette notion réalise une fonction précise dans le domaine $category."
-    }
-
-    val simpleSchemaTitle: String
-    val simpleSchema: List<String>
-    val outputTitle: String
-    val output: String
-    val advancedNote: String
-
-    when (key) {
-        "DNS" -> {
-            simpleSchemaTitle = "LE DNS EN UNE IMAGE"
-            simpleSchema = listOf(
-                "Tu écris : example.com",
-                "Ton ordinateur demande : « Quelle est son adresse ? »",
-                "Le DNS cherche la réponse",
-                "Le DNS renvoie une adresse IP",
-                "Ton navigateur peut contacter le site"
-            )
-            outputTitle = "EXEMPLE · CE QUE TU PEUX VOIR"
-            output = """
-> nslookup example.com
-
-Nom :     example.com
-Address:  [adresse IP du site]
-
-À comprendre :
-example.com = le nom humain
-Address = l'adresse trouvée par DNS
-            """.trimIndent()
-            advancedNote = "Quand tu seras à l'aise : DNS utilise souvent le port 53. Il existe plusieurs types de réponses DNS, par exemple A pour une adresse IPv4 et MX pour la messagerie. Tu n'as pas besoin de les mémoriser pour comprendre le rôle de base du DNS."
-        }
-        "DHCP" -> {
-            simpleSchemaTitle = "LE DHCP EN UNE IMAGE"
-            simpleSchema = listOf(
-                "Ton téléphone rejoint le Wi-Fi",
-                "Il demande : « Quels réglages réseau dois-je utiliser ? »",
-                "Le DHCP choisit une adresse disponible",
-                "Il donne IP + passerelle + DNS",
-                "Ton téléphone peut communiquer sur le réseau"
-            )
-            outputTitle = "EXEMPLE · CE QUE DHCP A DONNÉ"
-            output = """
-> ipconfig /all
-
-DHCP activé : Oui
-Adresse IPv4 : 192.168.1.42
-Passerelle : 192.168.1.1
-Serveur DHCP : 192.168.1.1
-Serveur DNS : 1.1.1.1
-
-À comprendre :
-DHCP a rempli ces réglages automatiquement.
-            """.trimIndent()
-            advancedNote = "Quand tu seras à l'aise : l'échange DHCP classique suit quatre messages que l'on résume par DORA. Le serveur utilise généralement UDP 67 et le client UDP 68. Un « bail » signifie simplement que l'adresse est prêtée pour une certaine durée."
-        }
-        "ARP" -> {
-            simpleSchemaTitle = "ARP EN UNE IMAGE"
-            simpleSchema = listOf(
-                "Ton PC veut parler à un appareil du réseau local",
-                "Il connaît son adresse IP",
-                "Il demande : « Quel appareil possède cette IP ? »",
-                "L'appareil répond avec son adresse matérielle",
-                "Ton PC peut lui envoyer les données localement"
-            )
-            outputTitle = "EXEMPLE · TABLE ARP"
-            output = """
-> arp -a
-
-192.168.1.1    34-ab-37-12-56-90
-192.168.1.20   b8-27-eb-44-11-2a
-
-À comprendre :
-à gauche = adresse IP
-à droite = adresse matérielle de l'appareil local
-            """.trimIndent()
-            advancedNote = "Quand tu seras à l'aise : l'adresse matérielle est appelée adresse MAC. ARP concerne surtout IPv4 sur le réseau local. Il peut être détourné par de fausses réponses, ce qu'on appelle souvent ARP spoofing."
-        }
-        "ICMP" -> {
-            simpleSchemaTitle = "PING ET ICMP EN UNE IMAGE"
-            simpleSchema = listOf(
-                "Ton PC envoie : « Est-ce que tu me reçois ? »",
-                "Le message traverse le réseau",
-                "La machine distante répond si elle l'autorise",
-                "Ton PC mesure le temps de réponse",
-                "Tu obtiens un indice sur l'état de la connexion"
-            )
-            outputTitle = "EXEMPLE · PING"
-            output = """
-> ping 1.1.1.1
-
-Réponse de 1.1.1.1 : temps=14 ms
-Réponse de 1.1.1.1 : temps=13 ms
-
-Paquets perdus : 0
-
-À comprendre :
-la machine répond et le réseau fonctionne jusqu'à elle.
-            """.trimIndent()
-            advancedNote = "Quand tu seras à l'aise : ping utilise des messages ICMP appelés Echo Request et Echo Reply. Un ping bloqué ne veut pas forcément dire que la machine est éteinte : un pare-feu peut simplement refuser ce type de message."
-        }
-        "HTTPS" -> {
-            simpleSchemaTitle = "HTTPS EN UNE IMAGE"
-            simpleSchema = listOf(
-                "Tu ouvres un site en https://",
-                "Ton navigateur vérifie le site",
-                "Une connexion protégée est créée",
-                "Tes données sont chiffrées pendant le trajet",
-                "Le serveur et ton navigateur peuvent échanger"
-            )
-            outputTitle = "EXEMPLE · UNE RÉPONSE HTTPS"
-            output = """
-> curl -I https://example.com
-
-HTTP/2 200
-content-type: text/html
-
-À comprendre :
-la connexion vers le site utilise HTTPS.
-Le contenu circule dans une connexion protégée.
-            """.trimIndent()
-            advancedNote = "Quand tu seras à l'aise : HTTPS utilise TLS pour protéger les données et utilise généralement le port 443. Le cadenas signifie que la connexion est protégée, pas forcément que le site lui-même est digne de confiance."
-        }
-        "SSH" -> {
-            simpleSchemaTitle = "SSH EN UNE IMAGE"
-            simpleSchema = listOf(
-                "Tu es devant ton ordinateur",
-                "Tu demandes une connexion vers un serveur",
-                "Le serveur prouve son identité",
-                "Tu t'authentifies",
-                "Tu obtiens un terminal distant protégé"
-            )
-            outputTitle = "EXEMPLE · CONNEXION SSH"
-            output = """
-> ssh utilisateur@192.168.1.50
-
-Password:
-utilisateur@serveur:~$
-
-À comprendre :
-tu écris sur ton PC,
-mais les commandes sont exécutées sur le serveur distant.
-            """.trimIndent()
-            advancedNote = "Quand tu seras à l'aise : SSH utilise généralement le port 22. On peut se connecter avec un mot de passe ou avec des clés. Les clés sont souvent préférées pour l'administration professionnelle."
-        }
-        "FTP" -> {
-            simpleSchemaTitle = "FTP EN UNE IMAGE"
-            simpleSchema = listOf(
-                "Ton ordinateur se connecte à un serveur de fichiers",
-                "Tu t'identifies si nécessaire",
-                "Tu demandes un fichier ou tu en envoies un",
-                "Le fichier est transféré",
-                "La connexion se termine"
-            )
-            outputTitle = "EXEMPLE · CONNEXION FTP"
-            output = """
-> ftp 192.168.1.50
-
-Connected to 192.168.1.50
-Name: utilisateur
-Password:
-Login successful
-
-À comprendre :
-le client est connecté au serveur de fichiers.
-            """.trimIndent()
-            advancedNote = "Quand tu seras à l'aise : FTP classique utilise généralement le port 21 pour les commandes et n'est pas chiffré par défaut. Pour un transfert sécurisé, on préfère souvent SFTP ou FTPS selon le système."
-        }
-        "HTTP_8080" -> {
-            simpleSchemaTitle = "UN PORT EN UNE IMAGE"
-            simpleSchema = listOf(
-                "Une machine possède une adresse IP",
-                "Plusieurs programmes peuvent y fonctionner",
-                "Chaque programme peut écouter sur un numéro de port",
-                "Le client vise ici le port 8080",
-                "Le programme qui écoute sur 8080 reçoit la connexion"
-            )
-            outputTitle = "EXEMPLE · PORT 8080"
-            output = """
-> curl http://192.168.1.50:8080
-
-[réponse du service Web]
-
-À comprendre :
-192.168.1.50 = la machine
-8080 = le point d'entrée choisi sur cette machine
-            """.trimIndent()
-            advancedNote = "Quand tu seras à l'aise : 8080 est souvent utilisé pour du Web alternatif, du développement ou certaines interfaces. Le numéro de port ne garantit pas à lui seul quel programme fonctionne derrière."
-        }
-        else -> {
-            simpleSchemaTitle = "IDÉE PRINCIPALE"
-            simpleSchema = deepDive.schema
-            outputTitle = "EXEMPLE"
-            output = deepDive.demo
-            advancedNote = "Pour aller plus loin, retiens d'abord la fonction principale avant d'ajouter les détails techniques."
-        }
-    }
-
-    val videos = when (key) {
-        "DNS" -> listOf(
-            CyberCourseVideo(
-                title = "Le DNS pour les débutants",
-                channel = "IT-Connect - Florian",
-                url = "https://www.youtube.com/watch?v=tyDxzzdKnsU"
-            )
-        )
-        "DHCP" -> listOf(
-            CyberCourseVideo(
-                title = "Comment fonctionne le DHCP expliqué simplement !",
-                channel = "Formip - Certification IT",
-                url = "https://www.youtube.com/watch?v=qtfW_CbGL9g"
-            ),
-            CyberCourseVideo(
-                title = "Comprendre le fonctionnement du DHCP en moins de 2 minutes !",
-                channel = "Formip - Certification IT",
-                url = "https://www.youtube.com/watch?v=qYBmMgKUNa4"
-            )
-        )
-        "ARP" -> listOf(
-            CyberCourseVideo(
-                title = "Découvre le protocole ARP simplement",
-                channel = "Formip - Certification IT",
-                url = "https://www.youtube.com/watch?v=BOwYZkME8qY"
-            )
-        )
-        else -> emptyList()
-    }
+    val key = resolveCourseKey(original) ?: normalizeCourseTerm(original)
+    val deepDive = beginnerDeepDive(key, original, category)
+    val displayName = beginnerDisplayName(key, original)
+    val memorySentence = beginnerMemory(key, original, category)
+    val simpleSchema = beginnerSimpleSchema(key, deepDive)
 
     return CyberCourse(
         title = "Cours · $displayName",
         subtitle = "Explication simple, pensée pour quelqu'un qui débute",
         memorySentence = memorySentence,
-        objectives = beginnerObjectives(key, displayName),
+        objectives = beginnerObjectives(displayName),
         deepDive = deepDive,
-        simpleSchemaTitle = simpleSchemaTitle,
+        simpleSchemaTitle = "$displayName EN UNE IMAGE",
         simpleSchema = simpleSchema,
-        expectedOutputTitle = outputTitle,
-        expectedOutput = output,
-        checkpoints = beginnerCheckpoints(key),
-        advancedNote = advancedNote,
-        videos = videos,
+        expectedOutputTitle = "CE QU'IL FAUT COMPRENDRE DANS L'EXEMPLE",
+        expectedOutput = beginnerExpectedOutput(key, displayName),
+        checkpoints = beginnerCheckpoints(displayName, memorySentence),
+        advancedNote = beginnerAdvancedNote(key, displayName),
+        videos = beginnerVideos(key),
         videoSearchQuery = "$displayName expliqué simplement français débutant"
     )
 }
 
-private fun beginnerObjectives(key: String, name: String): List<String> = when (key) {
-    "DNS" -> listOf(
-        "Comprendre pourquoi on utilise des noms comme google.com au lieu d'adresses numériques",
-        "Savoir dire en une phrase ce que fait DNS",
-        "Ne plus confondre DNS et DHCP"
-    )
-    "DHCP" -> listOf(
-        "Comprendre pourquoi ton téléphone reçoit automatiquement une adresse réseau",
-        "Savoir ce que DHCP donne réellement à un appareil",
-        "Ne plus confondre DHCP et DNS"
-    )
-    "ARP" -> listOf(
-        "Comprendre pourquoi un ordinateur doit reconnaître les appareils proches",
-        "Savoir ce qu'ARP cherche",
-        "Ne plus confondre ARP, DNS et DHCP"
-    )
-    "ICMP" -> listOf(
-        "Comprendre ce que teste la commande ping",
-        "Savoir à quoi servent les messages ICMP",
-        "Comprendre pourquoi un ping peut parfois être bloqué"
-    )
-    "HTTPS" -> listOf(
-        "Comprendre ce que protège HTTPS",
-        "Savoir ce que signifie le cadenas du navigateur",
-        "Retenir que HTTPS protège le trajet des données"
-    )
-    "SSH" -> listOf(
-        "Comprendre comment on peut administrer un serveur à distance",
-        "Savoir pourquoi SSH protège cette connexion",
-        "Reconnaître une commande SSH simple"
-    )
-    else -> listOf(
-        "Comprendre simplement ce qu'est $name",
-        "Savoir à quoi il sert dans la vraie vie",
-        "Savoir le distinguer des notions proches"
-    )
+private fun beginnerDisplayName(key: String, original: String): String = when (key) {
+    "HTTP_8080" -> "Port 8080"
+    "TASK_SCHEDULER" -> "Task Scheduler"
+    "PUBLIC_KEY" -> "Clé publique"
+    "PRIVATE_KEY" -> "Clé privée"
+    "MASTER_PASSWORD" -> "Mot de passe maître"
+    "SALT" -> "Sel cryptographique"
+    "SQL_INJECTION" -> "Injection SQL"
+    "TROJAN" -> "Cheval de Troie"
+    "FIREWALL" -> "Pare-feu"
+    "HYPERVISOR" -> "Hyperviseur"
+    "REVERSE_PROXY" -> "Proxy inverse"
+    "PENTEST_SCOPE" -> "Périmètre d'un pentest"
+    "INTEGRITY_HASH" -> "Empreinte et intégrité"
+    "DOMAIN_CONTROLLER" -> "Contrôleur de domaine"
+    "SHARED_RESPONSIBILITY" -> "Responsabilité partagée du cloud"
+    "LEAST_PRIVILEGE" -> "Moindre privilège"
+    "SECURITY_PATCHES" -> "Correctifs de sécurité"
+    "SHA256" -> "SHA-256"
+    else -> if (original.length <= 40) original else key.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
 }
 
-private fun beginnerCheckpoints(key: String): List<String> = when (key) {
-    "DNS" -> listOf(
-        "Si tu connais google.com mais pas son adresse IP, quel service t'aide ?",
-        "DNS donne-t-il une adresse IP à ton PC ou cherche-t-il l'adresse d'un nom ?",
-        "Peux-tu expliquer DNS avec l'image d'un annuaire ?"
-    )
-    "DHCP" -> listOf(
-        "Quand ton téléphone rejoint le Wi-Fi, qui peut lui donner automatiquement ses réglages réseau ?",
-        "Cite au moins deux informations que DHCP peut fournir.",
-        "Peux-tu expliquer DHCP avec l'image d'une réception d'hôtel ?"
-    )
-    "ARP" -> listOf(
-        "ARP sert-il surtout à trouver un appareil proche ou un site Internet par son nom ?",
-        "Que connaît ton PC au départ : une IP ou l'adresse matérielle ?",
-        "Peux-tu expliquer ARP sans utiliser de jargon ?"
-    )
-    "ICMP" -> listOf(
-        "Quelle commande très connue utilise ICMP pour tester une réponse ?",
-        "Si ping ne répond pas, la machine est-elle forcément éteinte ?",
-        "Que t'indique approximativement le temps affiché par ping ?"
-    )
-    "HTTPS" -> listOf(
-        "Que protège principalement HTTPS ?",
-        "Le cadenas garantit-il qu'un site est honnête ?",
-        "Quel est le numéro de port habituel de HTTPS si tu veux aller un peu plus loin ?"
-    )
-    "SSH" -> listOf(
-        "SSH permet-il surtout de naviguer sur un site ou de contrôler une machine à distance ?",
-        "Pourquoi protège-t-on la connexion SSH ?",
-        "À quoi ressemble une commande SSH simple ?"
-    )
-    else -> listOf(
-        "Peux-tu expliquer cette notion en une phrase simple ?",
-        "À quoi sert-elle concrètement ?",
-        "Quel exemple du quotidien t'aide à la retenir ?"
-    )
+private fun beginnerMemory(key: String, original: String, category: String): String = when (key) {
+    "DNS" -> "DNS transforme un nom facile à retenir, comme example.com, en une adresse que l'ordinateur peut utiliser."
+    "DHCP" -> "DHCP donne automatiquement à ton appareil les réglages réseau dont il a besoin pour communiquer."
+    "ARP" -> "ARP aide ton ordinateur à retrouver l'appareil correspondant à une adresse IP sur le réseau local."
+    "ICMP" -> "ICMP sert surtout à envoyer des messages de contrôle et de diagnostic, comme ceux utilisés par ping."
+    "HTTPS" -> "HTTPS protège les échanges entre ton navigateur et un site Web afin qu'ils ne circulent pas en clair."
+    "SSH" -> "SSH permet de contrôler un ordinateur distant à travers une connexion protégée."
+    "FTP" -> "FTP sert à transférer des fichiers entre un client et un serveur."
+    "HTTP_8080" -> "8080 est un numéro de porte réseau souvent utilisé par un service Web."
+    "PWD" -> "pwd te dit simplement dans quel dossier tu te trouves dans le terminal Linux."
+    "CD" -> "cd sert à changer de dossier dans le terminal."
+    "LS" -> "ls affiche les fichiers et dossiers présents à l'endroit où tu te trouves."
+    "WHOAMI" -> "whoami affiche quel utilisateur est actuellement utilisé par le terminal."
+    "SUDO" -> "sudo permet à un utilisateur autorisé d'exécuter une commande avec davantage de droits."
+    "GREP" -> "grep cherche du texte dans un fichier ou dans la sortie d'une commande."
+    "NANO" -> "nano est un petit éditeur de texte directement utilisable dans le terminal."
+    "BITLOCKER" -> "BitLocker chiffre un disque Windows pour protéger les données si le support est volé ou lu ailleurs."
+    "DEFRAG" -> "Defrag réorganise des données sur certains disques ; il ne chiffre pas les fichiers."
+    "NOTEPAD" -> "Notepad est simplement l'éditeur de texte de base de Windows."
+    "TASK_SCHEDULER" -> "Task Scheduler lance automatiquement des programmes ou scripts à une heure ou lors d'un événement."
+    "AES" -> "AES chiffre des données avec une clé secrète partagée entre le chiffrement et le déchiffrement."
+    "RSA" -> "RSA utilise deux clés liées : une peut être publique et l'autre doit rester privée."
+    "ECDSA" -> "ECDSA sert surtout à créer et vérifier des signatures numériques."
+    "SHA256" -> "SHA-256 crée une empreinte d'une donnée afin de pouvoir vérifier si elle a changé."
+    "PUBLIC_KEY" -> "Une clé publique peut être partagée ; elle fonctionne avec une clé privée qui, elle, reste secrète."
+    "PRIVATE_KEY" -> "Une clé privée doit rester secrète : elle représente la partie sensible d'une paire de clés."
+    "MASTER_PASSWORD" -> "Un mot de passe maître protège généralement l'accès à un ensemble de secrets, par exemple un coffre de mots de passe."
+    "SALT" -> "Un sel est une valeur aléatoire ajoutée avant de hacher un mot de passe pour rendre les empreintes plus difficiles à réutiliser."
+    "XSS" -> "XSS est une faille Web où du code non prévu peut être exécuté dans le navigateur d'un utilisateur."
+    "CSRF" -> "CSRF pousse le navigateur d'un utilisateur déjà connecté à effectuer une action qu'il n'avait pas voulue."
+    "SQL_INJECTION" -> "Une injection SQL arrive quand une entrée utilisateur modifie dangereusement une requête envoyée à une base de données."
+    "SSRF" -> "SSRF pousse un serveur vulnérable à faire une requête vers une destination qu'il ne devrait pas contacter."
+    "DNSSEC" -> "DNSSEC ajoute des vérifications cryptographiques aux réponses DNS pour aider à détecter une réponse falsifiée."
+    "NAT" -> "NAT traduit des adresses réseau, par exemple pour permettre à plusieurs appareils privés de partager une adresse publique."
+    "SPYWARE" -> "Un spyware est un logiciel espion qui cherche à collecter discrètement des informations."
+    "RANSOMWARE" -> "Un ransomware bloque ou chiffre des données puis réclame généralement une rançon."
+    "ROOTKIT" -> "Un rootkit cherche surtout à rester caché dans un système et à conserver un accès privilégié."
+    "ADWARE" -> "Un adware affiche ou injecte de la publicité, parfois de façon très intrusive."
+    "TROJAN" -> "Un cheval de Troie paraît légitime ou utile afin de convaincre l'utilisateur de l'exécuter."
+    "FIREWALL" -> "Un pare-feu décide quelles communications réseau sont autorisées et lesquelles sont bloquées."
+    "HYPERVISOR" -> "Un hyperviseur permet de faire fonctionner plusieurs machines virtuelles sur une même machine physique."
+    "REVERSE_PROXY" -> "Un proxy inverse reçoit une requête Web puis la transmet au vrai serveur placé derrière lui."
+    "PHISHING" -> "Le phishing cherche à tromper une personne pour lui faire révéler une information ou effectuer une action."
+    "VISHING" -> "Le vishing est simplement du phishing réalisé par téléphone ou par la voix."
+    "SMURFING" -> "Smurfing désigne une ancienne attaque réseau qui amplifie du trafic ICMP pour saturer une cible."
+    "HASHING" -> "Le hashing transforme une donnée en une empreinte courte utilisée notamment pour comparer ou vérifier des données."
+    "HARDENING" -> "Le hardening consiste à désactiver ou sécuriser ce qui n'est pas nécessaire afin de réduire les possibilités d'attaque."
+    "OSINT" -> "OSINT consiste à chercher et analyser des informations provenant de sources publiques et accessibles légalement."
+    "NMAP" -> "Nmap aide à voir quels appareils, ports et services sont visibles sur un réseau que tu es autorisé à analyser."
+    "GIT" -> "Git garde l'historique des modifications d'un projet et permet de revenir à des versions précédentes."
+    "DOCKER" -> "Docker exécute une application dans un conteneur isolé avec ce dont elle a besoin."
+    "GRADLE" -> "Gradle automatise la construction d'un projet, par exemple compiler une application Android et gérer ses dépendances."
+    "MFA" -> "MFA demande plusieurs preuves différentes avant d'autoriser une connexion, par exemple mot de passe + validation sur téléphone."
+    "INTEGRITY_HASH" -> "Une empreinte cryptographique permet de vérifier qu'une copie de preuve n'a pas été modifiée."
+    "PENTEST_SCOPE" -> "Avant un pentest, on définit exactement ce qui peut être testé et on obtient une autorisation claire."
+    "DOMAIN_CONTROLLER" -> "Un contrôleur de domaine aide une organisation à gérer de façon centrale les comptes, ordinateurs et connexions."
+    "SHARED_RESPONSIBILITY" -> "Dans le cloud, le fournisseur protège certaines choses et le client reste responsable d'autres réglages et données."
+    "LEAST_PRIVILEGE" -> "Le moindre privilège signifie donner uniquement les permissions nécessaires, et pas davantage."
+    "SECURITY_PATCHES" -> "Un correctif de sécurité répare une faiblesse connue afin de réduire le risque qu'elle soit exploitée."
+    else -> summarizeCyberChoice(original, category)
 }
 
-private fun dnsBeginnerCourse() = CyberChoiceDeepDive(
-    definition = "DNS signifie Domain Name System. Son rôle le plus simple est de faire le lien entre un nom facile à retenir, comme example.com, et l'adresse utilisée par les ordinateurs pour trouver le bon serveur.",
-    action = "DNS sert à répondre à une question très simple : « Je connais le nom du site, mais où se trouve-t-il sur le réseau ? ». Sans DNS, il faudrait souvent retenir des adresses numériques au lieu de noms.",
-    actions = listOf(
-        "reçoit le nom que ton appareil veut trouver",
-        "cherche si l'adresse correspondante est déjà connue",
-        "sinon demande la réponse à d'autres serveurs DNS",
-        "renvoie l'adresse trouvée à ton appareil"
-    ),
-    details = "Quand tu ouvres un site, ton ordinateur commence souvent par regarder s'il connaît déjà l'adresse. S'il ne la connaît pas, il demande à un serveur DNS. Ce serveur cherche la réponse et la renvoie. Ton navigateur peut alors contacter directement le serveur du site. L'idée importante est seulement : nom → recherche DNS → adresse → connexion.",
-    example = "Tu écris example.com dans ton navigateur. Ton ordinateur ne peut pas envoyer les données uniquement avec ce nom. DNS trouve l'adresse correspondant à example.com, puis le navigateur utilise cette adresse pour joindre le site.",
-    demoTitle = "COMMANDE SIMPLE",
-    demo = """
-> nslookup example.com
+private fun beginnerSimpleSchema(key: String, deepDive: CyberChoiceDeepDive): List<String> = when (key) {
+    "DNS" -> listOf("Tu écris un nom de site", "DNS cherche son adresse", "DNS renvoie l'adresse", "Le navigateur contacte le site")
+    "DHCP" -> listOf("Ton appareil rejoint le réseau", "Il demande ses réglages", "DHCP donne IP + passerelle + DNS", "L'appareil peut communiquer")
+    "ARP" -> listOf("Ton PC connaît une IP locale", "Il cherche quel appareil possède cette IP", "ARP obtient son adresse matérielle", "Le PC peut lui envoyer les données")
+    "HTTPS" -> listOf("Tu ouvres un site HTTPS", "Le navigateur vérifie le serveur", "Une connexion protégée est créée", "Les données circulent chiffrées")
+    "SSH" -> listOf("Tu demandes une connexion distante", "Le serveur est vérifié", "Tu t'authentifies", "Tu obtiens un terminal distant protégé")
+    "PHISHING" -> listOf("Un message paraît crédible", "Il crée de l'urgence ou de la confiance", "La victime est poussée à agir", "L'attaquant cherche une information ou un accès")
+    "MFA" -> listOf("Tu saisis ton mot de passe", "Un second facteur est demandé", "Le second facteur est vérifié", "L'accès est accordé")
+    "LEAST_PRIVILEGE" -> listOf("On identifie la tâche", "On donne seulement les droits nécessaires", "La tâche peut être faite", "Le risque est limité")
+    else -> deepDive.schema.take(5).ifEmpty { listOf("Un besoin apparaît", "La notion agit", "Un résultat est produit") }
+}
 
-Cherche surtout la ligne :
-Address: ...
+private fun beginnerExpectedOutput(key: String, name: String): String = when (key) {
+    "DNS" -> "Avec nslookup, repère surtout le nom demandé puis l'adresse IP renvoyée. C'est la traduction réalisée par DNS."
+    "DHCP" -> "Avec ipconfig /all, regarde l'adresse IPv4, la passerelle, le serveur DHCP et le DNS : ce sont des réglages que DHCP peut fournir."
+    "ARP" -> "Avec arp -a, tu vois des associations entre adresses IP locales et adresses matérielles."
+    "ICMP" -> "Avec ping, regarde si une réponse revient, le temps de réponse et le nombre de paquets perdus."
+    "PWD" -> "La commande renvoie un chemin, par exemple /home/alex/Documents : c'est le dossier courant."
+    "LS" -> "La commande affiche les noms des fichiers et dossiers présents."
+    "WHOAMI" -> "La commande affiche un nom d'utilisateur : c'est le compte qui exécute la commande."
+    "BITLOCKER" -> "Le statut indique si le volume est chiffré et si la protection BitLocker est active."
+    "SHA256", "INTEGRITY_HASH" -> "Deux fichiers identiques produisent la même empreinte SHA-256 ; si le contenu change, l'empreinte change aussi."
+    "NMAP" -> "Dans un labo autorisé, la sortie peut montrer un port ouvert et le service associé. Le but est d'observer, pas d'attaquer."
+    "MFA" -> "Il n'y a pas forcément une commande : dans la vraie vie, tu vois une deuxième étape après le mot de passe, par exemple un code ou une validation."
+    else -> "Regarde surtout trois choses : ce qui entre, l'action réalisée par $name, puis le résultat obtenu. Les valeurs exactes peuvent changer selon le système."
+}
 
-C'est l'adresse trouvée pour le nom demandé.
-    """.trimIndent(),
-    analogy = "DNS ressemble au répertoire de ton téléphone. Tu appuies sur le nom « Maman » ; ton téléphone retrouve le numéro enregistré et l'utilise pour appeler. Toi, tu retiens le nom. Le système retrouve l'adresse.",
-    schema = listOf(
-        "Nom du site",
-        "Question envoyée au DNS",
-        "DNS trouve l'adresse",
-        "Adresse renvoyée",
-        "Connexion au site"
-    )
+private fun beginnerAdvancedNote(key: String, name: String): String = when (key) {
+    "DNS" -> "Optionnel : DNS utilise souvent le port 53. Il existe plusieurs types de réponses DNS, mais tu n'as pas besoin de les mémoriser pour comprendre son rôle de base."
+    "DHCP" -> "Optionnel : l'échange classique est souvent résumé par DORA. Le serveur utilise généralement UDP 67 et le client UDP 68. Un bail signifie simplement que l'adresse est prêtée pour une durée."
+    "ARP" -> "Optionnel : l'adresse matérielle est appelée adresse MAC. ARP concerne surtout IPv4 sur le réseau local."
+    "HTTPS" -> "Optionnel : HTTPS utilise TLS pour protéger les données et utilise généralement le port 443."
+    "SSH" -> "Optionnel : SSH utilise généralement le port 22 et peut utiliser des clés au lieu d'un mot de passe."
+    "AES" -> "Optionnel : AES est un chiffrement symétrique, ce qui signifie que la même clé secrète sert pour chiffrer et déchiffrer."
+    "RSA" -> "Optionnel : RSA est asymétrique : il fonctionne avec une paire clé publique / clé privée."
+    "XSS" -> "Optionnel : on distingue plusieurs formes de XSS. Pour l'instant, retiens surtout que du contenu non fiable finit exécuté comme code dans le navigateur."
+    "NMAP" -> "Optionnel : Nmap possède beaucoup d'options. Pour débuter, retiens seulement qu'il sert à observer les hôtes, ports et services d'un périmètre autorisé."
+    else -> "Optionnel : lorsque l'idée principale est claire, tu peux apprendre le vocabulaire et les détails techniques associés à $name."
+}
+
+private fun beginnerObjectives(name: String): List<String> = listOf(
+    "Pouvoir expliquer $name avec des mots simples",
+    "Comprendre à quoi cette notion sert réellement",
+    "Reconnaître un exemple concret sans apprendre une définition par cœur"
 )
 
-private fun dhcpBeginnerCourse() = CyberChoiceDeepDive(
-    definition = "DHCP signifie Dynamic Host Configuration Protocol. Son rôle est de donner automatiquement à un appareil les informations dont il a besoin pour fonctionner correctement sur un réseau.",
-    action = "DHCP évite que tu aies à remplir toi-même les réglages réseau de ton téléphone ou de ton ordinateur. Il peut donner une adresse IP, la passerelle pour sortir du réseau local et l'adresse du service DNS.",
-    actions = listOf(
-        "repère qu'un nouvel appareil demande une configuration",
-        "choisit une adresse IP disponible",
-        "envoie les principaux réglages réseau",
-        "garde en mémoire que cette adresse est utilisée pendant un certain temps"
-    ),
-    details = "Quand ton appareil rejoint un réseau, il demande automatiquement s'il existe un service capable de le configurer. Le serveur DHCP lui propose des réglages. L'appareil les accepte, puis il peut communiquer. L'adresse donnée n'est pas forcément définitive : elle est généralement prêtée pour une durée appelée bail. Pour commencer, retiens surtout : DHCP configure automatiquement l'appareil.",
-    example = "Tu arrives chez un ami et connectes ton téléphone au Wi-Fi. Tu tapes seulement le mot de passe Wi-Fi. Tu ne renseignes aucune adresse réseau à la main. Quelques secondes plus tard, Internet fonctionne : DHCP a fourni les réglages nécessaires en arrière-plan.",
-    demoTitle = "COMMANDE SIMPLE SOUS WINDOWS",
-    demo = """
-> ipconfig /all
-
-Cherche :
-DHCP activé
-Adresse IPv4
-Passerelle par défaut
-Serveur DHCP
-Serveurs DNS
-    """.trimIndent(),
-    analogy = "Imagine un hôtel. Tu arrives à la réception sans numéro de chambre. La réception te donne une chambre disponible, t'indique la sortie et les services utiles. DHCP fait pareil avec un appareil : il lui donne les informations nécessaires pour trouver sa place sur le réseau.",
-    schema = listOf(
-        "Appareil rejoint le réseau",
-        "Il demande une configuration",
-        "DHCP choisit une adresse",
-        "DHCP envoie les réglages",
-        "Appareil prêt à communiquer"
-    )
+private fun beginnerCheckpoints(name: String, memory: String): List<String> = listOf(
+    "Peux-tu dire avec tes propres mots ce qu'est $name ?",
+    "Quel problème $name aide-t-il à résoudre ?",
+    "Peux-tu donner un exemple du quotidien ou sur un ordinateur ?",
+    "Phrase à comparer avec ta réponse : $memory"
 )
 
-private fun arpBeginnerCourse() = CyberChoiceDeepDive(
-    definition = "ARP signifie Address Resolution Protocol. Il aide un ordinateur à reconnaître physiquement un autre appareil qui se trouve sur le même réseau local.",
-    action = "Ton ordinateur peut connaître l'adresse IP d'un appareil proche sans encore savoir exactement à quel matériel local envoyer les données. ARP lui permet de demander : « Qui possède cette adresse IP ? ».",
-    actions = listOf(
-        "regarde si la réponse est déjà mémorisée",
-        "sinon demande sur le réseau local qui possède l'adresse IP recherchée",
-        "reçoit la réponse de l'appareil concerné",
-        "mémorise cette correspondance pendant un moment"
-    ),
-    details = "Sur ton réseau local, plusieurs appareils sont connectés au même routeur ou au même équipement réseau. Quand ton PC veut parler directement à l'un d'eux, ARP l'aide à retrouver le bon appareil à partir de son adresse IP. Tu peux donc voir ARP comme un petit service de mise en relation entre l'adresse IP et l'appareil local.",
-    example = "Ton PC veut envoyer quelque chose à l'imprimante 192.168.1.20. Il demande sur le réseau : « Quel appareil possède 192.168.1.20 ? ». L'imprimante répond. Ton PC sait alors à quel appareil local envoyer les données.",
-    demoTitle = "COMMANDE SIMPLE",
-    demo = """
-> arp -a
-
-Tu verras des lignes du type :
-192.168.1.1    34-ab-37-12-56-90
-
-La première valeur est l'adresse IP.
-La seconde identifie le matériel local.
-    """.trimIndent(),
-    analogy = "Imagine une résidence. Tu connais le numéro d'appartement, mais tu veux savoir quelle boîte aux lettres correspond à cet appartement. ARP pose la question aux voisins et mémorise la réponse.",
-    schema = listOf(
-        "Je connais l'IP de l'appareil",
-        "ARP demande qui possède cette IP",
-        "L'appareil concerné répond",
-        "La réponse est mémorisée",
-        "Les données peuvent être envoyées localement"
+private fun beginnerVideos(key: String): List<CyberCourseVideo> = when (key) {
+    "DNS" -> listOf(
+        CyberCourseVideo(
+            title = "Le DNS pour les débutants",
+            channel = "IT-Connect - Florian",
+            url = "https://www.youtube.com/watch?v=tyDxzzdKnsU"
+        )
     )
-)
-
-private fun icmpBeginnerCourse() = CyberChoiceDeepDive(
-    definition = "ICMP est un système de messages utilisé par les appareils réseau pour donner des informations simples sur l'état d'une communication. La commande ping utilise ICMP.",
-    action = "ICMP sert surtout au diagnostic. Il peut aider à savoir si une machine répond ou signaler qu'un problème est survenu pendant le trajet des données.",
-    actions = listOf(
-        "envoie un petit message de test",
-        "attend une réponse",
-        "mesure le temps nécessaire pour l'aller-retour",
-        "peut signaler certains problèmes de réseau"
-    ),
-    details = "Avec ping, ton ordinateur envoie un petit message. Si la machine distante accepte de répondre, elle renvoie un message. Ton PC affiche alors le temps de réponse. C'est un test utile, mais pas une preuve absolue : certains pare-feu bloquent volontairement ces messages.",
-    example = "Internet semble lent. Tu lances ping vers une adresse connue. Si les réponses arrivent, tu sais qu'une partie du réseau fonctionne. Si elles n'arrivent pas, il faut continuer le diagnostic au lieu de conclure immédiatement que la machine distante est éteinte.",
-    demoTitle = "COMMANDE SIMPLE",
-    demo = """
-> ping 1.1.1.1
-
-Cherche :
-Réponse de ...
-temps=... ms
-perdus=0
-
-Le temps indique approximativement la durée de l'aller-retour.
-    """.trimIndent(),
-    analogy = "C'est comme crier « Tu m'entends ? » dans une pièce et attendre « Oui ! ». Tu sais qu'une réponse revient, et tu peux estimer combien de temps elle a mis.",
-    schema = listOf(
-        "Ton PC envoie un message de test",
-        "Le réseau transporte le message",
-        "La machine distante répond",
-        "La réponse revient",
-        "Ton PC affiche le temps"
+    "DHCP" -> listOf(
+        CyberCourseVideo(
+            title = "Comment fonctionne le DHCP expliqué simplement !",
+            channel = "Formip - Certification IT",
+            url = "https://www.youtube.com/watch?v=qtfW_CbGL9g"
+        )
     )
-)
-
-private fun httpsBeginnerCourse() = CyberChoiceDeepDive(
-    definition = "HTTPS est la version protégée des échanges Web. Quand l'adresse d'un site commence par https://, le navigateur crée une connexion chiffrée avec le serveur.",
-    action = "HTTPS sert à empêcher qu'une personne placée sur le trajet puisse lire facilement ce que tu envoies ou modifier les données sans être détectée.",
-    actions = listOf(
-        "contacte le serveur du site",
-        "vérifie que le serveur présente une identité numérique valable",
-        "crée une connexion chiffrée",
-        "fait ensuite circuler les pages et formulaires dans cette connexion protégée"
-    ),
-    details = "Avant d'envoyer la page ou ton mot de passe, le navigateur et le serveur mettent en place une connexion protégée. Ensuite, les données sont transformées de façon à ne pas être lisibles simplement pendant leur trajet. C'est la partie essentielle à retenir.",
-    example = "Tu te connectes à un site bancaire depuis un Wi-Fi public. HTTPS protège le contenu envoyé entre ton navigateur et le serveur. Quelqu'un qui observe seulement le réseau ne devrait pas voir ton mot de passe en clair.",
-    demoTitle = "EXEMPLE SIMPLE",
-    demo = """
-Adresse protégée :
-https://example.com
-
-Indice visuel :
-le navigateur affiche généralement un symbole indiquant que la connexion est sécurisée.
-    """.trimIndent(),
-    analogy = "Imagine que ton message voyage dans une enveloppe fermée plutôt que sur une carte postale. Les personnes sur le trajet voient qu'une enveloppe circule, mais pas directement ce qu'elle contient.",
-    schema = listOf(
-        "Navigateur contacte le site",
-        "Le site prouve son identité",
-        "Connexion protégée créée",
-        "Données chiffrées pendant le trajet",
-        "Page reçue par le navigateur"
+    "ARP" -> listOf(
+        CyberCourseVideo(
+            title = "Découvre le protocole ARP simplement",
+            channel = "Formip - Certification IT",
+            url = "https://www.youtube.com/watch?v=BOwYZkME8qY"
+        )
     )
-)
+    else -> emptyList()
+}
 
-private fun sshBeginnerCourse() = CyberChoiceDeepDive(
-    definition = "SSH signifie Secure Shell. Il permet d'utiliser à distance le terminal d'un autre ordinateur à travers une connexion protégée.",
-    action = "SSH sert beaucoup à administrer des serveurs. Tu peux être devant ton ordinateur personnel et envoyer des commandes à un serveur situé ailleurs.",
-    actions = listOf(
-        "contacte l'ordinateur distant",
-        "vérifie l'identité du serveur",
-        "demande à l'utilisateur de s'authentifier",
-        "ouvre un terminal distant protégé"
-    ),
-    details = "Une fois connecté, ce que tu tapes dans ton terminal local est envoyé au serveur. Le serveur exécute les commandes puis renvoie le résultat. La connexion est chiffrée pour protéger les échanges pendant le trajet.",
-    example = "Un administrateur doit vérifier l'espace disque d'un serveur qui se trouve dans un datacenter. Il utilise SSH depuis son PC, ouvre un terminal distant et lance la commande sans se déplacer devant le serveur.",
-    demoTitle = "COMMANDE SIMPLE",
-    demo = """
-> ssh utilisateur@192.168.1.50
-
-Puis, après connexion :
-utilisateur@serveur:~$
-
-Tu es maintenant dans le terminal du serveur distant.
-    """.trimIndent(),
-    analogy = "SSH ressemble à une télécommande sécurisée pour ordinateur. Tu restes chez toi, mais tes actions sont exécutées sur la machine distante.",
-    schema = listOf(
-        "Ton ordinateur",
-        "Connexion SSH protégée",
-        "Authentification",
-        "Serveur distant",
-        "Terminal distant disponible"
+private fun beginnerDeepDive(key: String, original: String, category: String): CyberChoiceDeepDive = when (key) {
+    "PUBLIC_KEY" -> simpleDeepDive(
+        definition = "Une clé publique est une donnée cryptographique conçue pour pouvoir être partagée.",
+        role = "Elle permet à d'autres personnes ou logiciels de réaliser certaines opérations avec toi sans connaître ta clé privée.",
+        actions = listOf("elle peut être diffusée", "elle fonctionne avec une clé privée liée", "elle peut servir à chiffrer vers toi ou à vérifier certaines signatures selon le système"),
+        how = "Imagine une boîte aux lettres : tout le monde peut connaître l'ouverture permettant de déposer un message, mais seule la personne qui possède la clé privée peut effectuer l'opération secrète correspondante.",
+        example = "Un serveur peut publier une clé publique tandis que sa clé privée reste protégée sur le serveur.",
+        demoTitle = "EXEMPLE VISUEL",
+        demo = "Clé publique  → partageable\nClé privée    → secrète\nLes deux sont liées mathématiquement.",
+        analogy = "La clé publique ressemble à l'adresse de ta boîte aux lettres : tu peux la donner à tout le monde sans donner la clé qui ouvre la boîte.",
+        schema = listOf("Création d'une paire de clés", "Clé publique partagée", "Clé privée gardée secrète", "Les deux servent ensemble selon le mécanisme")
     )
-)
-
-private fun ftpBeginnerCourse() = CyberChoiceDeepDive(
-    definition = "FTP signifie File Transfer Protocol. C'est un protocole ancien utilisé pour envoyer et récupérer des fichiers sur un serveur.",
-    action = "FTP sert à déplacer des fichiers entre deux machines, par exemple envoyer un fichier vers un serveur ou télécharger un fichier depuis ce serveur.",
-    actions = listOf(
-        "se connecte au serveur de fichiers",
-        "authentifie l'utilisateur si nécessaire",
-        "permet de lister les fichiers",
-        "envoie ou télécharge les fichiers demandés"
-    ),
-    details = "Le principe est simple : un client FTP se connecte au serveur, l'utilisateur s'identifie, puis il peut gérer des fichiers selon ses droits. FTP classique est ancien et ne protège pas automatiquement les données pendant le trajet.",
-    example = "Une ancienne entreprise possède un serveur FTP pour recevoir des fichiers. Un utilisateur s'y connecte puis dépose un document. Sur un réseau non fiable, on préfère aujourd'hui une solution de transfert protégée.",
-    demoTitle = "COMMANDE SIMPLE",
-    demo = """
-> ftp 192.168.1.50
-
-Connected to 192.168.1.50
-Name: utilisateur
-Password:
-    """.trimIndent(),
-    analogy = "FTP ressemble à un comptoir de dépôt de colis : tu t'identifies, tu déposes un fichier ou tu en récupères un.",
-    schema = listOf(
-        "Client FTP",
-        "Connexion au serveur",
-        "Authentification",
-        "Choix du fichier",
-        "Envoi ou téléchargement"
+    "PRIVATE_KEY" -> simpleDeepDive(
+        definition = "Une clé privée est la partie secrète d'une paire de clés cryptographiques.",
+        role = "Elle doit rester protégée car celui qui la possède peut effectuer les opérations réservées au propriétaire de la paire de clés.",
+        actions = listOf("elle reste secrète", "elle peut servir à déchiffrer ou signer selon le système", "elle ne doit pas être envoyée comme une clé publique"),
+        how = "Une paire de clés est créée ensemble. La partie publique peut être diffusée ; la partie privée reste sur ton appareil ou dans un stockage protégé.",
+        example = "Dans SSH, une clé privée peut rester sur ton ordinateur tandis que la clé publique correspondante est installée sur le serveur.",
+        demoTitle = "EXEMPLE VISUEL",
+        demo = "TON PC : clé privée [SECRÈTE]\nSERVEUR : clé publique [PARTAGEABLE]",
+        analogy = "C'est la vraie clé de ta maison : tu peux donner ton adresse à quelqu'un, mais tu ne distribues pas la clé de la porte.",
+        schema = listOf("Paire de clés créée", "Partie publique partagée", "Partie privée protégée", "La preuve cryptographique utilise la partie privée")
     )
-)
-
-private fun http8080BeginnerCourse() = CyberChoiceDeepDive(
-    definition = "8080 est un numéro de port. Un port est comme un numéro de porte qui permet de savoir quel programme d'une machine doit recevoir une connexion réseau.",
-    action = "Le port 8080 est souvent utilisé par des applications Web quand elles n'utilisent pas le port Web habituel. Il ne chiffre rien et n'est pas un protocole à lui seul.",
-    actions = listOf(
-        "identifie un point d'entrée sur une machine",
-        "dirige la connexion vers le programme qui écoute sur ce numéro",
-        "permet à plusieurs programmes réseau de fonctionner sur la même adresse IP"
-    ),
-    details = "Une machine peut faire fonctionner plusieurs services en même temps. Ils partagent la même adresse IP, mais utilisent des ports différents. Si une application écoute sur 8080, le client précise :8080 dans l'adresse pour demander ce service précis.",
-    example = "Tu ouvres http://192.168.1.50:8080. 192.168.1.50 désigne la machine. 8080 indique quel service de cette machine tu veux joindre.",
-    demoTitle = "EXEMPLE SIMPLE",
-    demo = """
-http://192.168.1.50:8080
-
-192.168.1.50 = machine
-8080 = numéro de porte réseau
-    """.trimIndent(),
-    analogy = "L'adresse IP est l'adresse d'un immeuble. Le port est le numéro d'une porte à l'intérieur. 8080 est simplement l'une de ces portes possibles.",
-    schema = listOf(
-        "Adresse de la machine",
-        "Port 8080 demandé",
-        "Programme qui écoute sur 8080",
-        "Connexion acceptée",
-        "Réponse envoyée au client"
+    "MASTER_PASSWORD" -> simpleDeepDive(
+        definition = "Un mot de passe maître est un mot de passe principal utilisé pour déverrouiller un coffre contenant d'autres secrets.",
+        role = "Il évite d'avoir à mémoriser chaque mot de passe tout en protégeant l'accès au coffre.",
+        actions = listOf("déverrouille le coffre", "protège indirectement plusieurs secrets", "doit être particulièrement fort et unique"),
+        how = "Tu saisis le mot de passe maître au gestionnaire de mots de passe. S'il est correct, le coffre local peut être déverrouillé.",
+        example = "Un gestionnaire contient tes mots de passe de sites ; tu mémorises surtout le mot de passe maître du gestionnaire.",
+        demoTitle = "SCHÉMA",
+        demo = "Mot de passe maître → coffre chiffré → mots de passe enregistrés",
+        analogy = "C'est la clé du coffre-fort qui contient toutes les autres clés.",
+        schema = listOf("Tu saisis le mot de passe maître", "Le coffre est déverrouillé", "Les secrets deviennent accessibles", "Tu refermes le coffre")
     )
+    "SALT" -> simpleDeepDive(
+        definition = "Un sel cryptographique est une valeur aléatoire ajoutée à un mot de passe avant de calculer son empreinte.",
+        role = "Il fait en sorte que deux utilisateurs ayant le même mot de passe n'obtiennent pas forcément la même empreinte stockée.",
+        actions = listOf("un sel aléatoire est créé", "il est combiné au mot de passe", "le tout est haché", "le sel peut être stocké avec l'empreinte"),
+        how = "Le système ne cherche pas à cacher le sel. Son intérêt est de rendre chaque calcul différent et de compliquer les attaques basées sur des résultats déjà préparés.",
+        example = "Alice et Bob utilisent le même mot de passe mais ont deux sels différents : leurs empreintes stockées seront différentes.",
+        demoTitle = "EXEMPLE SIMPLE",
+        demo = "motdepasse + sel_A → empreinte_A\nmotdepasse + sel_B → empreinte_B",
+        analogy = "C'est comme ajouter un ingrédient aléatoire différent à deux recettes identiques : le résultat final n'est plus exactement le même.",
+        schema = listOf("Mot de passe", "+ sel aléatoire", "Calcul de l'empreinte", "Empreinte unique stockée")
+    )
+    "PHISHING" -> simpleDeepDive(
+        definition = "Le phishing est une technique de manipulation où quelqu'un se fait passer pour une personne ou un service de confiance.",
+        role = "Le but est de te pousser à donner une information, ouvrir un lien, envoyer de l'argent ou valider une action que tu n'aurais pas faite normalement.",
+        actions = listOf("crée un message crédible", "utilise souvent urgence, peur ou curiosité", "te dirige vers une action", "récupère l'information ou l'accès si tu te laisses tromper"),
+        how = "L'attaque vise surtout la personne. Le message peut imiter une banque, un collègue, une livraison ou un service connu.",
+        example = "Tu reçois : « Votre colis est bloqué, payez 1,99 € ici ». Le lien mène vers un faux site qui demande tes coordonnées.",
+        demoTitle = "EXEMPLE DE MESSAGE SUSPECT",
+        demo = "URGENT : votre compte sera fermé aujourd'hui.\nCliquez ici et confirmez votre mot de passe.",
+        analogy = "C'est quelqu'un déguisé en livreur qui essaie de te convaincre de lui donner les clés de la maison.",
+        schema = listOf("Faux message crédible", "Création d'urgence", "Victime clique ou répond", "Information ou action récupérée")
+    )
+    "INTEGRITY_HASH" -> simpleDeepDive(
+        definition = "Une empreinte cryptographique est une courte valeur calculée à partir d'un fichier ou d'une donnée.",
+        role = "En investigation numérique, elle permet de vérifier qu'une copie analysée est restée identique à la preuve d'origine.",
+        actions = listOf("on calcule l'empreinte de la preuve", "on travaille sur une copie", "on recalcule l'empreinte", "on compare les deux valeurs"),
+        how = "Si le contenu change, même légèrement, l'empreinte doit normalement changer. Une empreinte identique permet donc de vérifier l'intégrité de la copie.",
+        example = "Une image disque est copiée. On calcule SHA-256 avant puis après le transfert et on vérifie que les deux valeurs correspondent.",
+        demoTitle = "POWERSHELL",
+        demo = "Get-FileHash .\\preuve.img -Algorithm SHA256",
+        analogy = "L'empreinte est comme un sceau numérique : si le contenu du colis change, le sceau calculé ne correspond plus.",
+        schema = listOf("Preuve originale", "Calcul d'une empreinte", "Copie de travail", "Nouveau calcul", "Comparaison des empreintes")
+    )
+    "PENTEST_SCOPE" -> simpleDeepDive(
+        definition = "Le périmètre d'un pentest définit précisément ce que le testeur a le droit de tester.",
+        role = "Il protège le client et le testeur en évitant de toucher à des systèmes ou méthodes qui n'ont pas été autorisés.",
+        actions = listOf("on obtient une autorisation écrite", "on liste les systèmes concernés", "on définit les méthodes et horaires permis", "on précise les contacts en cas de problème"),
+        how = "Avant toute action technique, les deux parties se mettent d'accord sur les limites. Le test doit rester à l'intérieur de ces limites.",
+        example = "Le contrat autorise les tests sur app.exemple.test entre 20 h et 6 h, mais interdit tout test sur le serveur de production principal.",
+        demoTitle = "EXEMPLE DE PÉRIMÈTRE",
+        demo = "Autorisé : app.exemple.test\nInterdit : production.exemple.test\nPériode : 20:00 → 06:00",
+        analogy = "C'est comme un plombier autorisé à travailler dans ta salle de bain mais pas à démonter l'installation électrique de toute la maison.",
+        schema = listOf("Autorisation", "Périmètre défini", "Test dans les limites", "Résultats documentés")
+    )
+    "DOMAIN_CONTROLLER" -> simpleDeepDive(
+        definition = "Un contrôleur de domaine est un serveur central d'un environnement Active Directory.",
+        role = "Il aide à vérifier les comptes et à fournir les informations de l'annuaire pour les utilisateurs et ordinateurs de l'organisation.",
+        actions = listOf("conserve des informations de l'annuaire", "participe à la vérification des connexions", "aide à appliquer une gestion centralisée"),
+        how = "Quand un utilisateur se connecte à un ordinateur du domaine, l'environnement peut demander au contrôleur de domaine de vérifier son identité et ses droits.",
+        example = "Dans une entreprise, Alice utilise le même compte professionnel pour se connecter à plusieurs postes gérés par le domaine.",
+        demoTitle = "SCHÉMA SIMPLE",
+        demo = "PC d'Alice → contrôleur de domaine → compte vérifié → session ouverte",
+        analogy = "C'est l'accueil central d'une entreprise qui connaît les employés et vérifie leur badge avant de leur donner accès.",
+        schema = listOf("Utilisateur demande une connexion", "Le domaine vérifie son compte", "Les informations d'accès sont contrôlées", "La session est autorisée ou refusée")
+    )
+    "SHARED_RESPONSIBILITY" -> simpleDeepDive(
+        definition = "La responsabilité partagée signifie que la sécurité du cloud est répartie entre le fournisseur et le client.",
+        role = "Elle rappelle que mettre un service dans le cloud ne transfère pas automatiquement toute la sécurité au fournisseur.",
+        actions = listOf("le fournisseur protège son infrastructure", "le client protège ses comptes et données", "la répartition exacte dépend du service utilisé"),
+        how = "Le fournisseur gère les couches qu'il contrôle ; le client reste responsable de ses configurations, accès et données selon le contrat du service.",
+        example = "Le fournisseur protège le datacenter, mais si le client rend lui-même un stockage public, cette mauvaise configuration reste de sa responsabilité.",
+        demoTitle = "SCHÉMA SIMPLE",
+        demo = "Fournisseur : infrastructure\nClient : comptes + réglages + données\nResponsabilité : partagée",
+        analogy = "Dans un immeuble, le propriétaire sécurise l'entrée commune, mais tu dois encore fermer la porte de ton appartement.",
+        schema = listOf("Service cloud choisi", "Le fournisseur protège sa partie", "Le client configure sa partie", "Les deux responsabilités forment la sécurité globale")
+    )
+    "LEAST_PRIVILEGE" -> simpleDeepDive(
+        definition = "Le moindre privilège consiste à donner uniquement les droits nécessaires pour accomplir une tâche.",
+        role = "Il réduit les dégâts possibles si un compte ou une application se trompe, est piraté ou fait quelque chose d'imprévu.",
+        actions = listOf("identifier la tâche", "donner les droits minimum", "retirer les droits inutiles", "réévaluer les permissions lorsque le besoin change"),
+        how = "Au lieu de donner un compte administrateur à tout le monde, on donne seulement les permissions dont chaque personne ou application a besoin.",
+        example = "Une application lampe torche n'a pas besoin d'accéder à tes contacts : cette permission devrait être refusée.",
+        demoTitle = "EXEMPLE MOBILE",
+        demo = "Lampe torche → caméra/flash : nécessaire\nLampe torche → contacts : inutile",
+        analogy = "Un employé reçoit la clé de son bureau, pas un passe-partout ouvrant toutes les pièces de l'entreprise.",
+        schema = listOf("Tâche à réaliser", "Permissions nécessaires identifiées", "Seulement ces droits sont accordés", "Risque réduit")
+    )
+    "SECURITY_PATCHES" -> simpleDeepDive(
+        definition = "Un correctif de sécurité est une mise à jour qui répare une faiblesse connue dans un logiciel ou un système.",
+        role = "Il ferme une porte déjà identifiée avant qu'elle ne puisse être utilisée contre la machine.",
+        actions = listOf("l'éditeur découvre ou reçoit un problème", "il développe une correction", "la mise à jour est distribuée", "les utilisateurs l'installent"),
+        how = "Une vulnérabilité connue peut devenir une cible facile si la machine reste longtemps sans mise à jour. Installer les correctifs réduit cette exposition.",
+        example = "Windows Update propose une mise à jour de sécurité. Après test, l'organisation la déploie pour corriger une vulnérabilité publiée.",
+        demoTitle = "EXEMPLE WINDOWS",
+        demo = "Paramètres → Windows Update → Rechercher des mises à jour",
+        analogy = "C'est comme réparer rapidement une serrure dont on vient de découvrir le défaut, avant qu'un cambrioleur profite de la faiblesse.",
+        schema = listOf("Faiblesse découverte", "Correctif créé", "Mise à jour installée", "Faiblesse réduite ou supprimée")
+    )
+    "GIT" -> simpleDeepDive(
+        definition = "Git est un outil qui garde l'historique des modifications d'un projet de fichiers, très utilisé pour le code.",
+        role = "Il permet de savoir ce qui a changé, revenir en arrière et travailler à plusieurs sans remplacer aveuglément les fichiers des autres.",
+        actions = listOf("enregistre des versions appelées commits", "compare les changements", "permet de créer des branches", "synchronise avec un dépôt distant comme GitHub"),
+        how = "Tu modifies des fichiers, tu choisis les changements à enregistrer, puis tu crées un commit qui devient un point dans l'historique.",
+        example = "CyberQuiz utilise Git : après une modification, un commit permet de retrouver exactement la version précédente si nécessaire.",
+        demoTitle = "TERMINAL",
+        demo = "git status\ngit add .\ngit commit -m \"Ma modification\"",
+        analogy = "Git ressemble à une série de sauvegardes nommées avec un historique précis de ce qui a changé entre chaque version.",
+        schema = listOf("Fichiers modifiés", "Changements sélectionnés", "Commit créé", "Historique conservé")
+    )
+    "DOCKER" -> simpleDeepDive(
+        definition = "Docker est un outil permettant d'exécuter des applications dans des conteneurs.",
+        role = "Un conteneur regroupe l'application et son environnement afin qu'elle fonctionne de façon plus prévisible d'une machine à l'autre.",
+        actions = listOf("construit ou télécharge une image", "démarre un conteneur", "isole une partie de l'environnement", "permet de recréer facilement l'application"),
+        how = "Une image sert de modèle. Docker démarre à partir de cette image un conteneur qui exécute l'application.",
+        example = "Un développeur lance une base de données de test dans un conteneur sans l'installer directement dans Windows.",
+        demoTitle = "TERMINAL",
+        demo = "docker ps",
+        analogy = "C'est comme une boîte de transport qui contient tout ce dont une petite application a besoin pour voyager d'un ordinateur à l'autre.",
+        schema = listOf("Image Docker", "Conteneur démarré", "Application exécutée", "Environnement reproductible")
+    )
+    "GRADLE" -> simpleDeepDive(
+        definition = "Gradle est un outil d'automatisation de construction de projets logiciels.",
+        role = "Dans Android, il aide notamment à télécharger les dépendances, compiler le code et produire l'application.",
+        actions = listOf("lit la configuration du projet", "récupère les dépendances", "lance les tâches de compilation", "produit des fichiers comme l'APK"),
+        how = "Android Studio demande à Gradle d'exécuter une suite de tâches. Chaque tâche réalise une partie de la construction de l'application.",
+        example = "Quand tu cliques sur Run dans CyberQuiz, Gradle participe à la création de l'APK avant son installation sur le téléphone.",
+        demoTitle = "TERMINAL",
+        demo = ".\\gradlew assembleDebug",
+        analogy = "Gradle est comme le chef d'atelier qui suit la recette de fabrication et appelle chaque machine dans le bon ordre.",
+        schema = listOf("Projet Android", "Gradle lit la configuration", "Compilation", "APK produit")
+    )
+    else -> buildCyberChoiceDeepDive(original, category)
+}
+
+private fun simpleDeepDive(
+    definition: String,
+    role: String,
+    actions: List<String>,
+    how: String,
+    example: String,
+    demoTitle: String,
+    demo: String,
+    analogy: String,
+    schema: List<String>
+) = CyberChoiceDeepDive(
+    definition = definition,
+    action = role,
+    actions = actions,
+    details = how,
+    example = example,
+    demoTitle = demoTitle,
+    demo = demo,
+    analogy = analogy,
+    schema = schema
 )
