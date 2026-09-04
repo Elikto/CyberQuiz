@@ -154,6 +154,7 @@ fun QuizScreenV8(vm: QuizViewModel, onBack: () -> Unit) {
                         DetailedLearnMoreDialogV8(
                             question = q.question,
                             category = q.category,
+                            difficulty = q.difficulty,
                             answers = answers,
                             correctIndex = q.correctIndex,
                             explanation = q.explanation,
@@ -436,6 +437,7 @@ private fun ExplanationCardV8(
 private fun DetailedLearnMoreDialogV8(
     question: String,
     category: String,
+    difficulty: String,
     answers: List<String>,
     correctIndex: Int,
     explanation: String,
@@ -445,6 +447,7 @@ private fun DetailedLearnMoreDialogV8(
     var courseTerm by remember(question) { mutableStateOf<String?>(null) }
     val correctAnswer = answers.getOrElse(correctIndex) { "Réponse correcte" }
     val correctLetter = ('A'.code + correctIndex).toChar().toString()
+    val beginnerMode = difficulty.uppercase() == "EASY"
 
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -507,13 +510,25 @@ private fun DetailedLearnMoreDialogV8(
 
             LearnSectionTitleV8("COMPRENDRE CHAQUE PROPOSITION")
             Text(
-                "Résumé rapide : ce que signifie chaque terme et à quoi il sert. Sélectionne ensuite un choix si tu veux vraiment l'étudier.",
+                if (beginnerMode) {
+                    "Question facile : chaque choix est expliqué avec des mots simples. Lis d'abord ce que c'est, puis à quoi ça sert, avant de regarder pourquoi il correspond ou non à cette question."
+                } else {
+                    "Résumé rapide : ce que signifie chaque terme et à quoi il sert. Sélectionne ensuite un choix si tu veux vraiment l'étudier."
+                },
                 color = Q8Muted,
                 fontSize = 12.sp,
                 lineHeight = 17.sp
             )
             answers.forEachIndexed { index, answer ->
-                ChoiceDefinitionCardV8(index, answer, category, index == correctIndex)
+                ChoiceDefinitionCardV8(
+                    index = index,
+                    answer = answer,
+                    question = question,
+                    category = category,
+                    beginnerMode = beginnerMode,
+                    correctAnswer = correctAnswer,
+                    correct = index == correctIndex
+                )
             }
 
             LearnSectionTitleV8("ANALYSER UNE RÉPONSE")
@@ -559,6 +574,20 @@ private fun DetailedLearnMoreDialogV8(
                 val deepDive = remember(chosen, category) { buildCyberChoiceDeepDive(chosen, category) }
 
                 LearnSectionTitleV8("EXPLICATION DÉTAILLÉE · CHOIX $letter")
+
+                if (beginnerMode) {
+                    val beginner = remember(question, chosen, category, correctAnswer, isCorrect) {
+                        buildBeginnerChoiceExplanation(
+                            question = question,
+                            term = chosen,
+                            category = category,
+                            correctAnswer = correctAnswer,
+                            isCorrect = isCorrect
+                        )
+                    }
+                    BeginnerChoiceClarityV8(beginner)
+                }
+
                 DetailedChoiceCardV8(chosen, deepDive)
 
                 if (hasCyberExpertCourse(chosen)) {
@@ -659,7 +688,15 @@ private fun OpenExpertCourseButtonV8(term: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ChoiceDefinitionCardV8(index: Int, answer: String, category: String, correct: Boolean) {
+private fun ChoiceDefinitionCardV8(
+    index: Int,
+    answer: String,
+    question: String,
+    category: String,
+    beginnerMode: Boolean,
+    correctAnswer: String,
+    correct: Boolean
+) {
     val accent = if (correct) Q8Green else Q8Blue
     val letter = ('A'.code + index).toChar().toString()
     Column(
@@ -668,7 +705,7 @@ private fun ChoiceDefinitionCardV8(index: Int, answer: String, category: String,
             .background(Color(0xFF08152B), RoundedCornerShape(17.dp))
             .border(1.dp, accent.copy(alpha = if (correct) .65f else .30f), RoundedCornerShape(17.dp))
             .padding(13.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -681,12 +718,65 @@ private fun ChoiceDefinitionCardV8(index: Int, answer: String, category: String,
             Text(answer, color = Q8Text, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             if (correct) Text("BONNE", color = Q8Green, fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
         }
-        Text(
-            summarizeCyberChoice(answer, category),
-            color = Color(0xFFC9D4F0),
-            fontSize = 11.sp,
-            lineHeight = 17.sp
-        )
+
+        if (beginnerMode) {
+            val beginner = remember(question, answer, category, correctAnswer, correct) {
+                buildBeginnerChoiceExplanation(
+                    question = question,
+                    term = answer,
+                    category = category,
+                    correctAnswer = correctAnswer,
+                    isCorrect = correct
+                )
+            }
+            BeginnerMiniSectionV8("CE QUE C'EST", beginner.what, Q8Cyan)
+            BeginnerMiniSectionV8("À QUOI ÇA SERT", beginner.purpose, Q8Blue)
+            Text(
+                beginner.distinction,
+                color = if (correct) Color(0xFFC9F5DD) else Color(0xFFFFD8A2),
+                fontSize = 11.sp,
+                lineHeight = 17.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        (if (correct) Q8Green else Q8Orange).copy(alpha = .07f),
+                        RoundedCornerShape(12.dp)
+                    )
+                    .padding(10.dp)
+            )
+        } else {
+            Text(
+                summarizeCyberChoice(answer, category),
+                color = Color(0xFFC9D4F0),
+                fontSize = 11.sp,
+                lineHeight = 17.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun BeginnerMiniSectionV8(title: String, body: String, accent: Color) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(title, color = accent, fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.1.sp)
+        Text(body, color = Color(0xFFD6DFF5), fontSize = 11.sp, lineHeight = 17.sp)
+    }
+}
+
+@Composable
+private fun BeginnerChoiceClarityV8(explanation: BeginnerChoiceExplanation) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Q8Green.copy(alpha = .055f), RoundedCornerShape(17.dp))
+            .border(1.dp, Q8Green.copy(alpha = .30f), RoundedCornerShape(17.dp))
+            .padding(13.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp)
+    ) {
+        Text("D'ABORD, EN CLAIR", color = Q8Green, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
+        BeginnerMiniSectionV8("CE QUE C'EST", explanation.what, Q8Cyan)
+        BeginnerMiniSectionV8("À QUOI ÇA SERT", explanation.purpose, Q8Blue)
+        BeginnerMiniSectionV8("DANS CETTE QUESTION", explanation.distinction, Q8Orange)
     }
 }
 
