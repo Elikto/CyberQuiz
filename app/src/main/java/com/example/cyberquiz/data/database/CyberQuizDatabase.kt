@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [QuestionEntity::class, ProgressEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class CyberQuizDatabase : RoomDatabase() {
@@ -27,13 +27,21 @@ abstract class CyberQuizDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE progress ADD COLUMN quizType TEXT NOT NULL DEFAULT 'CYBERSECURITY'"
+                )
+            }
+        }
+
         fun get(context: Context): CyberQuizDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context,
                 CyberQuizDatabase::class.java,
                 "cyberquiz.db"
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
                 .also { INSTANCE = it }
         }
