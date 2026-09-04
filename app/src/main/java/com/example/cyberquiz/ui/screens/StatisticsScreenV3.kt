@@ -35,7 +35,11 @@ private val S3Muted = Color(0xFF9FAED3)
 private val S3Panel = Color(0xFF081226)
 
 @Composable
-fun StatisticsScreenV3(vm: QuizViewModel, onBack: () -> Unit) {
+fun StatisticsScreenV3(
+    vm: QuizViewModel,
+    onBack: () -> Unit,
+    onReviewConcept: (String) -> Unit
+) {
     val p by vm.progress.collectAsState()
     val categories by vm.categoryProgress.collectAsState()
     val concepts by vm.conceptProgress.collectAsState()
@@ -92,7 +96,18 @@ fun StatisticsScreenV3(vm: QuizViewModel, onBack: () -> Unit) {
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.4.sp
                 )
-                needsWork.take(8).forEach { ConceptProgressCardV3(it) }
+                Text(
+                    "Appuie sur une notion À revoir pour ouvrir directement la question correspondante dans ton carnet.",
+                    color = S3Muted,
+                    fontSize = 10.sp,
+                    lineHeight = 15.sp
+                )
+                needsWork.take(8).forEach { item ->
+                    ConceptProgressCardV3(
+                        item = item,
+                        onReviewClick = { onReviewConcept(item.concept) }
+                    )
+                }
             }
 
             if (acquired.isNotEmpty()) {
@@ -103,7 +118,9 @@ fun StatisticsScreenV3(vm: QuizViewModel, onBack: () -> Unit) {
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.4.sp
                 )
-                acquired.take(12).forEach { ConceptProgressCardV3(it) }
+                acquired.take(12).forEach { item ->
+                    ConceptProgressCardV3(item = item, onReviewClick = null)
+                }
             }
         }
 
@@ -240,7 +257,10 @@ private fun CategoryProgressCardV3(item: CategoryProgressEntity) {
 }
 
 @Composable
-private fun ConceptProgressCardV3(item: ConceptProgressEntity) {
+private fun ConceptProgressCardV3(
+    item: ConceptProgressEntity,
+    onReviewClick: (() -> Unit)?
+) {
     val accuracy = if (item.attempts == 0) 0 else item.correct * 100 / item.attempts
     val mastered = item.reviewMastered || (item.lastResultCorrect && accuracy >= 80)
     val accent = when {
@@ -255,11 +275,31 @@ private fun ConceptProgressCardV3(item: ConceptProgressEntity) {
         else -> "À revoir"
     }
 
-    Column(
+    val modifier = if (onReviewClick != null) {
         Modifier
             .fillMaxWidth()
-            .background(Color(0xFF071225), RoundedCornerShape(17.dp))
-            .border(1.dp, accent.copy(alpha = .35f), RoundedCornerShape(17.dp))
+            .clickable(onClick = onReviewClick)
+    } else {
+        Modifier.fillMaxWidth()
+    }
+
+    Column(
+        modifier
+            .background(
+                if (onReviewClick != null) {
+                    Brush.horizontalGradient(
+                        listOf(S3Orange.copy(alpha = .10f), Color(0xFF071225), S3Purple.copy(alpha = .05f))
+                    )
+                } else {
+                    Brush.horizontalGradient(listOf(Color(0xFF071225), Color(0xFF071225)))
+                },
+                RoundedCornerShape(17.dp)
+            )
+            .border(
+                if (onReviewClick != null) 1.4.dp else 1.dp,
+                accent.copy(alpha = if (onReviewClick != null) .70f else .35f),
+                RoundedCornerShape(17.dp)
+            )
             .padding(13.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -270,18 +310,22 @@ private fun ConceptProgressCardV3(item: ConceptProgressEntity) {
                     .background(accent.copy(alpha = .12f), RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(if (mastered) "✓" else "•", color = accent, fontWeight = FontWeight.Black)
+                Text(if (mastered) "✓" else "!", color = accent, fontWeight = FontWeight.Black)
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(item.concept, color = S3Text, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold)
                 Text(item.category.uppercase(), color = S3Blue, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             }
+            if (onReviewClick != null) {
+                Text("›", color = S3Orange, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            }
         }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(status, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             when {
+                onReviewClick != null -> Text("OUVRIR À REVOIR", color = S3Orange, fontSize = 8.sp, fontWeight = FontWeight.Black)
                 item.attempts > 0 -> Text("Quiz : ${item.correct}/${item.attempts}", color = S3Muted, fontSize = 9.sp)
                 item.reviewMastered -> Text("Retest validé", color = S3Muted, fontSize = 9.sp)
             }
