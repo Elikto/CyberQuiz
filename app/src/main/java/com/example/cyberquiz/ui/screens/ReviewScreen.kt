@@ -123,10 +123,6 @@ fun ReviewScreen(
             lineHeight = 19.sp
         )
 
-        if (highlightedItem != null) {
-            SelectedFromStatsBanner()
-        }
-
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ReviewSummaryCard(
                 value = active.size.toString(),
@@ -205,41 +201,6 @@ fun ReviewScreen(
             term = term,
             category = courseCategory,
             onDismiss = { courseTerm = null }
-        )
-    }
-}
-
-@Composable
-private fun SelectedFromStatsBanner() {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(
-                Brush.horizontalGradient(
-                    listOf(ReviewPurple.copy(alpha = .15f), ReviewBlue.copy(alpha = .10f))
-                ),
-                RoundedCornerShape(17.dp)
-            )
-            .border(1.2.dp, ReviewPurple.copy(alpha = .70f), RoundedCornerShape(17.dp))
-            .padding(horizontal = 13.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            Modifier
-                .size(32.dp)
-                .background(ReviewPurple.copy(alpha = .16f), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("↳", color = ReviewCyan, fontSize = 16.sp, fontWeight = FontWeight.Black)
-        }
-        Spacer(Modifier.width(10.dp))
-        Text(
-            "QUESTION SÉLECTIONNÉE DEPUIS STATISTIQUES",
-            color = ReviewCyan,
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Black,
-            letterSpacing = 1.1.sp,
-            modifier = Modifier.weight(1f)
         )
     }
 }
@@ -360,7 +321,6 @@ private fun ReviewItemCard(
                     )
                     val topLeft = Offset(inset, inset)
 
-                    // Halo large et doux.
                     drawRoundRect(
                         color = Color.White.copy(alpha = .12f * pulse),
                         topLeft = topLeft,
@@ -368,7 +328,6 @@ private fun ReviewItemCard(
                         cornerRadius = CornerRadius(radius, radius),
                         style = Stroke(width = 14.dp.toPx())
                     )
-                    // Halo intermédiaire plus lumineux.
                     drawRoundRect(
                         color = Color.White.copy(alpha = .28f * pulse),
                         topLeft = topLeft,
@@ -376,7 +335,6 @@ private fun ReviewItemCard(
                         cornerRadius = CornerRadius(radius, radius),
                         style = Stroke(width = 8.dp.toPx())
                     )
-                    // Trait blanc net au maximum de la pulsation.
                     drawRoundRect(
                         color = Color.White.copy(alpha = .96f * pulse),
                         topLeft = topLeft,
