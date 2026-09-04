@@ -25,10 +25,13 @@ fun HomeScreenV2(
     onQuiz: () -> Unit,
     onStats: () -> Unit,
     onCategories: () -> Unit,
+    onReview: () -> Unit,
     onProfile: () -> Unit,
     onSettings: () -> Unit
 ) {
     val p by vm.progress.collectAsState()
+    val reviewItems by vm.reviewItems.collectAsState()
+    val activeReviewCount = reviewItems.count { !it.mastered }
     val xp = p.xp % 100
     val progress = (xp / 100f).coerceIn(0f, 1f)
     val accuracy = if (p.answered == 0) 0 else p.correct * 100 / p.answered
@@ -78,6 +81,15 @@ fun HomeScreenV2(
         MenuCard("Statistiques", "Suis ta progression", Color(0xFF18BFFF), Color(0xFF072B5B), ActionIcon.BARS, onStats)
         Spacer(Modifier.height(10.dp))
         MenuCard("Catégories", "Choisis ton thème", Color(0xFF19F2E5), Color(0xFF06393B), ActionIcon.GRID, onCategories)
+        Spacer(Modifier.height(10.dp))
+        MenuCard(
+            "À revoir",
+            if (activeReviewCount == 0) "Aucune notion en attente" else "$activeReviewCount notion${if (activeReviewCount > 1) "s" else ""} à retravailler",
+            Color(0xFFFFB84A),
+            Color(0xFF4A2710),
+            ActionIcon.REVIEW,
+            onReview
+        )
 
         Spacer(Modifier.height(15.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -217,7 +229,7 @@ private fun MiniBars() {
     }
 }
 
-private enum class ActionIcon { PLAY, BARS, GRID }
+private enum class ActionIcon { PLAY, BARS, GRID, REVIEW }
 
 @Composable
 private fun MenuCard(title: String, subtitle: String, accent: Color, dark: Color, icon: ActionIcon, onClick: () -> Unit) {
@@ -242,6 +254,11 @@ private fun ActionCanvas(icon: ActionIcon, accent: Color) {
             ActionIcon.PLAY -> drawPath(Path().apply { moveTo(size.width*.25f,size.height*.15f); lineTo(size.width*.8f,size.height*.5f); lineTo(size.width*.25f,size.height*.85f); close() }, Color.White)
             ActionIcon.BARS -> { val bw=size.width*.18f; drawRoundRect(accent,Offset(size.width*.08f,size.height*.52f),Size(bw,size.height*.28f)); drawRoundRect(accent,Offset(size.width*.4f,size.height*.35f),Size(bw,size.height*.45f)); drawRoundRect(accent,Offset(size.width*.72f,size.height*.16f),Size(bw,size.height*.64f)) }
             ActionIcon.GRID -> { val c=size.width*.28f; val g=size.width*.12f; listOf(0f,c+g).forEach { x -> listOf(0f,c+g).forEach { y -> drawRoundRect(accent,Offset(x,y),Size(c,c)) } } }
+            ActionIcon.REVIEW -> {
+                drawCircle(accent, size.minDimension * .36f, Offset(size.width * .5f, size.height * .5f), style = Stroke(2.6f))
+                drawLine(accent, Offset(size.width * .5f, size.height * .27f), Offset(size.width * .5f, size.height * .56f), 3.2f, StrokeCap.Round)
+                drawCircle(accent, 2.4f, Offset(size.width * .5f, size.height * .68f))
+            }
         }
     }
 }
