@@ -107,4 +107,48 @@ interface QuizDao {
         "UPDATE review_items SET correctAfterWrongCount=correctAfterWrongCount+1, mastered=1 WHERE quizType=:quizType AND concept=:concept"
     )
     suspend fun recordReviewCorrect(quizType: String, concept: String)
+
+    @Query("SELECT * FROM category_progress WHERE quizType = :quizType ORDER BY answered DESC, category ASC")
+    fun categoryProgress(quizType: String): Flow<List<CategoryProgressEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertCategoryProgress(item: CategoryProgressEntity)
+
+    @Query(
+        "UPDATE category_progress SET answered=answered+1, correct=correct+:correctIncrement, lastAnsweredAt=:timestamp WHERE quizType=:quizType AND category=:category"
+    )
+    suspend fun incrementCategoryProgress(
+        quizType: String,
+        category: String,
+        correctIncrement: Int,
+        timestamp: Long
+    )
+
+    @Query("SELECT * FROM concept_progress WHERE quizType = :quizType ORDER BY lastAnsweredAt DESC")
+    fun conceptProgress(quizType: String): Flow<List<ConceptProgressEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertConceptProgress(item: ConceptProgressEntity)
+
+    @Query(
+        "UPDATE concept_progress SET category=:category, attempts=attempts+1, correct=correct+:correctIncrement, reviewMastered=:reviewMastered, lastResultCorrect=:lastResultCorrect, lastAnsweredAt=:timestamp WHERE quizType=:quizType AND concept=:concept"
+    )
+    suspend fun incrementConceptProgress(
+        quizType: String,
+        concept: String,
+        category: String,
+        correctIncrement: Int,
+        reviewMastered: Boolean,
+        lastResultCorrect: Boolean,
+        timestamp: Long
+    )
+
+    @Query(
+        "UPDATE concept_progress SET reviewMastered=1, lastResultCorrect=1, lastAnsweredAt=:timestamp WHERE quizType=:quizType AND concept=:concept"
+    )
+    suspend fun markConceptMasteredByReview(
+        quizType: String,
+        concept: String,
+        timestamp: Long
+    )
 }
