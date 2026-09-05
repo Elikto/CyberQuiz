@@ -11,12 +11,9 @@ import androidx.compose.ui.*
 import androidx.compose.ui.geometry.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
-import com.example.cyberquiz.R
 import com.example.cyberquiz.ui.theme.*
 import com.example.cyberquiz.viewmodel.QuizViewModel
 import kotlin.math.*
@@ -153,12 +150,45 @@ private fun TopButton(icon: TopIcon, onClick: () -> Unit) {
 @Composable
 private fun HeroLogo() {
     Box(Modifier.fillMaxWidth().height(188.dp), contentAlignment = Alignment.Center) {
-        Image(
-            painter = painterResource(R.drawable.cyberquiz_home_logo),
-            contentDescription = "CyberQuiz",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit
-        )
+        Canvas(Modifier.fillMaxSize()) {
+            val w = size.width; val h = size.height; val cx = w / 2; val cy = h * .56f
+            drawCircle(Brush.radialGradient(listOf(Color(0xFF8B2DFF).copy(.28f), Color.Transparent), Offset(cx, cy), 150f), 150f, Offset(cx, cy))
+            drawCircle(Brush.radialGradient(listOf(Color(0xFF00C8FF).copy(.14f), Color.Transparent), Offset(cx, cy), 205f), 205f, Offset(cx, cy))
+
+            val cyan = Color(0xFF12CCFF).copy(.75f); val purple = Color(0xFF9E43FF).copy(.67f)
+            listOf(.19f, .31f, .43f, .55f, .67f, .79f).forEachIndexed { i, f ->
+                val y = h * f; val c = if (i % 2 == 0) cyan else purple; val edge = 18f + i * 7; val gap = 78f + (i % 3) * 10
+                val l = Path().apply { moveTo(edge, y); lineTo(cx - gap - 26, y); lineTo(cx - gap, y + if (i % 2 == 0) 13 else -13) }
+                val r = Path().apply { moveTo(w - edge, y); lineTo(cx + gap + 26, y); lineTo(cx + gap, y + if (i % 2 == 0) 13 else -13) }
+                drawPath(l, c, style = Stroke(2.1f, cap = StrokeCap.Round)); drawPath(r, c, style = Stroke(2.1f, cap = StrokeCap.Round))
+                drawCircle(c, 3.8f, Offset(edge, y)); drawCircle(c, 3.8f, Offset(w - edge, y))
+            }
+            listOf(.18f, .27f, .73f, .82f).forEachIndexed { i, f ->
+                val x = w * f; val c = if (i % 2 == 0) cyan else purple
+                drawLine(c, Offset(x, h * .18f), Offset(x, h * .34f), 1.8f); drawCircle(c, 3.2f, Offset(x, h * .18f))
+            }
+
+            val top = h * .16f; val sw = 158f; val sh = 158f
+            val outer = Path().apply {
+                moveTo(cx, top); lineTo(cx + sw * .48f, top + sh * .23f); lineTo(cx + sw * .43f, top + sh * .64f)
+                quadraticBezierTo(cx + sw * .32f, top + sh * .87f, cx, top + sh)
+                quadraticBezierTo(cx - sw * .32f, top + sh * .87f, cx - sw * .43f, top + sh * .64f)
+                lineTo(cx - sw * .48f, top + sh * .23f); close()
+            }
+            val inner = Path().apply {
+                moveTo(cx, top + 13); lineTo(cx + sw * .35f, top + sh * .29f); lineTo(cx + sw * .31f, top + sh * .60f)
+                quadraticBezierTo(cx + sw * .23f, top + sh * .77f, cx, top + sh * .88f)
+                quadraticBezierTo(cx - sw * .23f, top + sh * .77f, cx - sw * .31f, top + sh * .60f)
+                lineTo(cx - sw * .35f, top + sh * .29f); close()
+            }
+            drawPath(outer, Brush.linearGradient(listOf(Color(0xFFF06CFF), Color(0xFF42D9FF), Color(0xFF247DFF))), style = Stroke(7f, cap = StrokeCap.Round))
+            drawPath(inner, Color(0xFF4AA8FF), style = Stroke(3f))
+
+            val lockTop = top + sh * .33f
+            drawArc(Color(0xFFEA83FF), 180f, 180f, false, Offset(cx - 24, lockTop), Size(48f, 51f), style = Stroke(7f, cap = StrokeCap.Round))
+            drawRoundRect(Brush.verticalGradient(listOf(Color(0xFFBB63FF), Color(0xFF408DFF))), Offset(cx - 30, lockTop + 26), Size(60f, 52f), CornerRadius(13f, 13f))
+            drawCircle(Color(0xFF08162F), 8.5f, Offset(cx, lockTop + 50)); drawLine(Color(0xFF08162F), Offset(cx, lockTop + 57), Offset(cx, lockTop + 68), 5f, StrokeCap.Round)
+        }
     }
 }
 
