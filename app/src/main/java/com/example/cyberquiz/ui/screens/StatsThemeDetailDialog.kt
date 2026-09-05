@@ -48,6 +48,7 @@ internal fun StatsThemeDetailDialog(
         recommendedThemeCourse(item.category, concepts)
     }
     var courseTerm by remember(item.category) { mutableStateOf<String?>(null) }
+    var showQuizOptions by remember(item.category) { mutableStateOf(false) }
     var selectedQuestionCount by remember(item.category) { mutableStateOf(10) }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -131,28 +132,37 @@ internal fun StatsThemeDetailDialog(
                 lineHeight = 18.sp
             )
 
-            ThemeSection("NOMBRE DE QUESTIONS", ThemeDetailCyan)
-            Text(
-                "Choisis la longueur de ton entraînement ciblé. Le quiz restera uniquement sur ${item.category}.",
-                color = ThemeDetailMuted,
-                fontSize = 10.sp,
-                lineHeight = 15.sp
-            )
-            ThemeQuestionCountSelector(
-                selected = selectedQuestionCount,
-                onSelected = { selectedQuestionCount = it }
-            )
+            if (!showQuizOptions) {
+                ThemeActionButton(
+                    title = "LANCER UN QUIZ CIBLÉ",
+                    subtitle = "Choisir le nombre de questions · ${item.category}",
+                    accent = ThemeDetailPurple,
+                    onClick = { showQuizOptions = true }
+                )
+            } else {
+                ThemeSection("NOMBRE DE QUESTIONS", ThemeDetailCyan)
+                Text(
+                    "Choisis la longueur de ton entraînement ciblé. Le quiz restera uniquement sur ${item.category}.",
+                    color = ThemeDetailMuted,
+                    fontSize = 10.sp,
+                    lineHeight = 15.sp
+                )
+                ThemeQuestionCountSelector(
+                    selected = selectedQuestionCount,
+                    onSelected = { selectedQuestionCount = it }
+                )
 
-            ThemeActionButton(
-                title = "LANCER UN QUIZ CIBLÉ",
-                subtitle = if (selectedQuestionCount == 0) {
-                    "${item.category} · quiz infini"
-                } else {
-                    "${item.category} · $selectedQuestionCount questions"
-                },
-                accent = ThemeDetailPurple,
-                onClick = { onQuiz(selectedQuestionCount) }
-            )
+                ThemeActionButton(
+                    title = "DÉMARRER LE QUIZ",
+                    subtitle = if (selectedQuestionCount == 0) {
+                        "${item.category} · quiz infini"
+                    } else {
+                        "${item.category} · $selectedQuestionCount questions"
+                    },
+                    accent = ThemeDetailPurple,
+                    onClick = { onQuiz(selectedQuestionCount) }
+                )
+            }
 
             ThemeActionButton(
                 title = "OUVRIR LE COURS CONSEILLÉ",
@@ -180,7 +190,8 @@ internal fun StatsThemeDetailDialog(
         CyberCourseDialog(
             term = term,
             category = item.category,
-            onDismiss = { courseTerm = null }
+            onDismiss = { courseTerm = null },
+            dismissLabel = "Retour au menu du thème"
         )
     }
 }
