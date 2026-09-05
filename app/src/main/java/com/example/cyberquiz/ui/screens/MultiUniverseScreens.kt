@@ -1,5 +1,7 @@
 package com.example.cyberquiz.ui.screens
 
+import android.app.ActivityManager
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,12 +13,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -234,6 +241,9 @@ fun ProfileScreenV3(
     onQuizTypeSelected: (QuizType) -> Unit,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    val showClearDataDialog = remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -299,6 +309,41 @@ fun ProfileScreenV3(
             }
         }
 
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF251016), RoundedCornerShape(19.dp))
+                .border(1.2.dp, Color(0xFFFF557A).copy(alpha = .70f), RoundedCornerShape(19.dp))
+                .clickable { showClearDataDialog.value = true }
+                .padding(15.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(45.dp)
+                    .background(Color(0xFFFF557A).copy(alpha = .12f), RoundedCornerShape(13.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("⌫", color = Color(0xFFFF7A96), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.width(13.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Effacer les données enregistrées",
+                    color = Color(0xFFFFA0B3),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Progression, historique, révisions et quiz en cours",
+                    color = MultiMuted,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                )
+            }
+            Text("›", color = Color(0xFFFF7A96), fontSize = 23.sp)
+        }
+
         Text(
             "TYPE DE QUIZ",
             color = MultiBlue,
@@ -347,6 +392,43 @@ fun ProfileScreenV3(
         }
 
         Spacer(Modifier.height(6.dp))
+    }
+
+    if (showClearDataDialog.value) {
+        AlertDialog(
+            onDismissRequest = { showClearDataDialog.value = false },
+            containerColor = Color(0xFF0B1429),
+            title = {
+                Text(
+                    "Effacer les données ?",
+                    color = MultiText,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    "Cette action supprimera toute la progression, l'historique, les révisions et les quiz en cours. L'application sera réinitialisée.",
+                    color = MultiMuted,
+                    lineHeight = 20.sp
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearDataDialog.value = false
+                        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                        activityManager?.clearApplicationUserData()
+                    }
+                ) {
+                    Text("EFFACER", color = Color(0xFFFF557A), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDataDialog.value = false }) {
+                    Text("ANNULER", color = MultiBlue, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
     }
 }
 
