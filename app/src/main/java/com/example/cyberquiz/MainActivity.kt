@@ -70,6 +70,7 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
     var previousScreen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
     var selectedQuizTypeName by rememberSaveable { mutableStateOf(storedQuizTypeName) }
     var highlightedReviewConcept by rememberSaveable { mutableStateOf<String?>(null) }
+    var configuredQuizUi by rememberSaveable { mutableStateOf(false) }
 
     val selectedQuizType = QuizType.entries.firstOrNull { it.name == selectedQuizTypeName }
         ?: QuizType.CYBERSECURITY
@@ -107,6 +108,7 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                 } else if (selectedQuizType == QuizType.CYBERSECURITY) {
                     navigateTo(AppScreen.QUIZ_SETUP)
                 } else {
+                    configuredQuizUi = false
                     vm.start(quizType = selectedQuizType.name)
                     navigateTo(AppScreen.QUIZ)
                 }
@@ -133,10 +135,12 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
             vm = vm,
             onBack = { goBack() },
             onStart = { config ->
+                configuredQuizUi = true
                 vm.startConfiguredQuiz(config)
                 navigateTo(AppScreen.QUIZ)
             },
             onResume = {
+                configuredQuizUi = true
                 vm.resumeConfiguredQuiz()
                 navigateTo(AppScreen.QUIZ)
             },
@@ -147,6 +151,7 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
 
         AppScreen.QUIZ -> QuizScreenV8(
             vm = vm,
+            configuredSession = configuredQuizUi,
             onBack = { goBack() }
         )
 
@@ -172,7 +177,10 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
             vm = vm,
             selectedQuizType = selectedQuizType,
             onBack = { goBack() },
-            onQuiz = { navigateTo(AppScreen.QUIZ) }
+            onQuiz = {
+                configuredQuizUi = false
+                navigateTo(AppScreen.QUIZ)
+            }
         )
 
         AppScreen.REVIEW -> ReviewScreen(
@@ -180,6 +188,7 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
             highlightedConcept = highlightedReviewConcept,
             onBack = { goBack() },
             onPractice = { item ->
+                configuredQuizUi = false
                 vm.startReviewQuestion(item.quizType, item.questionId)
                 navigateTo(AppScreen.QUIZ)
             }
