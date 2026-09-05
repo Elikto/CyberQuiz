@@ -2,6 +2,14 @@
 
 Application Android de quiz cybersécurité, basée sur Kotlin + Jetpack Compose + Room, avec backend FastAPI pour les questions générées dynamiquement.
 
+## Télécharger l'APK
+
+La dernière version Android installable est publiée automatiquement dans **GitHub Releases** à chaque mise à jour de la branche `main`.
+
+**[⬇️ Télécharger CyberQuiz.apk](https://github.com/Elikto/CyberQuiz/releases/download/apk-latest/CyberQuiz.apk)**
+
+Page de la dernière version : https://github.com/Elikto/CyberQuiz/releases/latest
+
 ## Android
 - minSdk 26
 - target/compile SDK 37
