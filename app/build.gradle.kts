@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -15,7 +17,7 @@ val generateCyberQuizIcon by tasks.registering {
         drawableDir.mkdirs()
         val encoded = cyberQuizIconBase64.asFile.readText().filterNot { it.isWhitespace() }
         drawableDir.resolve("cyberquiz_app_icon.jpg")
-            .writeBytes(java.util.Base64.getDecoder().decode(encoded))
+            .writeBytes(Base64.getDecoder().decode(encoded))
     }
 }
 
