@@ -12,6 +12,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -38,12 +41,14 @@ private val S3Panel = Color(0xFF081226)
 fun StatisticsScreenV3(
     vm: QuizViewModel,
     onBack: () -> Unit,
-    onReviewConcept: (String) -> Unit
+    onReviewConcept: (String) -> Unit,
+    onThemeQuiz: (String) -> Unit
 ) {
     val p by vm.progress.collectAsState()
     val categories by vm.categoryProgress.collectAsState()
     val concepts by vm.conceptProgress.collectAsState()
     val accuracy = if (p.answered == 0) 0 else p.correct * 100 / p.answered
+    var selectedTheme by remember { mutableStateOf<CategoryProgressEntity?>(null) }
 
     Column(
         modifier = Modifier
@@ -76,7 +81,18 @@ fun StatisticsScreenV3(
                 "La progression détaillée commence avec cette version. Réponds à quelques nouvelles questions Cyber pour voir apparaître tes résultats par domaine."
             )
         } else {
-            categories.forEach { CategoryProgressCardV3(it) }
+            Text(
+                "Appuie sur un thème pour comprendre ce que signifie ton pourcentage et obtenir un exercice ou un cours adapté.",
+                color = S3Muted,
+                fontSize = 10.sp,
+                lineHeight = 15.sp
+            )
+            categories.forEach { item ->
+                CategoryProgressCardV3(
+                    item = item,
+                    onClick = { selectedTheme = item }
+                )
+            }
         }
 
         StatsSectionV3("MAÎTRISE DES NOTIONS")
@@ -125,6 +141,18 @@ fun StatisticsScreenV3(
         }
 
         Spacer(Modifier.height(8.dp))
+    }
+
+    selectedTheme?.let { item ->
+        StatsThemeDetailDialog(
+            item = item,
+            concepts = concepts,
+            onQuiz = {
+                selectedTheme = null
+                onThemeQuiz(item.category)
+            },
+            onDismiss = { selectedTheme = null }
+        )
     }
 }
 
@@ -218,7 +246,10 @@ private fun MiniMetricV3(value: String, label: String, accent: Color, modifier: 
 }
 
 @Composable
-private fun CategoryProgressCardV3(item: CategoryProgressEntity) {
+private fun CategoryProgressCardV3(
+    item: CategoryProgressEntity,
+    onClick: () -> Unit
+) {
     val accuracy = if (item.answered == 0) 0 else item.correct * 100 / item.answered
     val accent = when {
         accuracy >= 85 -> S3Green
@@ -239,6 +270,7 @@ private fun CategoryProgressCardV3(item: CategoryProgressEntity) {
             .fillMaxWidth()
             .background(S3Panel, RoundedCornerShape(18.dp))
             .border(1.dp, accent.copy(alpha = .42f), RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -253,6 +285,17 @@ private fun CategoryProgressCardV3(item: CategoryProgressEntity) {
             }
         }
         StatsBarV3(accuracy / 100f, accent)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "COMPRENDRE CE RÉSULTAT",
+                color = S3Muted,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = .8.sp,
+                modifier = Modifier.weight(1f)
+            )
+            Text("›", color = accent, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
 
