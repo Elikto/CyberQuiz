@@ -102,7 +102,7 @@ fun HomeScreenV2(
             Spacer(Modifier.height(12.dp))
 
             MainQuizButton(
-                subtitle = if (selectedQuizType == QuizType.CYBER) {
+                subtitle = if (selectedQuizType == QuizType.CYBERSECURITY) {
                     "Testez vos connaissances"
                 } else {
                     "Quiz ${selectedQuizType.label}"
