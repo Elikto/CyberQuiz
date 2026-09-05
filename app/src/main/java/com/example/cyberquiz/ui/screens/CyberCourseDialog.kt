@@ -9,7 +9,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -37,9 +41,17 @@ internal fun CyberCourseDialog(
     category: String,
     onDismiss: () -> Unit
 ) {
-    val course = remember(term, category) { buildCyberCourse(term, category) }
-    val extra = remember(term, category) { buildCyberCourseExtra(term, category) }
+    var activeTerm by remember(term, category) { mutableStateOf(term) }
+    var activeCategory by remember(term, category) { mutableStateOf(category) }
+    val course = remember(activeTerm, activeCategory) { buildCyberCourse(activeTerm, activeCategory) }
+    val extra = remember(activeTerm, activeCategory) { buildCyberCourseExtra(activeTerm, activeCategory) }
+    val nextStep = remember(activeTerm, activeCategory) { nextCyberCourseStep(activeTerm, activeCategory) }
     val uriHandler = LocalUriHandler.current
+    val scrollState = rememberScrollState()
+
+    LaunchedEffect(activeTerm, activeCategory) {
+        scrollState.scrollTo(0)
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -53,7 +65,7 @@ internal fun CyberCourseDialog(
                     RoundedCornerShape(28.dp)
                 )
                 .border(1.5.dp, CoursePurple.copy(alpha = .75f), RoundedCornerShape(28.dp))
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -116,7 +128,7 @@ internal fun CyberCourseDialog(
             )
 
             CourseSectionTitle("DESSIN MENTAL")
-            ConceptMapCourse(term)
+            ConceptMapCourse(activeTerm)
 
             CourseSectionTitle("6 · VOIR ÇA SUR UN VRAI ORDINATEUR")
             TerminalCourseCard(
@@ -170,6 +182,18 @@ internal fun CyberCourseDialog(
                 uriHandler.openUri("https://www.youtube.com/results?search_query=$encoded")
             }
 
+            CourseSectionTitle("CONTINUER TON PARCOURS")
+            if (nextStep != null) {
+                CourseNextButton(nextStep) {
+                    activeTerm = nextStep.term
+                    activeCategory = nextStep.category
+                }
+            } else {
+                TextBlock(
+                    "Tu es arrivé au bout du parcours de cours Cyber actuellement disponible. Tu peux maintenant consolider l'ensemble avec des quiz ciblés."
+                )
+            }
+
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -190,6 +214,55 @@ internal fun CyberCourseDialog(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun CourseNextButton(step: CyberCourseStep, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.horizontalGradient(
+                    listOf(CourseGreen.copy(alpha = .13f), CourseBlue.copy(alpha = .11f), Color(0xFF071226))
+                ),
+                RoundedCornerShape(19.dp)
+            )
+            .border(1.3.dp, CourseGreen.copy(alpha = .65f), RoundedCornerShape(19.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 15.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(40.dp)
+                .background(CourseGreen.copy(alpha = .14f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            androidx.compose.material3.Text("→", color = CourseGreen, fontSize = 20.sp, fontWeight = FontWeight.Black)
+        }
+        Spacer(Modifier.width(11.dp))
+        Column(Modifier.weight(1f)) {
+            androidx.compose.material3.Text(
+                "COURS SUIVANT",
+                color = CourseGreen,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.2.sp
+            )
+            androidx.compose.material3.Text(
+                step.term,
+                color = CourseText,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Black
+            )
+            androidx.compose.material3.Text(
+                step.category,
+                color = CourseMuted,
+                fontSize = 10.sp
+            )
+        }
+        androidx.compose.material3.Text("›", color = CourseCyan, fontSize = 25.sp)
     }
 }
 
