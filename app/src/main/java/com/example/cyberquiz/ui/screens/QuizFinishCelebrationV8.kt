@@ -12,9 +12,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -43,7 +43,6 @@ private val FinishBlue = Color(0xFF19BFFF)
 private val FinishCyan = Color(0xFF19F2E5)
 private val FinishGreen = Color(0xFF38E69A)
 private val FinishOrange = Color(0xFFFFB84A)
-private val FinishRed = Color(0xFFFF557A)
 private val FinishText = Color(0xFFF5F7FF)
 private val FinishMuted = Color(0xFF9FAED3)
 
@@ -101,7 +100,7 @@ fun QuizFinishCelebrationV8(
                 level = tier.level,
                 progress = burst.value,
                 accent = tier.accent,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.matchParentSize()
             )
         }
 
