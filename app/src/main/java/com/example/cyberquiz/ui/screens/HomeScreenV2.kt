@@ -26,11 +26,13 @@ fun HomeScreenV2(
     onStats: () -> Unit,
     onCategories: () -> Unit,
     onReview: () -> Unit,
+    onHistory: () -> Unit,
     onProfile: () -> Unit,
     onSettings: () -> Unit
 ) {
     val p by vm.progress.collectAsState()
     val reviewItems by vm.reviewItems.collectAsState()
+    val history by vm.quizHistory.collectAsState()
     val activeReviewCount = reviewItems.count { !it.mastered }
     val xp = p.xp % 100
     val progress = (xp / 100f).coerceIn(0f, 1f)
@@ -89,6 +91,15 @@ fun HomeScreenV2(
             Color(0xFF4A2710),
             ActionIcon.REVIEW,
             onReview
+        )
+        Spacer(Modifier.height(10.dp))
+        MenuCard(
+            "Historique",
+            if (history.isEmpty()) "Aucun quiz terminé" else "${history.size} quiz terminé${if (history.size > 1) "s" else ""} enregistré${if (history.size > 1) "s" else ""}",
+            Color(0xFF8B7CFF),
+            Color(0xFF211B50),
+            ActionIcon.HISTORY,
+            onHistory
         )
 
         Spacer(Modifier.height(15.dp))
@@ -229,7 +240,7 @@ private fun MiniBars() {
     }
 }
 
-private enum class ActionIcon { PLAY, BARS, GRID, REVIEW }
+private enum class ActionIcon { PLAY, BARS, GRID, REVIEW, HISTORY }
 
 @Composable
 private fun MenuCard(title: String, subtitle: String, accent: Color, dark: Color, icon: ActionIcon, onClick: () -> Unit) {
@@ -258,6 +269,13 @@ private fun ActionCanvas(icon: ActionIcon, accent: Color) {
                 drawCircle(accent, size.minDimension * .36f, Offset(size.width * .5f, size.height * .5f), style = Stroke(2.6f))
                 drawLine(accent, Offset(size.width * .5f, size.height * .27f), Offset(size.width * .5f, size.height * .56f), 3.2f, StrokeCap.Round)
                 drawCircle(accent, 2.4f, Offset(size.width * .5f, size.height * .68f))
+            }
+            ActionIcon.HISTORY -> {
+                val center = Offset(size.width * .5f, size.height * .5f)
+                drawCircle(accent, size.minDimension * .36f, center, style = Stroke(2.6f))
+                drawLine(accent, center, Offset(center.x, size.height * .28f), 2.8f, StrokeCap.Round)
+                drawLine(accent, center, Offset(size.width * .68f, size.height * .58f), 2.8f, StrokeCap.Round)
+                drawCircle(accent, 2.6f, center)
             }
         }
     }
