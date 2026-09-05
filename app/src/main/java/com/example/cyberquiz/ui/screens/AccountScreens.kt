@@ -96,35 +96,7 @@ fun ProfileScreen(
             )
         }
 
-        Spacer(Modifier.height(28.dp))
-        Text("TYPE DE QUIZ", color = CyberBlue, fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(12.dp))
-
-        QuizType.entries.forEach { type ->
-            QuizTypeCard(
-                type = type,
-                selected = type == selectedQuizType,
-                onClick = { onQuizTypeSelected(type) }
-            )
-            Spacer(Modifier.height(12.dp))
-        }
-
-        Text(
-            text = if (selectedQuizType.available) {
-                "${selectedQuizType.label} est actuellement disponible."
-            } else {
-                "${selectedQuizType.label} est sélectionné. Sa banque de questions sera ajoutée prochainement."
-            },
-            color = if (selectedQuizType.available) Color(0xFF32E5A1) else Color(0xFFFFCC66),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF0B1429), RoundedCornerShape(16.dp))
-                .border(1.dp, CyberBlue.copy(alpha = .35f), RoundedCornerShape(16.dp))
-                .padding(14.dp)
-        )
-
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(22.dp))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -159,6 +131,34 @@ fun ProfileScreen(
             }
             Text("›", color = Color(0xFFFF7A96), fontSize = 24.sp)
         }
+
+        Spacer(Modifier.height(28.dp))
+        Text("TYPE DE QUIZ", color = CyberBlue, fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(12.dp))
+
+        QuizType.entries.forEach { type ->
+            QuizTypeCard(
+                type = type,
+                selected = type == selectedQuizType,
+                onClick = { onQuizTypeSelected(type) }
+            )
+            Spacer(Modifier.height(12.dp))
+        }
+
+        Text(
+            text = if (selectedQuizType.available) {
+                "${selectedQuizType.label} est actuellement disponible."
+            } else {
+                "${selectedQuizType.label} est sélectionné. Sa banque de questions sera ajoutée prochainement."
+            },
+            color = if (selectedQuizType.available) Color(0xFF32E5A1) else Color(0xFFFFCC66),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF0B1429), RoundedCornerShape(16.dp))
+                .border(1.dp, CyberBlue.copy(alpha = .35f), RoundedCornerShape(16.dp))
+                .padding(14.dp)
+        )
     }
 
     if (showClearDataDialog.value) {
