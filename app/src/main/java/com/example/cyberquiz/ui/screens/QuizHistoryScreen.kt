@@ -251,6 +251,8 @@ private fun HistoryCard(
 
 @Composable
 private fun HistoryExplorer(entry: QuizHistoryEntry, onBack: () -> Unit) {
+    var learnMoreIndex by rememberSaveable(entry.id) { mutableStateOf<Int?>(null) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -287,15 +289,39 @@ private fun HistoryExplorer(entry: QuizHistoryEntry, onBack: () -> Unit) {
         )
 
         entry.questions.forEachIndexed { index, question ->
-            HistoryQuestionCard(index + 1, question)
+            HistoryQuestionCard(
+                number = index + 1,
+                item = question,
+                onLearnMore = if (question.difficulty.equals("EASY", ignoreCase = true)) {
+                    { learnMoreIndex = index }
+                } else {
+                    null
+                }
+            )
         }
 
         Spacer(Modifier.height(8.dp))
     }
+
+    val learnMoreQuestion = learnMoreIndex?.let { entry.questions.getOrNull(it) }
+    if (learnMoreQuestion != null && learnMoreQuestion.difficulty.equals("EASY", ignoreCase = true)) {
+        HistoryEasyLearnMoreDialogV8(
+            question = learnMoreQuestion.question,
+            category = learnMoreQuestion.category,
+            answers = learnMoreQuestion.answers,
+            correctIndex = learnMoreQuestion.correctIndex,
+            explanation = learnMoreQuestion.explanation,
+            onDismiss = { learnMoreIndex = null }
+        )
+    }
 }
 
 @Composable
-private fun HistoryQuestionCard(number: Int, item: QuizHistoryQuestion) {
+private fun HistoryQuestionCard(
+    number: Int,
+    item: QuizHistoryQuestion,
+    onLearnMore: (() -> Unit)? = null
+) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -379,6 +405,37 @@ private fun HistoryQuestionCard(number: Int, item: QuizHistoryQuestion) {
                     .background(HistoryBlue.copy(alpha = .055f), RoundedCornerShape(13.dp))
                     .padding(11.dp)
             )
+        }
+
+        if (onLearnMore != null && item.difficulty.equals("EASY", ignoreCase = true)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(HistoryCyan.copy(alpha = .055f), RoundedCornerShape(14.dp))
+                    .border(1.dp, HistoryCyan.copy(alpha = .30f), RoundedCornerShape(14.dp))
+                    .clickable(onClick = onLearnMore)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    Modifier
+                        .size(31.dp)
+                        .background(HistoryBlue.copy(alpha = .12f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("?", color = HistoryCyan, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                }
+                Spacer(Modifier.size(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("En savoir plus", color = HistoryCyan, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Comprendre les 4 choix et approfondir la réponse",
+                        color = HistoryMuted,
+                        fontSize = 9.sp
+                    )
+                }
+                Text("›", color = HistoryCyan, fontSize = 22.sp)
+            }
         }
     }
 }
