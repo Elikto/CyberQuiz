@@ -40,6 +40,12 @@ data class AnswerResult(
     val question: QuestionEntity
 )
 
+data class QuizFinishSummary(
+    val answered: Int = 0,
+    val correct: Int = 0,
+    val xpGained: Int = 0
+)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class QuizViewModel(app: Application) : AndroidViewModel(app) {
     private val dao = CyberQuizDatabase.get(app).quizDao()
@@ -98,6 +104,9 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     private val _result = MutableStateFlow<AnswerResult?>(null)
     val result: StateFlow<AnswerResult?> = _result.asStateFlow()
 
+    private val _finishSummary = MutableStateFlow<QuizFinishSummary?>(null)
+    val finishSummary: StateFlow<QuizFinishSummary?> = _finishSummary.asStateFlow()
+
     private val _reviewMode = MutableStateFlow(false)
     val reviewMode: StateFlow<Boolean> = _reviewMode.asStateFlow()
 
@@ -123,6 +132,10 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     private var questionNumber = 0
     private var reviewQuestionId: Long? = null
     private var singleReviewQuestion = false
+
+    private var runAnswered = 0
+    private var runCorrect = 0
+    private var runXpGained = 0
 
     private var configuredSessionRuntime = false
     private var configuredSessionId: String? = null
@@ -154,6 +167,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
     fun start(category: Category? = null, quizType: String = CYBERSECURITY) {
         leaveConfiguredRuntime()
+        resetRunScore()
         singleReviewQuestion = false
         selectQuizType(quizType)
         currentCategory = category?.label
@@ -171,6 +185,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startCategory(quizType: String, category: String) {
         leaveConfiguredRuntime()
+        resetRunScore()
         singleReviewQuestion = false
         selectQuizType(quizType)
         currentCategory = category
@@ -188,6 +203,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startReviewQuestion(quizType: String, questionId: Long) {
         leaveConfiguredRuntime()
+        resetRunScore()
         singleReviewQuestion = true
         selectQuizType(quizType)
         currentCategory = null
@@ -207,6 +223,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         if (_activeSessions.value.size >= MAX_ACTIVE_SESSIONS) return
 
         saveLastSessionConfig(config)
+        resetRunScore()
         configuredSessionRuntime = true
         configuredSessionId = nextSessionId()
         configuredSessionConfig = config
@@ -286,6 +303,12 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         sessionPendingSelected = sessionPrefs
             .getInt(sessionKey(sessionId, FIELD_SELECTED), -1)
             .takeIf { it >= 0 }
+
+        runAnswered = sessionAnswered
+        runCorrect = sessionPrefs.getInt(sessionKey(sessionId, FIELD_CORRECT_COUNT), 0)
+        runXpGained = sessionPrefs.getInt(sessionKey(sessionId, FIELD_XP_GAINED), 0)
+        _finishSummary.value = null
+
         _reviewMode.value = configuredSessionConfig?.mode == QuizSessionMode.DIFFICULTIES
         _restoredSelection.value = sessionPendingSelected
         _result.value = null
@@ -321,6 +344,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
         if (configuredSessionId == sessionId) {
             leaveConfiguredRuntime()
+            resetRunScore()
             _reviewMode.value = false
             _restoredSelection.value = null
             _result.value = null
@@ -409,6 +433,10 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                 totalResponseMs = p.totalResponseMs
             )
 
+            runAnswered += 1
+            if (ok) runCorrect += 1
+            runXpGained += gainedXp
+
             _restoredSelection.value = index
             _result.value = AnswerResult(ok, gainedXp, current.explanation, current)
 
@@ -435,6 +463,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
         if (_reviewMode.value && singleReviewQuestion) {
             reviewQuestionId = null
+            publishFinishSummary()
             _state.value = QuizUiState.Finished
             return
         }
@@ -650,6 +679,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             val id = reviewQuestionId
             val question = if (id == null) null else dao.questionById(id)
             if (question == null) {
+                publishFinishSummary()
                 _state.value = QuizUiState.Finished
             } else {
                 questionNumber = 1
@@ -661,11 +691,27 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         val question = repo.next(currentQuizType, currentCategory)
         if (question == null) {
             repo.resetSeen(currentQuizType, currentCategory)
+            publishFinishSummary()
             _state.value = QuizUiState.Finished
         } else {
             questionNumber++
             _state.value = QuizUiState.Ready(question, questionNumber)
         }
+    }
+
+    private fun resetRunScore() {
+        runAnswered = 0
+        runCorrect = 0
+        runXpGained = 0
+        _finishSummary.value = null
+    }
+
+    private fun publishFinishSummary() {
+        _finishSummary.value = QuizFinishSummary(
+            answered = runAnswered,
+            correct = runCorrect,
+            xpGained = runXpGained
+        )
     }
 
     private fun saveLastSessionConfig(config: QuizSessionConfig) {
@@ -734,6 +780,8 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             .putString(sessionKey(id, FIELD_QUEUE), sessionQueue.joinToString(","))
             .putInt(sessionKey(id, FIELD_INDEX), sessionIndex)
             .putInt(sessionKey(id, FIELD_ANSWERED), sessionAnswered)
+            .putInt(sessionKey(id, FIELD_CORRECT_COUNT), runCorrect)
+            .putInt(sessionKey(id, FIELD_XP_GAINED), runXpGained)
             .putLong(sessionKey(id, FIELD_CURRENT_ID), sessionCurrentQuestionId ?: -1L)
             .putBoolean(sessionKey(id, FIELD_PENDING), sessionPendingAnswer)
             .putBoolean(sessionKey(id, FIELD_CORRECT), sessionPendingCorrect)
@@ -744,6 +792,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun finishConfiguredSession() {
+        publishFinishSummary()
         val id = configuredSessionId
         if (id != null) removeSessionStorage(id)
         leaveConfiguredRuntime()
@@ -777,6 +826,8 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             .remove(sessionKey(id, FIELD_QUEUE))
             .remove(sessionKey(id, FIELD_INDEX))
             .remove(sessionKey(id, FIELD_ANSWERED))
+            .remove(sessionKey(id, FIELD_CORRECT_COUNT))
+            .remove(sessionKey(id, FIELD_XP_GAINED))
             .remove(sessionKey(id, FIELD_CURRENT_ID))
             .remove(sessionKey(id, FIELD_PENDING))
             .remove(sessionKey(id, FIELD_CORRECT))
@@ -831,6 +882,8 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             )
             .putInt(sessionKey(id, FIELD_INDEX), sessionPrefs.getInt(KEY_LEGACY_INDEX, 0))
             .putInt(sessionKey(id, FIELD_ANSWERED), sessionPrefs.getInt(KEY_LEGACY_ANSWERED, 0))
+            .putInt(sessionKey(id, FIELD_CORRECT_COUNT), 0)
+            .putInt(sessionKey(id, FIELD_XP_GAINED), 0)
             .putLong(sessionKey(id, FIELD_CURRENT_ID), sessionPrefs.getLong(KEY_LEGACY_CURRENT_ID, -1L))
             .putBoolean(sessionKey(id, FIELD_PENDING), sessionPrefs.getBoolean(KEY_LEGACY_PENDING, false))
             .putBoolean(sessionKey(id, FIELD_CORRECT), sessionPrefs.getBoolean(KEY_LEGACY_CORRECT, false))
@@ -894,6 +947,8 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         private const val FIELD_QUEUE = "queue"
         private const val FIELD_INDEX = "index"
         private const val FIELD_ANSWERED = "answered"
+        private const val FIELD_CORRECT_COUNT = "correct_count"
+        private const val FIELD_XP_GAINED = "xp_gained"
         private const val FIELD_CURRENT_ID = "current_id"
         private const val FIELD_PENDING = "pending"
         private const val FIELD_CORRECT = "correct"
