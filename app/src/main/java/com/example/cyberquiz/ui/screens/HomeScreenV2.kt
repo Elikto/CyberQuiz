@@ -66,13 +66,9 @@ fun HomeScreenV2(
                 TopButton(TopIcon.PROFILE, onProfile)
             }
 
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(2.dp))
             HeroLogo()
 
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text("Cyber", color = Color.White, fontSize = 41.sp, fontWeight = FontWeight.Black)
-                Text("Quiz", color = Color(0xFFE04FFF), fontSize = 41.sp, fontWeight = FontWeight.Black)
-            }
             Text("APPRENDS  ·  JOUE  ·  SÉCURISE", color = Color(0xFFAEB9EA), fontSize = 11.sp, letterSpacing = 2.1.sp)
 
             Spacer(Modifier.height(8.dp))
@@ -235,66 +231,15 @@ private fun HeroLogo() {
     Box(
         Modifier
             .fillMaxWidth()
-            .height(214.dp),
+            .height(330.dp),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val cx = w / 2f
-            val cy = h / 2f
-            val cyan = Color(0xFF19D9FF).copy(alpha = .42f)
-            val purple = Color(0xFF9B5CFF).copy(alpha = .38f)
-
-            drawCircle(
-                Brush.radialGradient(
-                    listOf(Color(0xFF1A7DFF).copy(alpha = .18f), Color.Transparent),
-                    center = Offset(cx, cy),
-                    radius = 180f
-                ),
-                radius = 180f,
-                center = Offset(cx, cy)
-            )
-
-            listOf(.20f, .33f, .47f, .62f, .76f).forEachIndexed { i, fraction ->
-                val yy = h * fraction
-                val c = if (i % 2 == 0) cyan else purple
-                val left = Path().apply {
-                    moveTo(8f, yy)
-                    lineTo(cx - 118f, yy)
-                    lineTo(cx - 92f, yy + if (i % 2 == 0) 18f else -18f)
-                }
-                val right = Path().apply {
-                    moveTo(w - 8f, yy)
-                    lineTo(cx + 118f, yy)
-                    lineTo(cx + 92f, yy + if (i % 2 == 0) 18f else -18f)
-                }
-                drawPath(left, c, style = Stroke(2.2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                drawPath(right, c, style = Stroke(2.2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                drawCircle(c, 4f, Offset(8f, yy))
-                drawCircle(c, 4f, Offset(w - 8f, yy))
-            }
-        }
-
-        Box(
-            Modifier
-                .size(184.dp)
-                .background(Color(0xFF020611), RoundedCornerShape(38.dp))
-                .border(
-                    1.4.dp,
-                    Brush.linearGradient(listOf(Color(0xFF9B5CFF), Color(0xFF19D9FF))),
-                    RoundedCornerShape(38.dp)
-                )
-                .padding(5.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Image(
-                painter = painterResource(R.drawable.cyberquiz_app_icon),
-                contentDescription = "Logo CyberQuiz",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-            )
-        }
+        Image(
+            painter = painterResource(R.drawable.cyberquiz_home_logo),
+            contentDescription = "CyberQuiz",
+            modifier = Modifier.fillMaxWidth().height(330.dp),
+            contentScale = ContentScale.Fit
+        )
     }
 }
 
