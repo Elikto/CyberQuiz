@@ -132,34 +132,25 @@ internal fun StatsThemeDetailDialog(
                 lineHeight = 18.sp
             )
 
-            if (!showQuizOptions) {
-                ThemeActionButton(
-                    title = "LANCER UN QUIZ CIBLÉ",
-                    subtitle = "Choisir le nombre de questions · ${item.category}",
-                    accent = ThemeDetailPurple,
-                    onClick = { showQuizOptions = true }
-                )
-            } else {
+            ThemeActionButton(
+                title = "LANCER UN QUIZ CIBLÉ",
+                subtitle = if (showQuizOptions) {
+                    "Choisis le nombre de questions juste en dessous"
+                } else {
+                    "Choisir le nombre de questions · ${item.category}"
+                },
+                accent = ThemeDetailPurple,
+                onClick = { showQuizOptions = true }
+            )
+
+            if (showQuizOptions) {
                 ThemeSection("NOMBRE DE QUESTIONS", ThemeDetailCyan)
-                Text(
-                    "Choisis la longueur de ton entraînement ciblé. Le quiz restera uniquement sur ${item.category}.",
-                    color = ThemeDetailMuted,
-                    fontSize = 10.sp,
-                    lineHeight = 15.sp
-                )
                 ThemeQuestionCountSelector(
                     selected = selectedQuestionCount,
                     onSelected = { selectedQuestionCount = it }
                 )
-
-                ThemeActionButton(
-                    title = "DÉMARRER LE QUIZ",
-                    subtitle = if (selectedQuestionCount == 0) {
-                        "${item.category} · quiz infini"
-                    } else {
-                        "${item.category} · $selectedQuestionCount questions"
-                    },
-                    accent = ThemeDetailPurple,
+                ThemeLaunchButton(
+                    selectedQuestionCount = selectedQuestionCount,
                     onClick = { onQuiz(selectedQuestionCount) }
                 )
             }
@@ -234,6 +225,35 @@ private fun ThemeQuestionCountSelector(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ThemeLaunchButton(
+    selectedQuestionCount: Int,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .background(
+                Brush.horizontalGradient(
+                    listOf(ThemeDetailPurple.copy(alpha = .95f), Color(0xFF234A91))
+                ),
+                RoundedCornerShape(16.dp)
+            )
+            .border(1.4.dp, ThemeDetailPurple, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            if (selectedQuestionCount == 0) "LANCER · INFINI" else "LANCER · $selectedQuestionCount QUESTIONS",
+            color = ThemeDetailText,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = .7.sp
+        )
     }
 }
 
