@@ -56,6 +56,7 @@ fun QuizScreenV8(
     val state by vm.state.collectAsState()
     val result by vm.result.collectAsState()
     val progress by vm.progress.collectAsState()
+    val finishSummary by vm.finishSummary.collectAsState()
     val reviewMode by vm.reviewMode.collectAsState()
     val restoredSelection by vm.restoredSelection.collectAsState()
     val scrollState = rememberScrollState()
@@ -99,17 +100,40 @@ fun QuizScreenV8(
                 CircularProgressIndicator(color = Q8Cyan)
             }
 
-            QuizUiState.Finished -> FinishedQuizCardV8(
-                answered = progress.answered,
-                correct = progress.correct,
-                xp = progress.xp,
-                onReplay = {
-                    selected = null
-                    showLearnMore = false
-                    vm.start()
-                },
-                onBack = onBack
-            )
+            QuizUiState.Finished -> {
+                val summary = finishSummary
+                if (summary != null) {
+                    QuizFinishCelebrationV8(
+                        summary = summary,
+                        onReplay = {
+                            selected = null
+                            showLearnMore = false
+                            if (configuredSession) {
+                                vm.restartLastConfiguredQuiz()
+                            } else {
+                                vm.start()
+                            }
+                        },
+                        onBack = onBack
+                    )
+                } else {
+                    FinishedQuizCardV8(
+                        answered = progress.answered,
+                        correct = progress.correct,
+                        xp = progress.xp,
+                        onReplay = {
+                            selected = null
+                            showLearnMore = false
+                            if (configuredSession) {
+                                vm.restartLastConfiguredQuiz()
+                            } else {
+                                vm.start()
+                            }
+                        },
+                        onBack = onBack
+                    )
+                }
+            }
 
             is QuizUiState.Ready -> {
                 val q = s.question
