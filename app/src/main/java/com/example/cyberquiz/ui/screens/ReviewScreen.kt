@@ -55,9 +55,11 @@ fun ReviewScreen(
     vm: QuizViewModel,
     onBack: () -> Unit,
     onPractice: (ReviewItemEntity) -> Unit,
+    onCategoryQuiz: (String, Int) -> Unit,
     highlightedConcept: String? = null
 ) {
     val items by vm.reviewItemsWithQuestions.collectAsState()
+    val activeSessions by vm.activeSessions.collectAsState()
     val scrollState = rememberScrollState()
     var courseTerm by remember { mutableStateOf<String?>(null) }
     var courseCategory by remember { mutableStateOf("") }
@@ -72,6 +74,14 @@ fun ReviewScreen(
         listOf(highlightedItem) + activeRaw.filterNot { it.review.id == highlightedItem.review.id }
     }
     val mastered = items.filter { it.review.mastered }
+    val activeByCategory = active.groupBy { it.review.category }
+    val highlightedCategory = highlightedItem?.review?.category
+    val orderedActiveCategories = activeByCategory.keys.sortedWith(
+        compareBy<String> {
+            if (highlightedCategory != null && it.equals(highlightedCategory, ignoreCase = true)) 0 else 1
+        }.thenBy { it.lowercase() }
+    )
+    val categoryQuizEnabled = activeSessions.size < QuizViewModel.MAX_ACTIVE_SESSIONS
 
     var highlightedCardY by remember(highlightedItem?.review?.id) { mutableStateOf<Int?>(null) }
     var highlightPulseReady by remember(highlightedItem?.review?.id) { mutableStateOf(false) }
@@ -115,7 +125,7 @@ fun ReviewScreen(
             fontWeight = FontWeight.Black
         )
         Text(
-            "CyberQuiz mémorise les questions que tu rates sans afficher leur réponse. Tu peux te retester à l'aveugle ou choisir de réviser la notion avant.",
+            "CyberQuiz mémorise les questions que tu rates sans afficher leur réponse. Elles sont maintenant regroupées par catégorie pour te permettre de travailler un domaine entier d'un coup.",
             color = ReviewMuted,
             fontSize = 13.sp,
             lineHeight = 19.sp
@@ -148,31 +158,41 @@ fun ReviewScreen(
         } else {
             if (active.isNotEmpty()) {
                 SectionTitleReview("PRIORITÉ · À RETRAVAILLER")
-                active.forEach { item ->
-                    val isHighlighted = highlightedItem?.review?.id == item.review.id
-                    ReviewItemCard(
-                        item = item,
-                        highlighted = isHighlighted,
-                        flashHighlight = isHighlighted && highlightPulseReady,
-                        modifier = if (isHighlighted) {
-                            Modifier.onGloballyPositioned { coordinates ->
-                                if (highlightedCardY == null) {
-                                    highlightedCardY = coordinates.positionInParent().y.roundToInt()
-                                }
-                            }
-                        } else {
-                            Modifier
-                        },
-                        onCourse = if (hasCyberExpertCourse(item.review.concept)) {
-                            {
-                                courseTerm = item.review.concept
-                                courseCategory = item.review.category
-                            }
-                        } else {
-                            null
-                        },
-                        onPractice = { onPractice(item.review) }
+                orderedActiveCategories.forEach { category ->
+                    val categoryItems = activeByCategory[category].orEmpty()
+                    ReviewCategoryCard(
+                        category = category,
+                        questionCount = categoryItems.size,
+                        quizEnabled = categoryQuizEnabled,
+                        onLaunchQuiz = { onCategoryQuiz(category, categoryItems.size) }
                     )
+
+                    categoryItems.forEach { item ->
+                        val isHighlighted = highlightedItem?.review?.id == item.review.id
+                        ReviewItemCard(
+                            item = item,
+                            highlighted = isHighlighted,
+                            flashHighlight = isHighlighted && highlightPulseReady,
+                            modifier = if (isHighlighted) {
+                                Modifier.onGloballyPositioned { coordinates ->
+                                    if (highlightedCardY == null) {
+                                        highlightedCardY = coordinates.positionInParent().y.roundToInt()
+                                    }
+                                }
+                            } else {
+                                Modifier
+                            },
+                            onCourse = if (hasCyberExpertCourse(item.review.concept)) {
+                                {
+                                    courseTerm = item.review.concept
+                                    courseCategory = item.review.category
+                                }
+                            } else {
+                                null
+                            },
+                            onPractice = { onPractice(item.review) }
+                        )
+                    }
                 }
             }
 
@@ -244,6 +264,84 @@ private fun ReviewSummaryCard(value: String, label: String, accent: Color, modif
     ) {
         Text(value, color = accent, fontSize = 25.sp, fontWeight = FontWeight.Black)
         Text(label, color = ReviewMuted, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun ReviewCategoryCard(
+    category: String,
+    questionCount: Int,
+    quizEnabled: Boolean,
+    onLaunchQuiz: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.horizontalGradient(
+                    listOf(ReviewOrange.copy(alpha = .12f), Color(0xFF081226), ReviewPurple.copy(alpha = .06f))
+                ),
+                RoundedCornerShape(20.dp)
+            )
+            .border(1.2.dp, ReviewOrange.copy(alpha = .55f), RoundedCornerShape(20.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(11.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(38.dp)
+                    .background(ReviewOrange.copy(alpha = .13f), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("#", color = ReviewOrange, fontSize = 17.sp, fontWeight = FontWeight.Black)
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    category,
+                    color = ReviewText,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Black
+                )
+                Text(
+                    "$questionCount question${if (questionCount > 1) "s" else ""} à retravailler",
+                    color = ReviewMuted,
+                    fontSize = 10.sp
+                )
+            }
+            Text(
+                questionCount.toString(),
+                color = ReviewOrange,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Black
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(46.dp)
+                .background(
+                    if (quizEnabled) ReviewPurple.copy(alpha = .12f) else Color(0xFF111725),
+                    RoundedCornerShape(14.dp)
+                )
+                .border(
+                    1.1.dp,
+                    if (quizEnabled) ReviewPurple.copy(alpha = .80f) else Color(0xFF38425B),
+                    RoundedCornerShape(14.dp)
+                )
+                .clickable(enabled = quizEnabled, onClick = onLaunchQuiz),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                if (quizEnabled) "LANCER LE QUIZ · $questionCount" else "6 QUIZ EN COURS",
+                color = if (quizEnabled) ReviewPurple else Color(0xFF677089),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = .6.sp
+            )
+        }
     }
 }
 
