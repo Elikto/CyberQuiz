@@ -1,5 +1,6 @@
 package com.example.cyberquiz.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,9 +63,13 @@ fun QuizHistoryScreen(
     val activeSessions by vm.activeSessions.collectAsState()
     var expandedId by rememberSaveable { mutableStateOf<String?>(null) }
     var exploringId by rememberSaveable { mutableStateOf<String?>(null) }
+    val historyScrollState = rememberScrollState()
 
     val exploring = history.firstOrNull { it.id == exploringId }
     if (exploring != null) {
+        BackHandler {
+            exploringId = null
+        }
         HistoryExplorer(
             entry = exploring,
             onBack = { exploringId = null }
@@ -82,7 +87,7 @@ fun QuizHistoryScreen(
             )
             .statusBarsPadding()
             .navigationBarsPadding()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(historyScrollState)
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(13.dp)
     ) {
