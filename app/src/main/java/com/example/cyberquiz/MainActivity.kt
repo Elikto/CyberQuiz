@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -71,11 +72,13 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
             ?: QuizType.CYBERSECURITY.name
     }
 
+    val screenStateHolder = rememberSaveableStateHolder()
     var screen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
     var previousScreen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
     var selectedQuizTypeName by rememberSaveable { mutableStateOf(storedQuizTypeName) }
     var highlightedReviewConcept by rememberSaveable { mutableStateOf<String?>(null) }
     var configuredQuizUi by rememberSaveable { mutableStateOf(false) }
+    var quizQuestionTotal by rememberSaveable { mutableStateOf<Int?>(null) }
 
     val selectedQuizType = QuizType.entries.firstOrNull { it.name == selectedQuizTypeName }
         ?: QuizType.CYBERSECURITY
@@ -106,6 +109,7 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
 
     fun openQuizSetupFromFinish() {
         configuredQuizUi = false
+        quizQuestionTotal = null
         previousScreen = AppScreen.HOME
         screen = AppScreen.QUIZ_SETUP
     }
@@ -114,158 +118,177 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
         goBack()
     }
 
-    when (screen) {
-        AppScreen.HOME -> {
-            if (selectedQuizType == QuizType.CYBERSECURITY) {
-                HomeScreenV2(
-                    vm = vm,
-                    selectedQuizType = selectedQuizType,
-                    onQuiz = { navigateTo(AppScreen.QUIZ_SETUP) },
-                    onStats = { navigateTo(AppScreen.STATS) },
-                    onCategories = { navigateTo(AppScreen.CATEGORIES) },
-                    onReview = {
-                        highlightedReviewConcept = null
-                        navigateTo(AppScreen.REVIEW)
-                    },
-                    onHistory = { navigateTo(AppScreen.HISTORY) },
-                    onProfile = { navigateTo(AppScreen.PROFILE) },
-                    onSettings = { navigateTo(AppScreen.SETTINGS) }
-                )
-            } else {
-                UniverseHomeScreen(
-                    vm = vm,
-                    selectedQuizType = selectedQuizType,
-                    onQuiz = {
-                        if (!selectedQuizType.isPlayableNow()) {
-                            navigateTo(AppScreen.UNAVAILABLE_QUIZ)
-                        } else {
-                            configuredQuizUi = false
-                            vm.start(quizType = selectedQuizType.name)
-                            navigateTo(AppScreen.QUIZ)
-                        }
-                    },
-                    onStats = { navigateTo(AppScreen.STATS) },
-                    onCategories = {
-                        if (selectedQuizType.isPlayableNow()) {
-                            navigateTo(AppScreen.CATEGORIES)
-                        } else {
-                            navigateTo(AppScreen.UNAVAILABLE_QUIZ)
-                        }
-                    },
-                    onReview = {},
-                    onProfile = { navigateTo(AppScreen.PROFILE) },
-                    onSettings = { navigateTo(AppScreen.SETTINGS) }
-                )
-            }
-        }
-
-        AppScreen.QUIZ_SETUP -> QuizSetupScreen(
-            vm = vm,
-            onBack = { goBack() },
-            onStart = { config ->
-                configuredQuizUi = true
-                vm.startConfiguredQuiz(config)
-                navigateTo(AppScreen.QUIZ)
-            },
-            onResume = { sessionId ->
-                configuredQuizUi = true
-                vm.resumeConfiguredQuiz(sessionId)
-                navigateTo(AppScreen.QUIZ)
-            },
-            onAbandon = { sessionId ->
-                vm.abandonConfiguredQuiz(sessionId)
-            }
-        )
-
-        AppScreen.QUIZ -> QuizScreenV8(
-            vm = vm,
-            configuredSession = configuredQuizUi,
-            onBack = { goBack() },
-            onOtherQuiz = { openQuizSetupFromFinish() },
-            onHome = { goHome() }
-        )
-
-        AppScreen.STATS -> {
-            if (selectedQuizType == QuizType.CYBERSECURITY) {
-                StatisticsScreenV3(
-                    vm = vm,
-                    onBack = { goBack() },
-                    onReviewConcept = { concept ->
-                        highlightedReviewConcept = concept
-                        navigateTo(AppScreen.REVIEW)
-                    },
-                    onThemeQuiz = { category, questionCount ->
-                        if (vm.activeSessions.value.size < QuizViewModel.MAX_ACTIVE_SESSIONS) {
-                            configuredQuizUi = true
-                            vm.startConfiguredQuiz(
-                                QuizSessionConfig(
-                                    mode = QuizSessionMode.RANDOM,
-                                    categories = setOf(category),
-                                    questionCount = questionCount
-                                )
-                            )
-                            navigateTo(AppScreen.QUIZ)
-                        }
-                    }
-                )
-            } else {
-                StatisticsScreenV2(
-                    vm = vm,
-                    onBack = { goBack() }
-                )
-            }
-        }
-
-        AppScreen.CATEGORIES -> CategoriesScreenV3(
-            vm = vm,
-            selectedQuizType = selectedQuizType,
-            onBack = { goBack() },
-            onQuiz = {
-                configuredQuizUi = false
-                navigateTo(AppScreen.QUIZ)
-            }
-        )
-
-        AppScreen.REVIEW -> ReviewScreen(
-            vm = vm,
-            highlightedConcept = highlightedReviewConcept,
-            onBack = { goBack() },
-            onPractice = { item ->
-                configuredQuizUi = false
-                vm.startReviewQuestion(item.quizType, item.questionId)
-                navigateTo(AppScreen.QUIZ)
-            }
-        )
-
-        AppScreen.HISTORY -> QuizHistoryScreen(
-            vm = vm,
-            onBack = { goBack() },
-            onReplay = { historyId ->
-                if (vm.restartHistoryQuiz(historyId)) {
-                    configuredQuizUi = true
-                    navigateTo(AppScreen.QUIZ)
+    screenStateHolder.SaveableStateProvider(screen.name) {
+        when (screen) {
+            AppScreen.HOME -> {
+                if (selectedQuizType == QuizType.CYBERSECURITY) {
+                    HomeScreenV2(
+                        vm = vm,
+                        selectedQuizType = selectedQuizType,
+                        onQuiz = { navigateTo(AppScreen.QUIZ_SETUP) },
+                        onStats = { navigateTo(AppScreen.STATS) },
+                        onCategories = { navigateTo(AppScreen.CATEGORIES) },
+                        onReview = {
+                            highlightedReviewConcept = null
+                            navigateTo(AppScreen.REVIEW)
+                        },
+                        onHistory = { navigateTo(AppScreen.HISTORY) },
+                        onProfile = { navigateTo(AppScreen.PROFILE) },
+                        onSettings = { navigateTo(AppScreen.SETTINGS) }
+                    )
+                } else {
+                    UniverseHomeScreen(
+                        vm = vm,
+                        selectedQuizType = selectedQuizType,
+                        onQuiz = {
+                            if (!selectedQuizType.isPlayableNow()) {
+                                navigateTo(AppScreen.UNAVAILABLE_QUIZ)
+                            } else {
+                                configuredQuizUi = false
+                                quizQuestionTotal = null
+                                vm.start(quizType = selectedQuizType.name)
+                                navigateTo(AppScreen.QUIZ)
+                            }
+                        },
+                        onStats = { navigateTo(AppScreen.STATS) },
+                        onCategories = {
+                            if (selectedQuizType.isPlayableNow()) {
+                                navigateTo(AppScreen.CATEGORIES)
+                            } else {
+                                navigateTo(AppScreen.UNAVAILABLE_QUIZ)
+                            }
+                        },
+                        onReview = {},
+                        onProfile = { navigateTo(AppScreen.PROFILE) },
+                        onSettings = { navigateTo(AppScreen.SETTINGS) }
+                    )
                 }
             }
-        )
 
-        AppScreen.PROFILE -> ProfileScreenV3(
-            selectedQuizType = selectedQuizType,
-            onQuizTypeSelected = { type ->
-                selectedQuizTypeName = type.name
-                preferences.edit()
-                    .putString("selected_quiz_type", type.name)
-                    .apply()
-            },
-            onBack = { goBack() }
-        )
+            AppScreen.QUIZ_SETUP -> QuizSetupScreen(
+                vm = vm,
+                onBack = { goBack() },
+                onStart = { config ->
+                    configuredQuizUi = true
+                    quizQuestionTotal = config.questionCount.takeIf { it > 0 }
+                    vm.startConfiguredQuiz(config)
+                    navigateTo(AppScreen.QUIZ)
+                },
+                onResume = { sessionId ->
+                    configuredQuizUi = true
+                    quizQuestionTotal = vm.activeSessions.value
+                        .firstOrNull { it.id == sessionId }
+                        ?.config
+                        ?.questionCount
+                        ?.takeIf { it > 0 }
+                    vm.resumeConfiguredQuiz(sessionId)
+                    navigateTo(AppScreen.QUIZ)
+                },
+                onAbandon = { sessionId ->
+                    vm.abandonConfiguredQuiz(sessionId)
+                }
+            )
 
-        AppScreen.SETTINGS -> SettingsScreenV2(
-            onBack = { goBack() }
-        )
+            AppScreen.QUIZ -> QuizScreenV8(
+                vm = vm,
+                configuredSession = configuredQuizUi,
+                questionTotal = quizQuestionTotal,
+                onBack = { goBack() },
+                onOtherQuiz = { openQuizSetupFromFinish() },
+                onHome = { goHome() }
+            )
 
-        AppScreen.UNAVAILABLE_QUIZ -> QuizUnavailableScreen(
-            quizType = selectedQuizType,
-            onBack = { goBack() }
-        )
+            AppScreen.STATS -> {
+                if (selectedQuizType == QuizType.CYBERSECURITY) {
+                    StatisticsScreenV3(
+                        vm = vm,
+                        onBack = { goBack() },
+                        onReviewConcept = { concept ->
+                            highlightedReviewConcept = concept
+                            navigateTo(AppScreen.REVIEW)
+                        },
+                        onThemeQuiz = { category, questionCount ->
+                            if (vm.activeSessions.value.size < QuizViewModel.MAX_ACTIVE_SESSIONS) {
+                                configuredQuizUi = true
+                                quizQuestionTotal = questionCount.takeIf { it > 0 }
+                                vm.startConfiguredQuiz(
+                                    QuizSessionConfig(
+                                        mode = QuizSessionMode.RANDOM,
+                                        categories = setOf(category),
+                                        questionCount = questionCount
+                                    )
+                                )
+                                navigateTo(AppScreen.QUIZ)
+                            }
+                        }
+                    )
+                } else {
+                    StatisticsScreenV2(
+                        vm = vm,
+                        onBack = { goBack() }
+                    )
+                }
+            }
+
+            AppScreen.CATEGORIES -> CategoriesScreenV3(
+                vm = vm,
+                selectedQuizType = selectedQuizType,
+                onBack = { goBack() },
+                onQuiz = {
+                    configuredQuizUi = false
+                    quizQuestionTotal = null
+                    navigateTo(AppScreen.QUIZ)
+                }
+            )
+
+            AppScreen.REVIEW -> ReviewScreen(
+                vm = vm,
+                highlightedConcept = highlightedReviewConcept,
+                onBack = { goBack() },
+                onPractice = { item ->
+                    configuredQuizUi = false
+                    quizQuestionTotal = 1
+                    vm.startReviewQuestion(item.quizType, item.questionId)
+                    navigateTo(AppScreen.QUIZ)
+                }
+            )
+
+            AppScreen.HISTORY -> QuizHistoryScreen(
+                vm = vm,
+                onBack = { goBack() },
+                onReplay = { historyId ->
+                    val total = vm.quizHistory.value
+                        .firstOrNull { it.id == historyId }
+                        ?.config
+                        ?.questionCount
+                        ?.takeIf { it > 0 }
+                    if (vm.restartHistoryQuiz(historyId)) {
+                        configuredQuizUi = true
+                        quizQuestionTotal = total
+                        navigateTo(AppScreen.QUIZ)
+                    }
+                }
+            )
+
+            AppScreen.PROFILE -> ProfileScreenV3(
+                selectedQuizType = selectedQuizType,
+                onQuizTypeSelected = { type ->
+                    selectedQuizTypeName = type.name
+                    preferences.edit()
+                        .putString("selected_quiz_type", type.name)
+                        .apply()
+                },
+                onBack = { goBack() }
+            )
+
+            AppScreen.SETTINGS -> SettingsScreenV2(
+                onBack = { goBack() }
+            )
+
+            AppScreen.UNAVAILABLE_QUIZ -> QuizUnavailableScreen(
+                quizType = selectedQuizType,
+                onBack = { goBack() }
+            )
+        }
     }
 }
