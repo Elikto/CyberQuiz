@@ -15,6 +15,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cyberquiz.model.QuizSessionConfig
+import com.example.cyberquiz.model.QuizSessionMode
 import com.example.cyberquiz.ui.screens.CategoriesScreenV3
 import com.example.cyberquiz.ui.screens.HomeScreenV2
 import com.example.cyberquiz.ui.screens.ProfileScreenV3
@@ -192,10 +194,18 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                         highlightedReviewConcept = concept
                         navigateTo(AppScreen.REVIEW)
                     },
-                    onThemeQuiz = { category ->
-                        configuredQuizUi = false
-                        vm.startCategory(QuizType.CYBERSECURITY.name, category)
-                        navigateTo(AppScreen.QUIZ)
+                    onThemeQuiz = { category, questionCount ->
+                        if (vm.activeSessions.value.size < QuizViewModel.MAX_ACTIVE_SESSIONS) {
+                            configuredQuizUi = true
+                            vm.startConfiguredQuiz(
+                                QuizSessionConfig(
+                                    mode = QuizSessionMode.RANDOM,
+                                    categories = setOf(category),
+                                    questionCount = questionCount
+                                )
+                            )
+                            navigateTo(AppScreen.QUIZ)
+                        }
                     }
                 )
             } else {
