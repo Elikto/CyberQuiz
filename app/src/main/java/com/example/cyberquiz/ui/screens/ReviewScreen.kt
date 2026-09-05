@@ -30,7 +30,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -191,9 +191,7 @@ fun ReviewScreen(
                         expanded = expanded,
                         onToggle = { toggleCategory(category) },
                         onLaunchQuiz = { onCategoryQuiz(category, categoryItems.size) }
-                    )
-
-                    if (expanded) {
+                    ) {
                         categoryItems.forEach { item ->
                             val isHighlighted = highlightedItem?.review?.id == item.review.id
                             ReviewItemCard(
@@ -203,7 +201,9 @@ fun ReviewScreen(
                                 modifier = if (isHighlighted) {
                                     Modifier.onGloballyPositioned { coordinates ->
                                         if (highlightedCardY == null) {
-                                            highlightedCardY = coordinates.positionInParent().y.roundToInt()
+                                            highlightedCardY = (
+                                                coordinates.positionInRoot().y + scrollState.value
+                                            ).roundToInt()
                                         }
                                     }
                                 } else {
@@ -302,7 +302,8 @@ private fun ReviewCategoryCard(
     quizEnabled: Boolean,
     expanded: Boolean,
     onToggle: () -> Unit,
-    onLaunchQuiz: () -> Unit
+    onLaunchQuiz: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -383,6 +384,24 @@ private fun ReviewCategoryCard(
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Black,
                 letterSpacing = .6.sp
+            )
+        }
+
+        if (expanded) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(ReviewOrange.copy(alpha = .24f))
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF050D1C).copy(alpha = .78f), RoundedCornerShape(16.dp))
+                    .border(1.dp, ReviewOrange.copy(alpha = .20f), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 5.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                content = content
             )
         }
     }
