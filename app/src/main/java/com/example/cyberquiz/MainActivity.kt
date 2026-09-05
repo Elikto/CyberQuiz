@@ -139,13 +139,13 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                 vm.startConfiguredQuiz(config)
                 navigateTo(AppScreen.QUIZ)
             },
-            onResume = {
+            onResume = { sessionId ->
                 configuredQuizUi = true
-                vm.resumeConfiguredQuiz()
+                vm.resumeConfiguredQuiz(sessionId)
                 navigateTo(AppScreen.QUIZ)
             },
-            onAbandon = {
-                vm.abandonConfiguredQuiz()
+            onAbandon = { sessionId ->
+                vm.abandonConfiguredQuiz(sessionId)
             }
         )
 
