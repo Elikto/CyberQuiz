@@ -1,0 +1,65 @@
+name: Build downloadable APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Prepare downloadable APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk CyberQuiz.apk
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CyberQuiz-APK
+          path: CyberQuiz.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish latest APK in GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag -f apk-latest "$GITHUB_SHA"
+          git push origin refs/tags/apk-latest --force
+
+          if gh release view apk-latest >/dev/null 2>&1; then
+            gh release edit apk-latest \
+              --title "CyberQuiz APK - dernière version" \
+              --notes "APK Android généré automatiquement depuis la branche main. Télécharge CyberQuiz.apk dans les fichiers ci-dessous." \
+              --latest
+          else
+            gh release create apk-latest \
+              --title "CyberQuiz APK - dernière version" \
+              --notes "APK Android généré automatiquement depuis la branche main. Télécharge CyberQuiz.apk dans les fichiers ci-dessous." \
+              --latest
+          fi
+
+          gh release upload apk-latest CyberQuiz.apk --clobber
