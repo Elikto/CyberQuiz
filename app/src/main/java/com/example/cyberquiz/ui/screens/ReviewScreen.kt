@@ -17,6 +17,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -49,6 +50,7 @@ private val ReviewGreen = Color(0xFF38E69A)
 private val ReviewOrange = Color(0xFFFFB84A)
 private val ReviewText = Color(0xFFF5F7FF)
 private val ReviewMuted = Color(0xFF9FAED3)
+private const val ReviewCategorySeparator = "\u001F"
 
 @Composable
 fun ReviewScreen(
@@ -63,6 +65,7 @@ fun ReviewScreen(
     val scrollState = rememberScrollState()
     var courseTerm by remember { mutableStateOf<String?>(null) }
     var courseCategory by remember { mutableStateOf("") }
+    var expandedCategoriesState by rememberSaveable { mutableStateOf("") }
 
     val activeRaw = items.filterNot { it.review.mastered }
     val highlightedItem = highlightedConcept?.let { concept ->
@@ -82,9 +85,29 @@ fun ReviewScreen(
         }.thenBy { it.lowercase() }
     )
     val categoryQuizEnabled = activeSessions.size < QuizViewModel.MAX_ACTIVE_SESSIONS
+    val expandedCategories = remember(expandedCategoriesState) {
+        expandedCategoriesState
+            .split(ReviewCategorySeparator)
+            .filter { it.isNotBlank() }
+            .toSet()
+    }
+
+    fun toggleCategory(category: String) {
+        val updated = expandedCategories.toMutableSet()
+        if (!updated.add(category)) updated.remove(category)
+        expandedCategoriesState = updated.sorted().joinToString(ReviewCategorySeparator)
+    }
 
     var highlightedCardY by remember(highlightedItem?.review?.id) { mutableStateOf<Int?>(null) }
     var highlightPulseReady by remember(highlightedItem?.review?.id) { mutableStateOf(false) }
+
+    LaunchedEffect(highlightedCategory) {
+        if (highlightedCategory != null && highlightedCategory !in expandedCategories) {
+            val updated = expandedCategories.toMutableSet()
+            updated.add(highlightedCategory)
+            expandedCategoriesState = updated.sorted().joinToString(ReviewCategorySeparator)
+        }
+    }
 
     LaunchedEffect(highlightedItem?.review?.id) {
         if (highlightedItem == null) return@LaunchedEffect
@@ -125,7 +148,7 @@ fun ReviewScreen(
             fontWeight = FontWeight.Black
         )
         Text(
-            "CyberQuiz mémorise les questions que tu rates sans afficher leur réponse. Elles sont maintenant regroupées par catégorie pour te permettre de travailler un domaine entier d'un coup.",
+            "CyberQuiz mémorise les questions que tu rates sans afficher leur réponse. Elles sont regroupées par catégorie : appuie sur une catégorie pour afficher ou masquer ses questions.",
             color = ReviewMuted,
             fontSize = 13.sp,
             lineHeight = 19.sp
@@ -160,38 +183,43 @@ fun ReviewScreen(
                 SectionTitleReview("PRIORITÉ · À RETRAVAILLER")
                 orderedActiveCategories.forEach { category ->
                     val categoryItems = activeByCategory[category].orEmpty()
+                    val expanded = category in expandedCategories
                     ReviewCategoryCard(
                         category = category,
                         questionCount = categoryItems.size,
                         quizEnabled = categoryQuizEnabled,
+                        expanded = expanded,
+                        onToggle = { toggleCategory(category) },
                         onLaunchQuiz = { onCategoryQuiz(category, categoryItems.size) }
                     )
 
-                    categoryItems.forEach { item ->
-                        val isHighlighted = highlightedItem?.review?.id == item.review.id
-                        ReviewItemCard(
-                            item = item,
-                            highlighted = isHighlighted,
-                            flashHighlight = isHighlighted && highlightPulseReady,
-                            modifier = if (isHighlighted) {
-                                Modifier.onGloballyPositioned { coordinates ->
-                                    if (highlightedCardY == null) {
-                                        highlightedCardY = coordinates.positionInParent().y.roundToInt()
+                    if (expanded) {
+                        categoryItems.forEach { item ->
+                            val isHighlighted = highlightedItem?.review?.id == item.review.id
+                            ReviewItemCard(
+                                item = item,
+                                highlighted = isHighlighted,
+                                flashHighlight = isHighlighted && highlightPulseReady,
+                                modifier = if (isHighlighted) {
+                                    Modifier.onGloballyPositioned { coordinates ->
+                                        if (highlightedCardY == null) {
+                                            highlightedCardY = coordinates.positionInParent().y.roundToInt()
+                                        }
                                     }
-                                }
-                            } else {
-                                Modifier
-                            },
-                            onCourse = if (hasCyberExpertCourse(item.review.concept)) {
-                                {
-                                    courseTerm = item.review.concept
-                                    courseCategory = item.review.category
-                                }
-                            } else {
-                                null
-                            },
-                            onPractice = { onPractice(item.review) }
-                        )
+                                } else {
+                                    Modifier
+                                },
+                                onCourse = if (hasCyberExpertCourse(item.review.concept)) {
+                                    {
+                                        courseTerm = item.review.concept
+                                        courseCategory = item.review.category
+                                    }
+                                } else {
+                                    null
+                                },
+                                onPractice = { onPractice(item.review) }
+                            )
+                        }
                     }
                 }
             }
@@ -272,6 +300,8 @@ private fun ReviewCategoryCard(
     category: String,
     questionCount: Int,
     quizEnabled: Boolean,
+    expanded: Boolean,
+    onToggle: () -> Unit,
     onLaunchQuiz: () -> Unit
 ) {
     Column(
@@ -287,7 +317,13 @@ private fun ReviewCategoryCard(
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(11.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Box(
                 Modifier
                     .size(38.dp)
@@ -309,11 +345,18 @@ private fun ReviewCategoryCard(
                     color = ReviewMuted,
                     fontSize = 10.sp
                 )
+                Text(
+                    if (expanded) "MASQUER LES QUESTIONS" else "AFFICHER LES QUESTIONS",
+                    color = ReviewCyan,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = .7.sp
+                )
             }
             Text(
-                questionCount.toString(),
+                if (expanded) "⌃" else "⌄",
                 color = ReviewOrange,
-                fontSize = 24.sp,
+                fontSize = 22.sp,
                 fontWeight = FontWeight.Black
             )
         }
