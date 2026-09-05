@@ -11,9 +11,12 @@ import androidx.compose.ui.*
 import androidx.compose.ui.geometry.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
+import com.example.cyberquiz.R
 import com.example.cyberquiz.ui.theme.*
 import com.example.cyberquiz.viewmodel.QuizViewModel
 import kotlin.math.*
@@ -44,74 +47,154 @@ fun HomeScreenV2(
         else -> "Débutant Cyber"
     }
 
-    Column(
-        Modifier.fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF020610), Color(0xFF060B19), CyberBackground, Color(0xFF030712))))
-            .verticalScroll(rememberScrollState())
-            .statusBarsPadding().navigationBarsPadding()
-            .padding(horizontal = 18.dp, vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color(0xFF020611))
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            TopButton(TopIcon.SETTINGS, onSettings)
-            TopButton(TopIcon.PROFILE, onProfile)
+        HomeCircuitBackground()
+
+        Column(
+            Modifier.fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .statusBarsPadding().navigationBarsPadding()
+                .padding(horizontal = 18.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                TopButton(TopIcon.SETTINGS, onSettings)
+                TopButton(TopIcon.PROFILE, onProfile)
+            }
+
+            Spacer(Modifier.height(4.dp))
+            HeroLogo()
+
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("Cyber", color = Color.White, fontSize = 41.sp, fontWeight = FontWeight.Black)
+                Text("Quiz", color = Color(0xFFE04FFF), fontSize = 41.sp, fontWeight = FontWeight.Black)
+            }
+            Text("APPRENDS  ·  JOUE  ·  SÉCURISE", color = Color(0xFFAEB9EA), fontSize = 11.sp, letterSpacing = 2.1.sp)
+
+            Spacer(Modifier.height(8.dp))
+            Box(Modifier.background(Color(0xFF0D1730), RoundedCornerShape(50.dp)).border(1.dp, CyberBlue.copy(.55f), RoundedCornerShape(50.dp)).padding(horizontal = 13.dp, vertical = 6.dp)) {
+                Text("QUIZ : ${selectedQuizType.label.uppercase()}", color = Color(0xFFBFD7FF), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+            }
+
+            Spacer(Modifier.height(16.dp))
+            LevelCard(p.level, title, xp, progress)
+
+            Spacer(Modifier.height(14.dp))
+            Text("« La cybersécurité d'aujourd'hui\nconstruit un meilleur demain »", color = Color(0xFFC9D0F3), textAlign = TextAlign.Center, fontSize = 15.sp, lineHeight = 22.sp)
+
+            Spacer(Modifier.height(18.dp))
+            MenuCard("Commencer", "Lancer un nouveau quiz", Color(0xFFD652FF), Color(0xFF381160), ActionIcon.PLAY, onQuiz)
+            Spacer(Modifier.height(10.dp))
+            MenuCard("Statistiques", "Suis ta progression", Color(0xFF18BFFF), Color(0xFF072B5B), ActionIcon.BARS, onStats)
+            Spacer(Modifier.height(10.dp))
+            MenuCard("Catégories", "Choisis ton thème", Color(0xFF19F2E5), Color(0xFF06393B), ActionIcon.GRID, onCategories)
+            Spacer(Modifier.height(10.dp))
+            MenuCard(
+                "À revoir",
+                if (activeReviewCount == 0) "Aucune notion en attente" else "$activeReviewCount notion${if (activeReviewCount > 1) "s" else ""} à retravailler",
+                Color(0xFFFFB84A),
+                Color(0xFF4A2710),
+                ActionIcon.REVIEW,
+                onReview
+            )
+            Spacer(Modifier.height(10.dp))
+            MenuCard(
+                "Historique",
+                if (history.isEmpty()) "Aucun quiz terminé" else "${history.size} quiz terminé${if (history.size > 1) "s" else ""} enregistré${if (history.size > 1) "s" else ""}",
+                Color(0xFF8B7CFF),
+                Color(0xFF211B50),
+                ActionIcon.HISTORY,
+                onHistory
+            )
+
+            Spacer(Modifier.height(15.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatCard("🔥", p.streak.toString(), "Série", Modifier.weight(1f), Color(0xFFFFA61A))
+                StatCard("★", p.xp.toString(), "XP", Modifier.weight(1f), Color(0xFFD64CFF))
+                StatCard("▥", p.level.toString(), "Niveau", Modifier.weight(1f), Color(0xFF1AC3FF))
+                StatCard("🏆", "$accuracy%", "Réussite", Modifier.weight(1f), Color(0xFFFFCC33))
+            }
+
+            Spacer(Modifier.height(10.dp))
+            DigitalPlanet()
         }
+    }
+}
 
-        Spacer(Modifier.height(4.dp))
-        HeroLogo()
-
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text("Cyber", color = Color.White, fontSize = 41.sp, fontWeight = FontWeight.Black)
-            Text("Quiz", color = Color(0xFFE04FFF), fontSize = 41.sp, fontWeight = FontWeight.Black)
-        }
-        Text("APPRENDS  ·  JOUE  ·  SÉCURISE", color = Color(0xFFAEB9EA), fontSize = 11.sp, letterSpacing = 2.1.sp)
-
-        Spacer(Modifier.height(8.dp))
-        Box(Modifier.background(Color(0xFF0D1730), RoundedCornerShape(50.dp)).border(1.dp, CyberBlue.copy(.55f), RoundedCornerShape(50.dp)).padding(horizontal = 13.dp, vertical = 6.dp)) {
-            Text("QUIZ : ${selectedQuizType.label.uppercase()}", color = Color(0xFFBFD7FF), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-        }
-
-        Spacer(Modifier.height(16.dp))
-        LevelCard(p.level, title, xp, progress)
-
-        Spacer(Modifier.height(14.dp))
-        Text("« La cybersécurité d'aujourd'hui\nconstruit un meilleur demain »", color = Color(0xFFC9D0F3), textAlign = TextAlign.Center, fontSize = 15.sp, lineHeight = 22.sp)
-
-        Spacer(Modifier.height(18.dp))
-        MenuCard("Commencer", "Lancer un nouveau quiz", Color(0xFFD652FF), Color(0xFF381160), ActionIcon.PLAY, onQuiz)
-        Spacer(Modifier.height(10.dp))
-        MenuCard("Statistiques", "Suis ta progression", Color(0xFF18BFFF), Color(0xFF072B5B), ActionIcon.BARS, onStats)
-        Spacer(Modifier.height(10.dp))
-        MenuCard("Catégories", "Choisis ton thème", Color(0xFF19F2E5), Color(0xFF06393B), ActionIcon.GRID, onCategories)
-        Spacer(Modifier.height(10.dp))
-        MenuCard(
-            "À revoir",
-            if (activeReviewCount == 0) "Aucune notion en attente" else "$activeReviewCount notion${if (activeReviewCount > 1) "s" else ""} à retravailler",
-            Color(0xFFFFB84A),
-            Color(0xFF4A2710),
-            ActionIcon.REVIEW,
-            onReview
+@Composable
+private fun HomeCircuitBackground() {
+    Canvas(Modifier.fillMaxSize()) {
+        drawRect(
+            Brush.verticalGradient(
+                listOf(
+                    Color(0xFF020611),
+                    Color(0xFF040B18),
+                    Color(0xFF050A16),
+                    Color(0xFF020610)
+                )
+            )
         )
-        Spacer(Modifier.height(10.dp))
-        MenuCard(
-            "Historique",
-            if (history.isEmpty()) "Aucun quiz terminé" else "${history.size} quiz terminé${if (history.size > 1) "s" else ""} enregistré${if (history.size > 1) "s" else ""}",
-            Color(0xFF8B7CFF),
-            Color(0xFF211B50),
-            ActionIcon.HISTORY,
-            onHistory
-        )
 
-        Spacer(Modifier.height(15.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatCard("🔥", p.streak.toString(), "Série", Modifier.weight(1f), Color(0xFFFFA61A))
-            StatCard("★", p.xp.toString(), "XP", Modifier.weight(1f), Color(0xFFD64CFF))
-            StatCard("▥", p.level.toString(), "Niveau", Modifier.weight(1f), Color(0xFF1AC3FF))
-            StatCard("🏆", "$accuracy%", "Réussite", Modifier.weight(1f), Color(0xFFFFCC33))
+        val cyan = Color(0xFF18CFFF).copy(alpha = .12f)
+        val purple = Color(0xFF9B5CFF).copy(alpha = .10f)
+        val dim = Color(0xFF4074B8).copy(alpha = .07f)
+        val w = size.width
+        val h = size.height
+
+        var x = 24f
+        while (x < w) {
+            drawLine(dim, Offset(x, 0f), Offset(x, h), 1f)
+            x += 58f
+        }
+        var y = 20f
+        while (y < h) {
+            drawLine(dim, Offset(0f, y), Offset(w, y), 1f)
+            y += 58f
         }
 
-        Spacer(Modifier.height(10.dp))
-        DigitalPlanet()
+        val leftTraces = listOf(
+            Triple(.08f, .10f, .28f),
+            Triple(.03f, .22f, .42f),
+            Triple(.10f, .36f, .24f),
+            Triple(.02f, .50f, .34f),
+            Triple(.09f, .66f, .26f),
+            Triple(.04f, .82f, .39f)
+        )
+        leftTraces.forEachIndexed { index, (startX, yFraction, reach) ->
+            val c = if (index % 2 == 0) cyan else purple
+            val sy = h * yFraction
+            val sx = w * startX
+            val ex = w * reach
+            val p = Path().apply {
+                moveTo(sx, sy)
+                lineTo(ex - 34f, sy)
+                lineTo(ex, sy + if (index % 2 == 0) 28f else -28f)
+                lineTo(ex + 48f, sy + if (index % 2 == 0) 28f else -28f)
+            }
+            drawPath(p, c, style = Stroke(2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawCircle(c.copy(alpha = .7f), 4f, Offset(sx, sy))
+            drawCircle(c.copy(alpha = .55f), 3f, Offset(ex + 48f, sy + if (index % 2 == 0) 28f else -28f))
+        }
+
+        val rightTraces = listOf(.15f, .29f, .44f, .58f, .73f, .90f)
+        rightTraces.forEachIndexed { index, yFraction ->
+            val c = if (index % 2 == 0) purple else cyan
+            val sy = h * yFraction
+            val sx = w * .94f
+            val ex = w * (if (index % 3 == 0) .66f else .72f)
+            val p = Path().apply {
+                moveTo(sx, sy)
+                lineTo(ex + 38f, sy)
+                lineTo(ex, sy + if (index % 2 == 0) -24f else 24f)
+                lineTo(ex - 42f, sy + if (index % 2 == 0) -24f else 24f)
+            }
+            drawPath(p, c, style = Stroke(2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawCircle(c.copy(alpha = .7f), 4f, Offset(sx, sy))
+        }
     }
 }
 
@@ -149,45 +232,68 @@ private fun TopButton(icon: TopIcon, onClick: () -> Unit) {
 
 @Composable
 private fun HeroLogo() {
-    Box(Modifier.fillMaxWidth().height(188.dp), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(214.dp),
+        contentAlignment = Alignment.Center
+    ) {
         Canvas(Modifier.fillMaxSize()) {
-            val w = size.width; val h = size.height; val cx = w / 2; val cy = h * .56f
-            drawCircle(Brush.radialGradient(listOf(Color(0xFF8B2DFF).copy(.28f), Color.Transparent), Offset(cx, cy), 150f), 150f, Offset(cx, cy))
-            drawCircle(Brush.radialGradient(listOf(Color(0xFF00C8FF).copy(.14f), Color.Transparent), Offset(cx, cy), 205f), 205f, Offset(cx, cy))
+            val w = size.width
+            val h = size.height
+            val cx = w / 2f
+            val cy = h / 2f
+            val cyan = Color(0xFF19D9FF).copy(alpha = .42f)
+            val purple = Color(0xFF9B5CFF).copy(alpha = .38f)
 
-            val cyan = Color(0xFF12CCFF).copy(.75f); val purple = Color(0xFF9E43FF).copy(.67f)
-            listOf(.19f, .31f, .43f, .55f, .67f, .79f).forEachIndexed { i, f ->
-                val y = h * f; val c = if (i % 2 == 0) cyan else purple; val edge = 18f + i * 7; val gap = 78f + (i % 3) * 10
-                val l = Path().apply { moveTo(edge, y); lineTo(cx - gap - 26, y); lineTo(cx - gap, y + if (i % 2 == 0) 13 else -13) }
-                val r = Path().apply { moveTo(w - edge, y); lineTo(cx + gap + 26, y); lineTo(cx + gap, y + if (i % 2 == 0) 13 else -13) }
-                drawPath(l, c, style = Stroke(2.1f, cap = StrokeCap.Round)); drawPath(r, c, style = Stroke(2.1f, cap = StrokeCap.Round))
-                drawCircle(c, 3.8f, Offset(edge, y)); drawCircle(c, 3.8f, Offset(w - edge, y))
-            }
-            listOf(.18f, .27f, .73f, .82f).forEachIndexed { i, f ->
-                val x = w * f; val c = if (i % 2 == 0) cyan else purple
-                drawLine(c, Offset(x, h * .18f), Offset(x, h * .34f), 1.8f); drawCircle(c, 3.2f, Offset(x, h * .18f))
-            }
+            drawCircle(
+                Brush.radialGradient(
+                    listOf(Color(0xFF1A7DFF).copy(alpha = .18f), Color.Transparent),
+                    center = Offset(cx, cy),
+                    radius = 180f
+                ),
+                radius = 180f,
+                center = Offset(cx, cy)
+            )
 
-            val top = h * .16f; val sw = 158f; val sh = 158f
-            val outer = Path().apply {
-                moveTo(cx, top); lineTo(cx + sw * .48f, top + sh * .23f); lineTo(cx + sw * .43f, top + sh * .64f)
-                quadraticBezierTo(cx + sw * .32f, top + sh * .87f, cx, top + sh)
-                quadraticBezierTo(cx - sw * .32f, top + sh * .87f, cx - sw * .43f, top + sh * .64f)
-                lineTo(cx - sw * .48f, top + sh * .23f); close()
+            listOf(.20f, .33f, .47f, .62f, .76f).forEachIndexed { i, fraction ->
+                val yy = h * fraction
+                val c = if (i % 2 == 0) cyan else purple
+                val left = Path().apply {
+                    moveTo(8f, yy)
+                    lineTo(cx - 118f, yy)
+                    lineTo(cx - 92f, yy + if (i % 2 == 0) 18f else -18f)
+                }
+                val right = Path().apply {
+                    moveTo(w - 8f, yy)
+                    lineTo(cx + 118f, yy)
+                    lineTo(cx + 92f, yy + if (i % 2 == 0) 18f else -18f)
+                }
+                drawPath(left, c, style = Stroke(2.2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                drawPath(right, c, style = Stroke(2.2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                drawCircle(c, 4f, Offset(8f, yy))
+                drawCircle(c, 4f, Offset(w - 8f, yy))
             }
-            val inner = Path().apply {
-                moveTo(cx, top + 13); lineTo(cx + sw * .35f, top + sh * .29f); lineTo(cx + sw * .31f, top + sh * .60f)
-                quadraticBezierTo(cx + sw * .23f, top + sh * .77f, cx, top + sh * .88f)
-                quadraticBezierTo(cx - sw * .23f, top + sh * .77f, cx - sw * .31f, top + sh * .60f)
-                lineTo(cx - sw * .35f, top + sh * .29f); close()
-            }
-            drawPath(outer, Brush.linearGradient(listOf(Color(0xFFF06CFF), Color(0xFF42D9FF), Color(0xFF247DFF))), style = Stroke(7f, cap = StrokeCap.Round))
-            drawPath(inner, Color(0xFF4AA8FF), style = Stroke(3f))
+        }
 
-            val lockTop = top + sh * .33f
-            drawArc(Color(0xFFEA83FF), 180f, 180f, false, Offset(cx - 24, lockTop), Size(48f, 51f), style = Stroke(7f, cap = StrokeCap.Round))
-            drawRoundRect(Brush.verticalGradient(listOf(Color(0xFFBB63FF), Color(0xFF408DFF))), Offset(cx - 30, lockTop + 26), Size(60f, 52f), CornerRadius(13f, 13f))
-            drawCircle(Color(0xFF08162F), 8.5f, Offset(cx, lockTop + 50)); drawLine(Color(0xFF08162F), Offset(cx, lockTop + 57), Offset(cx, lockTop + 68), 5f, StrokeCap.Round)
+        Box(
+            Modifier
+                .size(184.dp)
+                .background(Color(0xFF020611), RoundedCornerShape(38.dp))
+                .border(
+                    1.4.dp,
+                    Brush.linearGradient(listOf(Color(0xFF9B5CFF), Color(0xFF19D9FF))),
+                    RoundedCornerShape(38.dp)
+                )
+                .padding(5.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(R.drawable.cyberquiz_app_icon),
+                contentDescription = "Logo CyberQuiz",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
         }
     }
 }
