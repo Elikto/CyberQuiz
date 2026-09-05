@@ -250,6 +250,20 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                     quizQuestionTotal = 1
                     vm.startReviewQuestion(item.quizType, item.questionId)
                     navigateTo(AppScreen.QUIZ)
+                },
+                onCategoryQuiz = { category, questionCount ->
+                    if (questionCount > 0 && vm.activeSessions.value.size < QuizViewModel.MAX_ACTIVE_SESSIONS) {
+                        configuredQuizUi = true
+                        quizQuestionTotal = questionCount
+                        vm.startConfiguredQuiz(
+                            QuizSessionConfig(
+                                mode = QuizSessionMode.DIFFICULTIES,
+                                categories = setOf(category),
+                                questionCount = questionCount
+                            )
+                        )
+                        navigateTo(AppScreen.QUIZ)
+                    }
                 }
             )
 
