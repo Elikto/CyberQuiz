@@ -104,8 +104,16 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     private val _lastSessionConfig = MutableStateFlow(loadLastSessionConfig())
     val lastSessionConfig: StateFlow<QuizSessionConfig> = _lastSessionConfig.asStateFlow()
 
-    private val _activeSession = MutableStateFlow<ActiveQuizSessionSummary?>(loadActiveSessionSummary())
-    val activeSession: StateFlow<ActiveQuizSessionSummary?> = _activeSession.asStateFlow()
+    private val _activeSessions = MutableStateFlow(loadActiveSessionsWithLegacyMigration())
+    val activeSessions: StateFlow<List<ActiveQuizSessionSummary>> = _activeSessions.asStateFlow()
+
+    val activeSession: StateFlow<ActiveQuizSessionSummary?> = _activeSessions
+        .map { it.firstOrNull() }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = _activeSessions.value.firstOrNull()
+        )
 
     private val _restoredSelection = MutableStateFlow<Int?>(null)
     val restoredSelection: StateFlow<Int?> = _restoredSelection.asStateFlow()
@@ -117,6 +125,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     private var singleReviewQuestion = false
 
     private var configuredSessionRuntime = false
+    private var configuredSessionId: String? = null
     private var configuredSessionConfig: QuizSessionConfig? = null
     private var sessionQueue = mutableListOf<Long>()
     private var sessionIndex = 0
@@ -144,7 +153,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun start(category: Category? = null, quizType: String = CYBERSECURITY) {
-        configuredSessionRuntime = false
+        leaveConfiguredRuntime()
         singleReviewQuestion = false
         selectQuizType(quizType)
         currentCategory = category?.label
@@ -161,7 +170,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun startCategory(quizType: String, category: String) {
-        configuredSessionRuntime = false
+        leaveConfiguredRuntime()
         singleReviewQuestion = false
         selectQuizType(quizType)
         currentCategory = category
@@ -178,7 +187,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun startReviewQuestion(quizType: String, questionId: Long) {
-        configuredSessionRuntime = false
+        leaveConfiguredRuntime()
         singleReviewQuestion = true
         selectQuizType(quizType)
         currentCategory = null
@@ -195,8 +204,11 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun startConfiguredQuiz(config: QuizSessionConfig) {
+        if (_activeSessions.value.size >= MAX_ACTIVE_SESSIONS) return
+
         saveLastSessionConfig(config)
         configuredSessionRuntime = true
+        configuredSessionId = nextSessionId()
         configuredSessionConfig = config
         singleReviewQuestion = false
         selectQuizType(CYBERSECURITY)
@@ -252,28 +264,33 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun resumeConfiguredQuiz() {
-        if (!sessionPrefs.getBoolean(KEY_ACTIVE, false)) return
+    fun resumeConfiguredQuiz(sessionId: String) {
+        if (sessionId !in loadSessionIds()) return
 
         configuredSessionRuntime = true
-        configuredSessionConfig = loadActiveConfig()
+        configuredSessionId = sessionId
+        configuredSessionConfig = loadSessionConfig(sessionId)
         singleReviewQuestion = false
         selectQuizType(CYBERSECURITY)
         currentCategory = null
         reviewQuestionId = null
-        sessionQueue = loadActiveQueue().toMutableList()
-        sessionIndex = sessionPrefs.getInt(KEY_ACTIVE_INDEX, 0)
-        sessionAnswered = sessionPrefs.getInt(KEY_ACTIVE_ANSWERED, 0)
-        sessionCurrentQuestionId = sessionPrefs.getLong(KEY_ACTIVE_CURRENT_ID, -1L).takeIf { it > 0L }
-        sessionPendingAnswer = sessionPrefs.getBoolean(KEY_ACTIVE_PENDING, false)
-        sessionPendingCorrect = sessionPrefs.getBoolean(KEY_ACTIVE_CORRECT, false)
-        sessionPendingXp = sessionPrefs.getInt(KEY_ACTIVE_XP, 0)
-        sessionPendingSelected = sessionPrefs.getInt(KEY_ACTIVE_SELECTED, -1).takeIf { it >= 0 }
+        sessionQueue = loadSessionQueue(sessionId).toMutableList()
+        sessionIndex = sessionPrefs.getInt(sessionKey(sessionId, FIELD_INDEX), 0)
+        sessionAnswered = sessionPrefs.getInt(sessionKey(sessionId, FIELD_ANSWERED), 0)
+        sessionCurrentQuestionId = sessionPrefs
+            .getLong(sessionKey(sessionId, FIELD_CURRENT_ID), -1L)
+            .takeIf { it > 0L }
+        sessionPendingAnswer = sessionPrefs.getBoolean(sessionKey(sessionId, FIELD_PENDING), false)
+        sessionPendingCorrect = sessionPrefs.getBoolean(sessionKey(sessionId, FIELD_CORRECT), false)
+        sessionPendingXp = sessionPrefs.getInt(sessionKey(sessionId, FIELD_XP), 0)
+        sessionPendingSelected = sessionPrefs
+            .getInt(sessionKey(sessionId, FIELD_SELECTED), -1)
+            .takeIf { it >= 0 }
         _reviewMode.value = configuredSessionConfig?.mode == QuizSessionMode.DIFFICULTIES
         _restoredSelection.value = sessionPendingSelected
         _result.value = null
         _state.value = QuizUiState.Loading
-        updateActiveSessionSummary()
+        refreshActiveSessions()
 
         viewModelScope.launch {
             initialized.await()
@@ -299,23 +316,16 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun abandonConfiguredQuiz() {
-        clearActiveSessionStorage()
-        configuredSessionRuntime = false
-        configuredSessionConfig = null
-        sessionQueue.clear()
-        sessionIndex = 0
-        sessionAnswered = 0
-        sessionCurrentQuestionId = null
-        sessionPendingAnswer = false
-        sessionPendingCorrect = false
-        sessionPendingXp = 0
-        sessionPendingSelected = null
-        _activeSession.value = null
-        _reviewMode.value = false
-        _restoredSelection.value = null
-        _result.value = null
-        _state.value = QuizUiState.Finished
+    fun abandonConfiguredQuiz(sessionId: String) {
+        removeSessionStorage(sessionId)
+
+        if (configuredSessionId == sessionId) {
+            leaveConfiguredRuntime()
+            _reviewMode.value = false
+            _restoredSelection.value = null
+            _result.value = null
+            _state.value = QuizUiState.Finished
+        }
     }
 
     fun restartLastConfiguredQuiz() {
@@ -673,82 +683,171 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         questionCount = sessionPrefs.getInt(KEY_LAST_COUNT, 10)
     )
 
-    private fun loadActiveConfig(): QuizSessionConfig = QuizSessionConfig(
-        mode = readMode(KEY_ACTIVE_MODE, QuizSessionMode.RANDOM),
-        categories = readCategories(KEY_ACTIVE_CATEGORIES),
-        questionCount = sessionPrefs.getInt(KEY_ACTIVE_COUNT, 10)
+    private fun loadActiveSessionsWithLegacyMigration(): List<ActiveQuizSessionSummary> {
+        migrateLegacySessionIfNeeded()
+        return loadActiveSessions()
+    }
+
+    private fun loadActiveSessions(): List<ActiveQuizSessionSummary> = loadSessionIds()
+        .mapNotNull { id -> loadSessionSummary(id) }
+        .take(MAX_ACTIVE_SESSIONS)
+
+    private fun loadSessionSummary(id: String): ActiveQuizSessionSummary? {
+        if (!sessionPrefs.contains(sessionKey(id, FIELD_MODE))) return null
+        return ActiveQuizSessionSummary(
+            id = id,
+            config = loadSessionConfig(id),
+            answered = sessionPrefs.getInt(sessionKey(id, FIELD_ANSWERED), 0),
+            pendingAnswer = sessionPrefs.getBoolean(sessionKey(id, FIELD_PENDING), false)
+        )
+    }
+
+    private fun loadSessionConfig(id: String): QuizSessionConfig = QuizSessionConfig(
+        mode = readMode(sessionKey(id, FIELD_MODE), QuizSessionMode.RANDOM),
+        categories = readCategories(sessionKey(id, FIELD_CATEGORIES)),
+        questionCount = sessionPrefs.getInt(sessionKey(id, FIELD_COUNT), 10)
     )
 
-    private fun loadActiveSessionSummary(): ActiveQuizSessionSummary? {
-        if (!sessionPrefs.getBoolean(KEY_ACTIVE, false)) return null
-        return ActiveQuizSessionSummary(
-            config = loadActiveConfig(),
-            answered = sessionPrefs.getInt(KEY_ACTIVE_ANSWERED, 0),
-            pendingAnswer = sessionPrefs.getBoolean(KEY_ACTIVE_PENDING, false)
-        )
-    }
-
-    private fun updateActiveSessionSummary() {
-        val config = configuredSessionConfig ?: return
-        _activeSession.value = ActiveQuizSessionSummary(
-            config = config,
-            answered = sessionAnswered,
-            pendingAnswer = sessionPendingAnswer
-        )
-    }
-
-    private fun persistActiveSession() {
-        val config = configuredSessionConfig ?: return
-        sessionPrefs.edit()
-            .putBoolean(KEY_ACTIVE, true)
-            .putString(KEY_ACTIVE_MODE, config.mode.name)
-            .putString(KEY_ACTIVE_CATEGORIES, encodeCategories(config.categories))
-            .putInt(KEY_ACTIVE_COUNT, config.questionCount)
-            .putString(KEY_ACTIVE_QUEUE, sessionQueue.joinToString(","))
-            .putInt(KEY_ACTIVE_INDEX, sessionIndex)
-            .putInt(KEY_ACTIVE_ANSWERED, sessionAnswered)
-            .putLong(KEY_ACTIVE_CURRENT_ID, sessionCurrentQuestionId ?: -1L)
-            .putBoolean(KEY_ACTIVE_PENDING, sessionPendingAnswer)
-            .putBoolean(KEY_ACTIVE_CORRECT, sessionPendingCorrect)
-            .putInt(KEY_ACTIVE_XP, sessionPendingXp)
-            .putInt(KEY_ACTIVE_SELECTED, sessionPendingSelected ?: -1)
-            .apply()
-        updateActiveSessionSummary()
-    }
-
-    private fun loadActiveQueue(): List<Long> = sessionPrefs
-        .getString(KEY_ACTIVE_QUEUE, "")
+    private fun loadSessionQueue(id: String): List<Long> = sessionPrefs
+        .getString(sessionKey(id, FIELD_QUEUE), "")
         .orEmpty()
         .split(',')
         .mapNotNull { it.toLongOrNull() }
 
+    private fun refreshActiveSessions() {
+        _activeSessions.value = loadActiveSessions()
+    }
+
+    private fun persistActiveSession() {
+        val id = configuredSessionId ?: return
+        val config = configuredSessionConfig ?: return
+        val ids = loadSessionIds().toMutableList()
+        ids.remove(id)
+        ids.add(0, id)
+        while (ids.size > MAX_ACTIVE_SESSIONS) ids.removeLast()
+
+        sessionPrefs.edit()
+            .putString(KEY_ACTIVE_SESSION_IDS, ids.joinToString(","))
+            .putString(sessionKey(id, FIELD_MODE), config.mode.name)
+            .putString(sessionKey(id, FIELD_CATEGORIES), encodeCategories(config.categories))
+            .putInt(sessionKey(id, FIELD_COUNT), config.questionCount)
+            .putString(sessionKey(id, FIELD_QUEUE), sessionQueue.joinToString(","))
+            .putInt(sessionKey(id, FIELD_INDEX), sessionIndex)
+            .putInt(sessionKey(id, FIELD_ANSWERED), sessionAnswered)
+            .putLong(sessionKey(id, FIELD_CURRENT_ID), sessionCurrentQuestionId ?: -1L)
+            .putBoolean(sessionKey(id, FIELD_PENDING), sessionPendingAnswer)
+            .putBoolean(sessionKey(id, FIELD_CORRECT), sessionPendingCorrect)
+            .putInt(sessionKey(id, FIELD_XP), sessionPendingXp)
+            .putInt(sessionKey(id, FIELD_SELECTED), sessionPendingSelected ?: -1)
+            .apply()
+        refreshActiveSessions()
+    }
+
     private fun finishConfiguredSession() {
-        clearActiveSessionStorage()
-        configuredSessionRuntime = false
-        sessionPendingAnswer = false
-        sessionPendingSelected = null
-        sessionCurrentQuestionId = null
-        _activeSession.value = null
+        val id = configuredSessionId
+        if (id != null) removeSessionStorage(id)
+        leaveConfiguredRuntime()
         _reviewMode.value = false
         _restoredSelection.value = null
         _result.value = null
         _state.value = QuizUiState.Finished
     }
 
-    private fun clearActiveSessionStorage() {
+    private fun leaveConfiguredRuntime() {
+        configuredSessionRuntime = false
+        configuredSessionId = null
+        configuredSessionConfig = null
+        sessionQueue.clear()
+        sessionIndex = 0
+        sessionAnswered = 0
+        sessionCurrentQuestionId = null
+        sessionPendingAnswer = false
+        sessionPendingCorrect = false
+        sessionPendingXp = 0
+        sessionPendingSelected = null
+    }
+
+    private fun removeSessionStorage(id: String) {
+        val ids = loadSessionIds().filterNot { it == id }
         sessionPrefs.edit()
-            .remove(KEY_ACTIVE)
-            .remove(KEY_ACTIVE_MODE)
-            .remove(KEY_ACTIVE_CATEGORIES)
-            .remove(KEY_ACTIVE_COUNT)
-            .remove(KEY_ACTIVE_QUEUE)
-            .remove(KEY_ACTIVE_INDEX)
-            .remove(KEY_ACTIVE_ANSWERED)
-            .remove(KEY_ACTIVE_CURRENT_ID)
-            .remove(KEY_ACTIVE_PENDING)
-            .remove(KEY_ACTIVE_CORRECT)
-            .remove(KEY_ACTIVE_XP)
-            .remove(KEY_ACTIVE_SELECTED)
+            .putString(KEY_ACTIVE_SESSION_IDS, ids.joinToString(","))
+            .remove(sessionKey(id, FIELD_MODE))
+            .remove(sessionKey(id, FIELD_CATEGORIES))
+            .remove(sessionKey(id, FIELD_COUNT))
+            .remove(sessionKey(id, FIELD_QUEUE))
+            .remove(sessionKey(id, FIELD_INDEX))
+            .remove(sessionKey(id, FIELD_ANSWERED))
+            .remove(sessionKey(id, FIELD_CURRENT_ID))
+            .remove(sessionKey(id, FIELD_PENDING))
+            .remove(sessionKey(id, FIELD_CORRECT))
+            .remove(sessionKey(id, FIELD_XP))
+            .remove(sessionKey(id, FIELD_SELECTED))
+            .apply()
+        refreshActiveSessions()
+    }
+
+    private fun loadSessionIds(): List<String> = sessionPrefs
+        .getString(KEY_ACTIVE_SESSION_IDS, "")
+        .orEmpty()
+        .split(',')
+        .filter { it.isNotBlank() }
+        .distinct()
+        .take(MAX_ACTIVE_SESSIONS)
+
+    private fun nextSessionId(): String {
+        val existing = loadSessionIds().toSet()
+        var candidate = System.currentTimeMillis().toString()
+        var suffix = 1
+        while (candidate in existing) {
+            candidate = "${System.currentTimeMillis()}_$suffix"
+            suffix++
+        }
+        return candidate
+    }
+
+    private fun sessionKey(id: String, field: String): String = "session_${id}_$field"
+
+    private fun migrateLegacySessionIfNeeded() {
+        if (loadSessionIds().isNotEmpty()) return
+        if (!sessionPrefs.getBoolean(KEY_LEGACY_ACTIVE, false)) return
+
+        val id = "legacy_${System.currentTimeMillis()}"
+        sessionPrefs.edit()
+            .putString(KEY_ACTIVE_SESSION_IDS, id)
+            .putString(
+                sessionKey(id, FIELD_MODE),
+                sessionPrefs.getString(KEY_LEGACY_MODE, QuizSessionMode.RANDOM.name)
+                    ?: QuizSessionMode.RANDOM.name
+            )
+            .putString(
+                sessionKey(id, FIELD_CATEGORIES),
+                sessionPrefs.getString(KEY_LEGACY_CATEGORIES, encodeCategories(Category.entries.map { it.label }.toSet()))
+                    ?: encodeCategories(Category.entries.map { it.label }.toSet())
+            )
+            .putInt(sessionKey(id, FIELD_COUNT), sessionPrefs.getInt(KEY_LEGACY_COUNT, 10))
+            .putString(
+                sessionKey(id, FIELD_QUEUE),
+                sessionPrefs.getString(KEY_LEGACY_QUEUE, "") ?: ""
+            )
+            .putInt(sessionKey(id, FIELD_INDEX), sessionPrefs.getInt(KEY_LEGACY_INDEX, 0))
+            .putInt(sessionKey(id, FIELD_ANSWERED), sessionPrefs.getInt(KEY_LEGACY_ANSWERED, 0))
+            .putLong(sessionKey(id, FIELD_CURRENT_ID), sessionPrefs.getLong(KEY_LEGACY_CURRENT_ID, -1L))
+            .putBoolean(sessionKey(id, FIELD_PENDING), sessionPrefs.getBoolean(KEY_LEGACY_PENDING, false))
+            .putBoolean(sessionKey(id, FIELD_CORRECT), sessionPrefs.getBoolean(KEY_LEGACY_CORRECT, false))
+            .putInt(sessionKey(id, FIELD_XP), sessionPrefs.getInt(KEY_LEGACY_XP, 0))
+            .putInt(sessionKey(id, FIELD_SELECTED), sessionPrefs.getInt(KEY_LEGACY_SELECTED, -1))
+            .remove(KEY_LEGACY_ACTIVE)
+            .remove(KEY_LEGACY_MODE)
+            .remove(KEY_LEGACY_CATEGORIES)
+            .remove(KEY_LEGACY_COUNT)
+            .remove(KEY_LEGACY_QUEUE)
+            .remove(KEY_LEGACY_INDEX)
+            .remove(KEY_LEGACY_ANSWERED)
+            .remove(KEY_LEGACY_CURRENT_ID)
+            .remove(KEY_LEGACY_PENDING)
+            .remove(KEY_LEGACY_CORRECT)
+            .remove(KEY_LEGACY_XP)
+            .remove(KEY_LEGACY_SELECTED)
             .apply()
     }
 
@@ -776,6 +875,8 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     companion object {
+        const val MAX_ACTIVE_SESSIONS = 6
+
         private const val CYBERSECURITY = "CYBERSECURITY"
         private const val NUTRITION = "NUTRITION"
 
@@ -785,18 +886,31 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         private const val KEY_LAST_MODE = "last_mode"
         private const val KEY_LAST_CATEGORIES = "last_categories"
         private const val KEY_LAST_COUNT = "last_count"
+        private const val KEY_ACTIVE_SESSION_IDS = "active_session_ids"
 
-        private const val KEY_ACTIVE = "active"
-        private const val KEY_ACTIVE_MODE = "active_mode"
-        private const val KEY_ACTIVE_CATEGORIES = "active_categories"
-        private const val KEY_ACTIVE_COUNT = "active_count"
-        private const val KEY_ACTIVE_QUEUE = "active_queue"
-        private const val KEY_ACTIVE_INDEX = "active_index"
-        private const val KEY_ACTIVE_ANSWERED = "active_answered"
-        private const val KEY_ACTIVE_CURRENT_ID = "active_current_id"
-        private const val KEY_ACTIVE_PENDING = "active_pending"
-        private const val KEY_ACTIVE_CORRECT = "active_correct"
-        private const val KEY_ACTIVE_XP = "active_xp"
-        private const val KEY_ACTIVE_SELECTED = "active_selected"
+        private const val FIELD_MODE = "mode"
+        private const val FIELD_CATEGORIES = "categories"
+        private const val FIELD_COUNT = "count"
+        private const val FIELD_QUEUE = "queue"
+        private const val FIELD_INDEX = "index"
+        private const val FIELD_ANSWERED = "answered"
+        private const val FIELD_CURRENT_ID = "current_id"
+        private const val FIELD_PENDING = "pending"
+        private const val FIELD_CORRECT = "correct"
+        private const val FIELD_XP = "xp"
+        private const val FIELD_SELECTED = "selected"
+
+        private const val KEY_LEGACY_ACTIVE = "active"
+        private const val KEY_LEGACY_MODE = "active_mode"
+        private const val KEY_LEGACY_CATEGORIES = "active_categories"
+        private const val KEY_LEGACY_COUNT = "active_count"
+        private const val KEY_LEGACY_QUEUE = "active_queue"
+        private const val KEY_LEGACY_INDEX = "active_index"
+        private const val KEY_LEGACY_ANSWERED = "active_answered"
+        private const val KEY_LEGACY_CURRENT_ID = "active_current_id"
+        private const val KEY_LEGACY_PENDING = "active_pending"
+        private const val KEY_LEGACY_CORRECT = "active_correct"
+        private const val KEY_LEGACY_XP = "active_xp"
+        private const val KEY_LEGACY_SELECTED = "active_selected"
     }
 }
