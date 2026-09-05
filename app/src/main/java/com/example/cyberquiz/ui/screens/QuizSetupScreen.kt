@@ -51,14 +51,15 @@ fun QuizSetupScreen(
     val lastConfig by vm.lastSessionConfig.collectAsState()
     val activeSession by vm.activeSession.collectAsState()
     val reviewItems by vm.reviewItems.collectAsState()
+    val allCategories = Category.entries.map { it.label }
 
     var modeName by rememberSaveable(lastConfig.mode.name) { mutableStateOf(lastConfig.mode.name) }
     var questionCount by rememberSaveable(lastConfig.questionCount) { mutableStateOf(lastConfig.questionCount) }
-    var selectedCategories by remember(lastConfig.categories) { mutableStateOf(lastConfig.categories) }
+    var selectedCategories by remember { mutableStateOf(allCategories.toSet()) }
+    var categoriesExpanded by rememberSaveable { mutableStateOf(false) }
 
     val selectedMode = runCatching { QuizSessionMode.valueOf(modeName) }
         .getOrDefault(QuizSessionMode.RANDOM)
-    val allCategories = Category.entries.map { it.label }
     val activeReviewCount = reviewItems.count {
         !it.mastered && it.category in selectedCategories
     }
@@ -164,34 +165,20 @@ fun QuizSetupScreen(
             }
 
             SetupSectionTitle("2 · CATÉGORIES")
-            SetupChoiceChip(
-                text = if (selectedCategories.size == allCategories.size) "✓ TOUTES LES CATÉGORIES" else "TOUTES LES CATÉGORIES",
-                selected = selectedCategories.size == allCategories.size,
-                accent = SetupBlue,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                selectedCategories = allCategories.toSet()
-            }
-
-            allCategories.chunked(2).forEach { rowCategories ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    rowCategories.forEach { category ->
-                        SetupChoiceChip(
-                            text = category.uppercase(),
-                            selected = category in selectedCategories,
-                            accent = SetupBlue,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            selectedCategories = if (category in selectedCategories) {
-                                selectedCategories - category
-                            } else {
-                                selectedCategories + category
-                            }
-                        }
+            CategoryDropdownV8(
+                allCategories = allCategories,
+                selectedCategories = selectedCategories,
+                expanded = categoriesExpanded,
+                onToggleExpanded = { categoriesExpanded = !categoriesExpanded },
+                onSelectAll = { selectedCategories = allCategories.toSet() },
+                onToggleCategory = { category ->
+                    selectedCategories = if (category in selectedCategories) {
+                        selectedCategories - category
+                    } else {
+                        selectedCategories + category
                     }
-                    if (rowCategories.size == 1) Spacer(Modifier.weight(1f))
                 }
-            }
+            )
 
             if (selectedCategories.isEmpty()) {
                 Text(
@@ -262,6 +249,145 @@ fun QuizSetupScreen(
         }
 
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun CategoryDropdownV8(
+    allCategories: List<String>,
+    selectedCategories: Set<String>,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    onSelectAll: () -> Unit,
+    onToggleCategory: (String) -> Unit
+) {
+    val allSelected = selectedCategories.size == allCategories.size
+    val summary = when {
+        allSelected -> "Toutes les catégories"
+        selectedCategories.isEmpty() -> "Aucune catégorie"
+        selectedCategories.size == 1 -> selectedCategories.first()
+        else -> "${selectedCategories.size} catégories sélectionnées"
+    }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF08152A), RoundedCornerShape(17.dp))
+            .border(1.dp, SetupBlue.copy(alpha = .48f), RoundedCornerShape(17.dp)),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggleExpanded)
+                .padding(horizontal = 14.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    summary.uppercase(),
+                    color = if (selectedCategories.isEmpty()) SetupOrange else SetupBlue,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black
+                )
+                Text(
+                    "${selectedCategories.size}/${allCategories.size} sélectionnées",
+                    color = SetupMuted,
+                    fontSize = 9.sp
+                )
+            }
+            Text(
+                if (expanded) "⌃" else "⌄",
+                color = SetupCyan,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        if (expanded) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(SetupBlue.copy(alpha = .20f))
+            )
+
+            CategoryOptionRowV8(
+                text = "Toutes les catégories",
+                selected = allSelected,
+                accent = SetupCyan,
+                onClick = onSelectAll
+            )
+
+            allCategories.forEach { category ->
+                CategoryOptionRowV8(
+                    text = category,
+                    selected = category in selectedCategories,
+                    accent = SetupBlue,
+                    onClick = { onToggleCategory(category) }
+                )
+            }
+
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggleExpanded)
+                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "FERMER LE MENU",
+                    color = SetupCyan,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryOptionRowV8(
+    text: String,
+    selected: Boolean,
+    accent: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(21.dp)
+                .background(
+                    if (selected) accent.copy(alpha = .16f) else Color(0xFF07101F),
+                    RoundedCornerShape(6.dp)
+                )
+                .border(
+                    1.dp,
+                    if (selected) accent else Color(0xFF36517C),
+                    RoundedCornerShape(6.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            if (selected) {
+                Text("✓", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Black)
+            }
+        }
+        Spacer(Modifier.width(11.dp))
+        Text(
+            text,
+            color = if (selected) SetupText else SetupMuted,
+            fontSize = 11.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
