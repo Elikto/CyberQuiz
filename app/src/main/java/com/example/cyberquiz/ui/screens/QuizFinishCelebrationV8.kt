@@ -21,17 +21,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cyberquiz.data.repository.QuizHistoryStore
 import com.example.cyberquiz.viewmodel.QuizFinishSummary
 import kotlin.math.PI
 import kotlin.math.cos
@@ -66,6 +71,20 @@ fun QuizFinishCelebrationV8(
     val percent = if (answered == 0) 0 else (correct * 100 / answered)
     val perfect = answered > 0 && correct == answered
     val tier = finishTier(percent, perfect)
+    val context = LocalContext.current
+
+    val latestHistory = remember(context, answered, correct, summary.xpGained) {
+        val now = System.currentTimeMillis()
+        QuizHistoryStore(context).load().firstOrNull()?.takeIf { entry ->
+            val age = now - entry.endedAt
+            entry.answered == answered &&
+                entry.correct == correct &&
+                entry.xpGained == summary.xpGained &&
+                entry.questions.isNotEmpty() &&
+                age in -1_000L..30_000L
+        }
+    }
+    var showExplorer by remember(latestHistory?.id) { mutableStateOf(false) }
 
     val entrance = remember(percent, answered) { Animatable(0.82f) }
     val burst = remember(percent, answered) { Animatable(0f) }
@@ -234,6 +253,14 @@ fun QuizFinishCelebrationV8(
                 filled = true,
                 onClick = onReplay
             )
+            if (latestHistory != null) {
+                FinishActionButtonV8(
+                    text = "EXPLORER LES RÉPONSES",
+                    accent = FinishGreen,
+                    filled = false,
+                    onClick = { showExplorer = true }
+                )
+            }
             FinishActionButtonV8(
                 text = "FAIRE UN AUTRE QUIZ",
                 accent = FinishCyan,
@@ -242,11 +269,18 @@ fun QuizFinishCelebrationV8(
             )
             FinishActionButtonV8(
                 text = "ACCUEIL",
-                accent = Color(0xFF7184A9),
+                accent = FinishBlue,
                 filled = false,
                 onClick = onHome
             )
         }
+    }
+
+    if (showExplorer && latestHistory != null) {
+        FinishedQuizExplorerDialog(
+            entry = latestHistory,
+            onDismiss = { showExplorer = false }
+        )
     }
 }
 
@@ -268,14 +302,14 @@ private fun FinishActionButtonV8(
                     )
                 } else {
                     Brush.horizontalGradient(
-                        listOf(accent.copy(alpha = .06f), Color(0xFF071225))
+                        listOf(accent.copy(alpha = .09f), Color(0xFF071225))
                     )
                 },
                 RoundedCornerShape(16.dp)
             )
             .border(
-                if (filled) 1.2.dp else 1.dp,
-                if (filled) FinishPurple else accent.copy(alpha = .70f),
+                if (filled) 1.2.dp else 1.1.dp,
+                if (filled) FinishPurple else accent.copy(alpha = .82f),
                 RoundedCornerShape(16.dp)
             )
             .clickable(onClick = onClick),
