@@ -82,7 +82,7 @@ fun HomeScreenV2(
             Spacer(Modifier.height(18.dp))
 
             Image(
-                painter = painterResource(R.drawable.cyberquiz_home_brand),
+                painter = painterResource(R.drawable.cyberquiz_app_icon),
                 contentDescription = "CyberQuiz",
                 modifier = Modifier
                     .fillMaxWidth()
