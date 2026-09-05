@@ -4,6 +4,21 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val cyberQuizIconBase64 = layout.projectDirectory.file("cyberquiz_app_icon.b64")
+val generatedCyberQuizIconRes = layout.buildDirectory.dir("generated/cyberquizIcon/res")
+val generateCyberQuizIcon by tasks.registering {
+    inputs.file(cyberQuizIconBase64)
+    outputs.dir(generatedCyberQuizIconRes)
+
+    doLast {
+        val drawableDir = generatedCyberQuizIconRes.get().dir("drawable-nodpi").asFile
+        drawableDir.mkdirs()
+        val encoded = cyberQuizIconBase64.asFile.readText().filterNot { it.isWhitespace() }
+        drawableDir.resolve("cyberquiz_app_icon.jpg")
+            .writeBytes(java.util.Base64.getDecoder().decode(encoded))
+    }
+}
+
 android {
     namespace = "com.example.cyberquiz"
     compileSdk = 37
@@ -32,6 +47,14 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    sourceSets.getByName("main").res.srcDir(generatedCyberQuizIconRes)
+}
+
+tasks.configureEach {
+    if (name.startsWith("merge") && name.endsWith("Resources")) {
+        dependsOn(generateCyberQuizIcon)
     }
 }
 
