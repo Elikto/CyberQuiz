@@ -48,14 +48,25 @@ private val Q8Muted = Color(0xFF9FAED3)
 private val Q8Panel = Color(0xFF081226)
 
 @Composable
-fun QuizScreenV8(vm: QuizViewModel, onBack: () -> Unit) {
+fun QuizScreenV8(
+    vm: QuizViewModel,
+    configuredSession: Boolean = false,
+    onBack: () -> Unit
+) {
     val state by vm.state.collectAsState()
     val result by vm.result.collectAsState()
     val progress by vm.progress.collectAsState()
     val reviewMode by vm.reviewMode.collectAsState()
+    val restoredSelection by vm.restoredSelection.collectAsState()
     val scrollState = rememberScrollState()
     var selected by remember { mutableStateOf<Int?>(null) }
     var showLearnMore by remember { mutableStateOf(false) }
+
+    LaunchedEffect(restoredSelection, result) {
+        if (result != null && restoredSelection != null) {
+            selected = restoredSelection
+        }
+    }
 
     LaunchedEffect(result) {
         if (result != null) {
@@ -146,7 +157,7 @@ fun QuizScreenV8(vm: QuizViewModel, onBack: () -> Unit) {
                         onLearnMore = { showLearnMore = true }
                     )
 
-                    if (reviewMode) {
+                    if (reviewMode && !configuredSession) {
                         PrimaryButtonV8("Retour aux notions à revoir", true) {
                             selected = null
                             showLearnMore = false
