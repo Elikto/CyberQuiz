@@ -45,11 +45,11 @@ fun QuizSetupScreen(
     vm: QuizViewModel,
     onBack: () -> Unit,
     onStart: (QuizSessionConfig) -> Unit,
-    onResume: () -> Unit,
-    onAbandon: () -> Unit
+    onResume: (String) -> Unit,
+    onAbandon: (String) -> Unit
 ) {
     val lastConfig by vm.lastSessionConfig.collectAsState()
-    val activeSession by vm.activeSession.collectAsState()
+    val activeSessions by vm.activeSessions.collectAsState()
     val reviewItems by vm.reviewItems.collectAsState()
     val allCategories = Category.entries.map { it.label }
 
@@ -57,13 +57,17 @@ fun QuizSetupScreen(
     var questionCount by rememberSaveable(lastConfig.questionCount) { mutableStateOf(lastConfig.questionCount) }
     var selectedCategories by remember { mutableStateOf(allCategories.toSet()) }
     var categoriesExpanded by rememberSaveable { mutableStateOf(false) }
+    var showNewQuizForm by rememberSaveable { mutableStateOf(false) }
 
     val selectedMode = runCatching { QuizSessionMode.valueOf(modeName) }
         .getOrDefault(QuizSessionMode.RANDOM)
     val activeReviewCount = reviewItems.count {
         !it.mastered && it.category in selectedCategories
     }
-    val canStart = selectedCategories.isNotEmpty() &&
+    val hasFreeSlot = activeSessions.size < QuizViewModel.MAX_ACTIVE_SESSIONS
+    val showConfiguration = activeSessions.isEmpty() || (showNewQuizForm && hasFreeSlot)
+    val canStart = hasFreeSlot &&
+        selectedCategories.isNotEmpty() &&
         (selectedMode != QuizSessionMode.DIFFICULTIES || activeReviewCount > 0)
 
     Column(
@@ -89,7 +93,7 @@ fun QuizSetupScreen(
             fontWeight = FontWeight.Black
         )
         Text(
-            "Choisis exactement le type de session que tu veux lancer. CyberQuiz mémorise ce choix pour la prochaine fois.",
+            "Reprends une session existante ou prépare un nouveau quiz. CyberQuiz peut conserver jusqu'à 6 quiz en cours.",
             color = SetupMuted,
             fontSize = 12.sp,
             lineHeight = 18.sp
@@ -97,158 +101,283 @@ fun QuizSetupScreen(
 
         PreviousChoiceCard(lastConfig)
 
-        if (activeSession != null) {
-            ActiveSessionCard(
-                session = activeSession!!,
-                onResume = onResume,
-                onAbandon = onAbandon
-            )
-        } else {
-            SetupSectionTitle("1 · DIFFICULTÉ")
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SetupChoiceChip(
-                    text = "FACILE",
-                    selected = selectedMode == QuizSessionMode.EASY,
-                    accent = SetupGreen,
-                    modifier = Modifier.weight(1f)
-                ) { modeName = QuizSessionMode.EASY.name }
-                SetupChoiceChip(
-                    text = "MOYEN",
-                    selected = selectedMode == QuizSessionMode.MEDIUM,
-                    accent = SetupOrange,
-                    modifier = Modifier.weight(1f)
-                ) { modeName = QuizSessionMode.MEDIUM.name }
-                SetupChoiceChip(
-                    text = "DIFFICILE",
-                    selected = selectedMode == QuizSessionMode.HARD,
-                    accent = SetupRed,
-                    modifier = Modifier.weight(1f)
-                ) { modeName = QuizSessionMode.HARD.name }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SetupChoiceChip(
-                    text = "ALÉATOIRE",
-                    selected = selectedMode == QuizSessionMode.RANDOM,
-                    accent = SetupPurple,
-                    modifier = Modifier.weight(1f)
-                ) { modeName = QuizSessionMode.RANDOM.name }
-                SetupChoiceChip(
-                    text = "MES DIFFICULTÉS",
-                    selected = selectedMode == QuizSessionMode.DIFFICULTIES,
-                    accent = SetupCyan,
-                    modifier = Modifier.weight(1f)
-                ) { modeName = QuizSessionMode.DIFFICULTIES.name }
+        if (activeSessions.isNotEmpty()) {
+            SetupSectionTitle("QUIZ EN COURS · ${activeSessions.size}/${QuizViewModel.MAX_ACTIVE_SESSIONS}")
+
+            activeSessions.forEachIndexed { index, session ->
+                ActiveSessionCard(
+                    number = index + 1,
+                    session = session,
+                    onResume = { onResume(session.id) },
+                    onAbandon = { onAbandon(session.id) }
+                )
             }
 
-            if (selectedMode == QuizSessionMode.DIFFICULTIES) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(SetupCyan.copy(alpha = .06f), RoundedCornerShape(16.dp))
-                        .border(1.dp, SetupCyan.copy(alpha = .30f), RoundedCornerShape(16.dp))
-                        .padding(13.dp),
-                    verticalArrangement = Arrangement.spacedBy(5.dp)
-                ) {
-                    Text(
-                        "$activeReviewCount question${if (activeReviewCount > 1) "s" else ""} à revoir dans les catégories sélectionnées",
-                        color = if (activeReviewCount > 0) SetupCyan else SetupOrange,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "Une bonne réponse fait passer une question de À revoir à Maîtrisée après révision. Une nouvelle erreur la conserve dans À revoir.",
-                        color = SetupMuted,
-                        fontSize = 11.sp,
-                        lineHeight = 16.sp
-                    )
-                }
+            if (hasFreeSlot) {
+                NewQuizCard(
+                    activeCount = activeSessions.size,
+                    expanded = showNewQuizForm,
+                    onClick = { showNewQuizForm = !showNewQuizForm }
+                )
+            } else {
+                SessionLimitCard()
+            }
+        }
+
+        if (showConfiguration) {
+            if (activeSessions.isNotEmpty()) {
+                SetupSectionTitle("NOUVEAU QUIZ")
             }
 
-            SetupSectionTitle("2 · CATÉGORIES")
-            CategoryDropdownV8(
-                allCategories = allCategories,
+            QuizConfigurationForm(
+                selectedMode = selectedMode,
+                onModeSelected = { modeName = it.name },
                 selectedCategories = selectedCategories,
-                expanded = categoriesExpanded,
-                onToggleExpanded = { categoriesExpanded = !categoriesExpanded },
-                onSelectAll = { selectedCategories = allCategories.toSet() },
+                allCategories = allCategories,
+                categoriesExpanded = categoriesExpanded,
+                onToggleCategoriesExpanded = { categoriesExpanded = !categoriesExpanded },
+                onSelectAllCategories = { selectedCategories = allCategories.toSet() },
                 onToggleCategory = { category ->
                     selectedCategories = if (category in selectedCategories) {
                         selectedCategories - category
                     } else {
                         selectedCategories + category
                     }
+                },
+                activeReviewCount = activeReviewCount,
+                questionCount = questionCount,
+                onQuestionCountSelected = { questionCount = it },
+                canStart = canStart,
+                onStart = {
+                    onStart(
+                        QuizSessionConfig(
+                            mode = selectedMode,
+                            categories = selectedCategories,
+                            questionCount = questionCount
+                        )
+                    )
                 }
             )
-
-            if (selectedCategories.isEmpty()) {
-                Text(
-                    "Sélectionne au moins une catégorie.",
-                    color = SetupOrange,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            SetupSectionTitle("3 · NOMBRE DE QUESTIONS")
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(10, 20, 50).forEach { count ->
-                    SetupChoiceChip(
-                        text = count.toString(),
-                        selected = questionCount == count,
-                        accent = SetupPurple,
-                        modifier = Modifier.weight(1f)
-                    ) { questionCount = count }
-                }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(100, 200).forEach { count ->
-                    SetupChoiceChip(
-                        text = count.toString(),
-                        selected = questionCount == count,
-                        accent = SetupPurple,
-                        modifier = Modifier.weight(1f)
-                    ) { questionCount = count }
-                }
-                SetupChoiceChip(
-                    text = "INFINI",
-                    selected = questionCount == 0,
-                    accent = SetupCyan,
-                    modifier = Modifier.weight(1f)
-                ) { questionCount = 0 }
-            }
-
-            if (questionCount >= 100 && selectedMode != QuizSessionMode.DIFFICULTIES) {
-                Text(
-                    "Pour les longues sessions, les questions correspondant à tes filtres sont remélangées lorsqu'un cycle est terminé.",
-                    color = SetupMuted,
-                    fontSize = 10.sp,
-                    lineHeight = 15.sp
-                )
-            }
-
-            val pendingConfig = QuizSessionConfig(
-                mode = selectedMode,
-                categories = selectedCategories,
-                questionCount = questionCount
-            )
-
-            StartQuizButton(enabled = canStart) {
-                onStart(pendingConfig)
-            }
-
-            if (!canStart && selectedMode == QuizSessionMode.DIFFICULTIES && selectedCategories.isNotEmpty()) {
-                Text(
-                    "Tu n'as actuellement aucune question À revoir dans ces catégories.",
-                    color = SetupOrange,
-                    fontSize = 11.sp,
-                    lineHeight = 16.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
         }
 
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun QuizConfigurationForm(
+    selectedMode: QuizSessionMode,
+    onModeSelected: (QuizSessionMode) -> Unit,
+    selectedCategories: Set<String>,
+    allCategories: List<String>,
+    categoriesExpanded: Boolean,
+    onToggleCategoriesExpanded: () -> Unit,
+    onSelectAllCategories: () -> Unit,
+    onToggleCategory: (String) -> Unit,
+    activeReviewCount: Int,
+    questionCount: Int,
+    onQuestionCountSelected: (Int) -> Unit,
+    canStart: Boolean,
+    onStart: () -> Unit
+) {
+    SetupSectionTitle("1 · DIFFICULTÉ")
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        SetupChoiceChip(
+            text = "FACILE",
+            selected = selectedMode == QuizSessionMode.EASY,
+            accent = SetupGreen,
+            modifier = Modifier.weight(1f)
+        ) { onModeSelected(QuizSessionMode.EASY) }
+        SetupChoiceChip(
+            text = "MOYEN",
+            selected = selectedMode == QuizSessionMode.MEDIUM,
+            accent = SetupOrange,
+            modifier = Modifier.weight(1f)
+        ) { onModeSelected(QuizSessionMode.MEDIUM) }
+        SetupChoiceChip(
+            text = "DIFFICILE",
+            selected = selectedMode == QuizSessionMode.HARD,
+            accent = SetupRed,
+            modifier = Modifier.weight(1f)
+        ) { onModeSelected(QuizSessionMode.HARD) }
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        SetupChoiceChip(
+            text = "ALÉATOIRE",
+            selected = selectedMode == QuizSessionMode.RANDOM,
+            accent = SetupPurple,
+            modifier = Modifier.weight(1f)
+        ) { onModeSelected(QuizSessionMode.RANDOM) }
+        SetupChoiceChip(
+            text = "MES DIFFICULTÉS",
+            selected = selectedMode == QuizSessionMode.DIFFICULTIES,
+            accent = SetupCyan,
+            modifier = Modifier.weight(1f)
+        ) { onModeSelected(QuizSessionMode.DIFFICULTIES) }
+    }
+
+    if (selectedMode == QuizSessionMode.DIFFICULTIES) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(SetupCyan.copy(alpha = .06f), RoundedCornerShape(16.dp))
+                .border(1.dp, SetupCyan.copy(alpha = .30f), RoundedCornerShape(16.dp))
+                .padding(13.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Text(
+                "$activeReviewCount question${if (activeReviewCount > 1) "s" else ""} à revoir dans les catégories sélectionnées",
+                color = if (activeReviewCount > 0) SetupCyan else SetupOrange,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "Une bonne réponse fait passer une question de À revoir à Maîtrisée après révision. Une nouvelle erreur la conserve dans À revoir.",
+                color = SetupMuted,
+                fontSize = 11.sp,
+                lineHeight = 16.sp
+            )
+        }
+    }
+
+    SetupSectionTitle("2 · CATÉGORIES")
+    CategoryDropdownV8(
+        allCategories = allCategories,
+        selectedCategories = selectedCategories,
+        expanded = categoriesExpanded,
+        onToggleExpanded = onToggleCategoriesExpanded,
+        onSelectAll = onSelectAllCategories,
+        onToggleCategory = onToggleCategory
+    )
+
+    if (selectedCategories.isEmpty()) {
+        Text(
+            "Sélectionne au moins une catégorie.",
+            color = SetupOrange,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+
+    SetupSectionTitle("3 · NOMBRE DE QUESTIONS")
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(10, 20, 50).forEach { count ->
+            SetupChoiceChip(
+                text = count.toString(),
+                selected = questionCount == count,
+                accent = SetupPurple,
+                modifier = Modifier.weight(1f)
+            ) { onQuestionCountSelected(count) }
+        }
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(100, 200).forEach { count ->
+            SetupChoiceChip(
+                text = count.toString(),
+                selected = questionCount == count,
+                accent = SetupPurple,
+                modifier = Modifier.weight(1f)
+            ) { onQuestionCountSelected(count) }
+        }
+        SetupChoiceChip(
+            text = "INFINI",
+            selected = questionCount == 0,
+            accent = SetupCyan,
+            modifier = Modifier.weight(1f)
+        ) { onQuestionCountSelected(0) }
+    }
+
+    if (questionCount >= 100 && selectedMode != QuizSessionMode.DIFFICULTIES) {
+        Text(
+            "Pour les longues sessions, les questions correspondant à tes filtres sont remélangées lorsqu'un cycle est terminé.",
+            color = SetupMuted,
+            fontSize = 10.sp,
+            lineHeight = 15.sp
+        )
+    }
+
+    StartQuizButton(enabled = canStart, onClick = onStart)
+
+    if (!canStart && selectedMode == QuizSessionMode.DIFFICULTIES && selectedCategories.isNotEmpty()) {
+        Text(
+            "Tu n'as actuellement aucune question À revoir dans ces catégories.",
+            color = SetupOrange,
+            fontSize = 11.sp,
+            lineHeight = 16.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+private fun NewQuizCard(
+    activeCount: Int,
+    expanded: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.horizontalGradient(
+                    listOf(SetupPurple.copy(alpha = .11f), SetupBlue.copy(alpha = .08f), SetupPanel)
+                ),
+                RoundedCornerShape(18.dp)
+            )
+            .border(1.2.dp, SetupPurple.copy(alpha = .62f), RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 15.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(38.dp)
+                .background(SetupPurple.copy(alpha = .14f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("+", color = SetupPurple, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                if (expanded) "NOUVEAU QUIZ EN PRÉPARATION" else "COMMENCER UN NOUVEAU QUIZ",
+                color = SetupText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Black
+            )
+            Text(
+                "$activeCount/${QuizViewModel.MAX_ACTIVE_SESSIONS} sessions utilisées",
+                color = SetupMuted,
+                fontSize = 9.sp
+            )
+        }
+        Text(if (expanded) "⌃" else "⌄", color = SetupCyan, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun SessionLimitCard() {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(SetupOrange.copy(alpha = .055f), RoundedCornerShape(17.dp))
+            .border(1.dp, SetupOrange.copy(alpha = .45f), RoundedCornerShape(17.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            "6 QUIZ EN COURS · LIMITE ATTEINTE",
+            color = SetupOrange,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Black
+        )
+        Text(
+            "Termine ou arrête définitivement une session pour pouvoir en commencer une nouvelle.",
+            color = SetupMuted,
+            fontSize = 10.sp,
+            lineHeight = 15.sp
+        )
     }
 }
 
@@ -434,6 +563,7 @@ private fun PreviousChoiceCard(config: QuizSessionConfig) {
 
 @Composable
 private fun ActiveSessionCard(
+    number: Int,
     session: ActiveQuizSessionSummary,
     onResume: () -> Unit,
     onAbandon: () -> Unit
@@ -441,56 +571,79 @@ private fun ActiveSessionCard(
     Column(
         Modifier
             .fillMaxWidth()
-            .background(SetupPanel, RoundedCornerShape(22.dp))
-            .border(1.2.dp, SetupCyan.copy(alpha = .58f), RoundedCornerShape(22.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .background(SetupPanel, RoundedCornerShape(20.dp))
+            .border(1.1.dp, SetupCyan.copy(alpha = .48f), RoundedCornerShape(20.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp)
     ) {
-        Text("QUIZ EN COURS", color = SetupCyan, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.4.sp)
-        Text(sessionDescription(session.config), color = SetupText, fontSize = 16.sp, fontWeight = FontWeight.Black)
-        Text(
-            if (session.config.infinite) {
-                "${session.answered} réponse${if (session.answered > 1) "s" else ""} enregistrée${if (session.answered > 1) "s" else ""} · session infinie"
-            } else {
-                "${session.answered} / ${session.config.questionCount} réponse${if (session.answered > 1) "s" else ""} enregistrée${if (session.answered > 1) "s" else ""}"
-            },
-            color = SetupMuted,
-            fontSize = 11.sp
-        )
-        if (session.pendingAnswer) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "Ta dernière réponse a déjà été enregistrée : en reprenant, tu retrouveras son explication avant de continuer.",
-                color = SetupGreen,
-                fontSize = 10.sp,
-                lineHeight = 15.sp
+                "QUIZ EN COURS $number",
+                color = SetupCyan,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.2.sp,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                if (session.config.infinite) "∞" else "${session.answered}/${session.config.questionCount}",
+                color = SetupPurple,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Black
             )
         }
 
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .background(
-                    Brush.horizontalGradient(listOf(Color(0xFF55208B), Color(0xFF163E79))),
-                    RoundedCornerShape(16.dp)
-                )
-                .border(1.3.dp, SetupPurple, RoundedCornerShape(16.dp))
-                .clickable(onClick = onResume),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("REPRENDRE LE QUIZ", color = SetupText, fontSize = 13.sp, fontWeight = FontWeight.Black)
+        Text(
+            sessionDescription(session.config),
+            color = SetupText,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            lineHeight = 19.sp
+        )
+
+        if (session.pendingAnswer) {
+            Text(
+                "Dernière réponse déjà enregistrée · l'explication sera restaurée.",
+                color = SetupGreen,
+                fontSize = 9.sp,
+                lineHeight = 14.sp
+            )
         }
 
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(45.dp)
-                .background(SetupRed.copy(alpha = .055f), RoundedCornerShape(14.dp))
-                .border(1.dp, SetupRed.copy(alpha = .55f), RoundedCornerShape(14.dp))
-                .clickable(onClick = onAbandon),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("ARRÊTER DÉFINITIVEMENT", color = SetupRed, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = .8.sp)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(44.dp)
+                    .background(
+                        Brush.horizontalGradient(listOf(Color(0xFF55208B), Color(0xFF163E79))),
+                        RoundedCornerShape(14.dp)
+                    )
+                    .border(1.2.dp, SetupPurple, RoundedCornerShape(14.dp))
+                    .clickable(onClick = onResume),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("REPRENDRE", color = SetupText, fontSize = 10.sp, fontWeight = FontWeight.Black)
+            }
+
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(44.dp)
+                    .background(SetupRed.copy(alpha = .055f), RoundedCornerShape(14.dp))
+                    .border(1.dp, SetupRed.copy(alpha = .50f), RoundedCornerShape(14.dp))
+                    .clickable(onClick = onAbandon),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "ARRÊTER DÉFINITIVEMENT",
+                    color = SetupRed,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 10.sp
+                )
+            }
         }
     }
 }
