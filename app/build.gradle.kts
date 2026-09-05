@@ -51,7 +51,7 @@ android {
         buildConfig = true
     }
 
-    sourceSets.getByName("main").res.srcDir(generatedCyberQuizIconRes)
+    sourceSets.getByName("main").res.srcDir(generatedCyberQuizIconRes.get().asFile)
 }
 
 tasks.configureEach {
