@@ -51,7 +51,9 @@ private val Q8Panel = Color(0xFF081226)
 fun QuizScreenV8(
     vm: QuizViewModel,
     configuredSession: Boolean = false,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOtherQuiz: () -> Unit = onBack,
+    onHome: () -> Unit = onBack
 ) {
     val state by vm.state.collectAsState()
     val result by vm.result.collectAsState()
@@ -114,7 +116,8 @@ fun QuizScreenV8(
                                 vm.start()
                             }
                         },
-                        onBack = onBack
+                        onOtherQuiz = onOtherQuiz,
+                        onHome = onHome
                     )
                 } else {
                     FinishedQuizCardV8(
@@ -130,7 +133,8 @@ fun QuizScreenV8(
                                 vm.start()
                             }
                         },
-                        onBack = onBack
+                        onOtherQuiz = onOtherQuiz,
+                        onHome = onHome
                     )
                 }
             }
@@ -1003,7 +1007,8 @@ private fun FinishedQuizCardV8(
     correct: Int,
     xp: Int,
     onReplay: () -> Unit,
-    onBack: () -> Unit
+    onOtherQuiz: () -> Unit,
+    onHome: () -> Unit
 ) {
     val rate = if (answered == 0) 0 else correct * 100 / answered
     Column(
@@ -1014,7 +1019,7 @@ private fun FinishedQuizCardV8(
             .border(1.4.dp, Q8Blue, RoundedCornerShape(26.dp))
             .padding(22.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         FinishShieldV8()
         Text("Session terminée", color = Q8Text, fontSize = 26.sp, fontWeight = FontWeight.Black)
@@ -1025,16 +1030,23 @@ private fun FinishedQuizCardV8(
             FinishStatV8("XP total", xp.toString(), Modifier.weight(1f))
         }
         PrimaryButtonV8("Rejouer", true, onReplay)
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .border(1.dp, Color(0xFF42547D), RoundedCornerShape(16.dp))
-                .clickable(onClick = onBack),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Retour", color = Q8Muted, fontWeight = FontWeight.Bold)
-        }
+        SecondaryFinishButtonV8("FAIRE UN AUTRE QUIZ", Q8Cyan, onOtherQuiz)
+        SecondaryFinishButtonV8("ACCUEIL", Q8Muted, onHome)
+    }
+}
+
+@Composable
+private fun SecondaryFinishButtonV8(text: String, accent: Color, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .background(accent.copy(alpha = .045f), RoundedCornerShape(16.dp))
+            .border(1.dp, accent.copy(alpha = .60f), RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text, color = accent, fontSize = 11.sp, fontWeight = FontWeight.Black)
     }
 }
 
