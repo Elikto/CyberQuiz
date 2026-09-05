@@ -39,7 +39,7 @@ private val ThemeDetailMuted = Color(0xFF9FAED3)
 internal fun StatsThemeDetailDialog(
     item: CategoryProgressEntity,
     concepts: List<ConceptProgressEntity>,
-    onQuiz: () -> Unit,
+    onQuiz: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
     val accuracy = if (item.answered == 0) 0 else item.correct * 100 / item.answered
@@ -48,6 +48,7 @@ internal fun StatsThemeDetailDialog(
         recommendedThemeCourse(item.category, concepts)
     }
     var courseTerm by remember(item.category) { mutableStateOf<String?>(null) }
+    var selectedQuestionCount by remember(item.category) { mutableStateOf(10) }
 
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -130,11 +131,27 @@ internal fun StatsThemeDetailDialog(
                 lineHeight = 18.sp
             )
 
+            ThemeSection("NOMBRE DE QUESTIONS", ThemeDetailCyan)
+            Text(
+                "Choisis la longueur de ton entraînement ciblé. Le quiz restera uniquement sur ${item.category}.",
+                color = ThemeDetailMuted,
+                fontSize = 10.sp,
+                lineHeight = 15.sp
+            )
+            ThemeQuestionCountSelector(
+                selected = selectedQuestionCount,
+                onSelected = { selectedQuestionCount = it }
+            )
+
             ThemeActionButton(
                 title = "LANCER UN QUIZ CIBLÉ",
-                subtitle = "Questions uniquement sur ${item.category}",
+                subtitle = if (selectedQuestionCount == 0) {
+                    "${item.category} · quiz infini"
+                } else {
+                    "${item.category} · $selectedQuestionCount questions"
+                },
                 accent = ThemeDetailPurple,
-                onClick = onQuiz
+                onClick = { onQuiz(selectedQuestionCount) }
             )
 
             ThemeActionButton(
@@ -165,6 +182,47 @@ internal fun StatsThemeDetailDialog(
             category = item.category,
             onDismiss = { courseTerm = null }
         )
+    }
+}
+
+@Composable
+private fun ThemeQuestionCountSelector(
+    selected: Int,
+    onSelected: (Int) -> Unit
+) {
+    val options = listOf(10, 20, 50, 100, 200, 0)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.chunked(3).forEach { rowOptions ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                rowOptions.forEach { count ->
+                    val active = count == selected
+                    val label = if (count == 0) "INFINI" else count.toString()
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(42.dp)
+                            .background(
+                                if (active) ThemeDetailPurple.copy(alpha = .17f) else Color(0xFF08152B),
+                                RoundedCornerShape(13.dp)
+                            )
+                            .border(
+                                if (active) 1.4.dp else 1.dp,
+                                if (active) ThemeDetailPurple else Color(0xFF2A4774),
+                                RoundedCornerShape(13.dp)
+                            )
+                            .clickable { onSelected(count) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            label,
+                            color = if (active) ThemeDetailText else ThemeDetailMuted,
+                            fontSize = if (count == 0) 9.sp else 12.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -256,7 +314,7 @@ private fun recommendedThemeCourse(
         "pentest" -> "Nmap"
         "active directory" -> "Kerberos"
         "cloud security" -> "MFA"
-        "mobile security" -> "Moindre privilège"
+        "mobile security" -> "MDM"
         "sécurité système" -> "Pare-feu"
         else -> "MFA"
     }
