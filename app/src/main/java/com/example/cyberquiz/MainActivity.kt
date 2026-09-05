@@ -191,6 +191,11 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                     onReviewConcept = { concept ->
                         highlightedReviewConcept = concept
                         navigateTo(AppScreen.REVIEW)
+                    },
+                    onThemeQuiz = { category ->
+                        configuredQuizUi = false
+                        vm.startCategory(QuizType.CYBERSECURITY.name, category)
+                        navigateTo(AppScreen.QUIZ)
                     }
                 )
             } else {
