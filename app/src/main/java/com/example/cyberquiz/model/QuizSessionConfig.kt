@@ -18,6 +18,7 @@ data class QuizSessionConfig(
 }
 
 data class ActiveQuizSessionSummary(
+    val id: String,
     val config: QuizSessionConfig,
     val answered: Int = 0,
     val pendingAnswer: Boolean = false
