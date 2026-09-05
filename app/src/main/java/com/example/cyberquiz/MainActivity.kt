@@ -16,7 +16,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cyberquiz.ui.screens.CategoriesScreenV3
+import com.example.cyberquiz.ui.screens.HomeScreenV2
 import com.example.cyberquiz.ui.screens.ProfileScreenV3
+import com.example.cyberquiz.ui.screens.QuizHistoryScreen
 import com.example.cyberquiz.ui.screens.QuizScreenV8
 import com.example.cyberquiz.ui.screens.QuizSetupScreen
 import com.example.cyberquiz.ui.screens.QuizType
@@ -37,6 +39,7 @@ enum class AppScreen {
     STATS,
     CATEGORIES,
     REVIEW,
+    HISTORY,
     PROFILE,
     SETTINGS,
     UNAVAILABLE_QUIZ
@@ -94,42 +97,65 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
         }
     }
 
+    fun goHome() {
+        screen = AppScreen.HOME
+        previousScreen = AppScreen.HOME
+    }
+
+    fun openQuizSetupFromFinish() {
+        configuredQuizUi = false
+        previousScreen = AppScreen.HOME
+        screen = AppScreen.QUIZ_SETUP
+    }
+
     BackHandler(enabled = screen != AppScreen.HOME) {
         goBack()
     }
 
     when (screen) {
-        AppScreen.HOME -> UniverseHomeScreen(
-            vm = vm,
-            selectedQuizType = selectedQuizType,
-            onQuiz = {
-                if (!selectedQuizType.isPlayableNow()) {
-                    navigateTo(AppScreen.UNAVAILABLE_QUIZ)
-                } else if (selectedQuizType == QuizType.CYBERSECURITY) {
-                    navigateTo(AppScreen.QUIZ_SETUP)
-                } else {
-                    configuredQuizUi = false
-                    vm.start(quizType = selectedQuizType.name)
-                    navigateTo(AppScreen.QUIZ)
-                }
-            },
-            onStats = { navigateTo(AppScreen.STATS) },
-            onCategories = {
-                if (selectedQuizType.isPlayableNow()) {
-                    navigateTo(AppScreen.CATEGORIES)
-                } else {
-                    navigateTo(AppScreen.UNAVAILABLE_QUIZ)
-                }
-            },
-            onReview = {
-                if (selectedQuizType == QuizType.CYBERSECURITY) {
-                    highlightedReviewConcept = null
-                    navigateTo(AppScreen.REVIEW)
-                }
-            },
-            onProfile = { navigateTo(AppScreen.PROFILE) },
-            onSettings = { navigateTo(AppScreen.SETTINGS) }
-        )
+        AppScreen.HOME -> {
+            if (selectedQuizType == QuizType.CYBERSECURITY) {
+                HomeScreenV2(
+                    vm = vm,
+                    selectedQuizType = selectedQuizType,
+                    onQuiz = { navigateTo(AppScreen.QUIZ_SETUP) },
+                    onStats = { navigateTo(AppScreen.STATS) },
+                    onCategories = { navigateTo(AppScreen.CATEGORIES) },
+                    onReview = {
+                        highlightedReviewConcept = null
+                        navigateTo(AppScreen.REVIEW)
+                    },
+                    onHistory = { navigateTo(AppScreen.HISTORY) },
+                    onProfile = { navigateTo(AppScreen.PROFILE) },
+                    onSettings = { navigateTo(AppScreen.SETTINGS) }
+                )
+            } else {
+                UniverseHomeScreen(
+                    vm = vm,
+                    selectedQuizType = selectedQuizType,
+                    onQuiz = {
+                        if (!selectedQuizType.isPlayableNow()) {
+                            navigateTo(AppScreen.UNAVAILABLE_QUIZ)
+                        } else {
+                            configuredQuizUi = false
+                            vm.start(quizType = selectedQuizType.name)
+                            navigateTo(AppScreen.QUIZ)
+                        }
+                    },
+                    onStats = { navigateTo(AppScreen.STATS) },
+                    onCategories = {
+                        if (selectedQuizType.isPlayableNow()) {
+                            navigateTo(AppScreen.CATEGORIES)
+                        } else {
+                            navigateTo(AppScreen.UNAVAILABLE_QUIZ)
+                        }
+                    },
+                    onReview = {},
+                    onProfile = { navigateTo(AppScreen.PROFILE) },
+                    onSettings = { navigateTo(AppScreen.SETTINGS) }
+                )
+            }
+        }
 
         AppScreen.QUIZ_SETUP -> QuizSetupScreen(
             vm = vm,
@@ -152,7 +178,9 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
         AppScreen.QUIZ -> QuizScreenV8(
             vm = vm,
             configuredSession = configuredQuizUi,
-            onBack = { goBack() }
+            onBack = { goBack() },
+            onOtherQuiz = { openQuizSetupFromFinish() },
+            onHome = { goHome() }
         )
 
         AppScreen.STATS -> {
@@ -191,6 +219,17 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                 configuredQuizUi = false
                 vm.startReviewQuestion(item.quizType, item.questionId)
                 navigateTo(AppScreen.QUIZ)
+            }
+        )
+
+        AppScreen.HISTORY -> QuizHistoryScreen(
+            vm = vm,
+            onBack = { goBack() },
+            onReplay = { historyId ->
+                if (vm.restartHistoryQuiz(historyId)) {
+                    configuredQuizUi = true
+                    navigateTo(AppScreen.QUIZ)
+                }
             }
         )
 
