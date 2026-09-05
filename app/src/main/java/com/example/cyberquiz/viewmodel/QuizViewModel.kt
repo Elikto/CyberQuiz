@@ -11,9 +11,12 @@ import com.example.cyberquiz.data.database.ProgressEntity
 import com.example.cyberquiz.data.database.QuestionEntity
 import com.example.cyberquiz.data.database.ReviewItemEntity
 import com.example.cyberquiz.data.database.ReviewItemWithQuestion
+import com.example.cyberquiz.data.repository.QuizHistoryStore
 import com.example.cyberquiz.data.repository.QuizRepository
 import com.example.cyberquiz.model.ActiveQuizSessionSummary
 import com.example.cyberquiz.model.Category
+import com.example.cyberquiz.model.QuizHistoryEntry
+import com.example.cyberquiz.model.QuizHistoryQuestion
 import com.example.cyberquiz.model.QuizSessionConfig
 import com.example.cyberquiz.model.QuizSessionMode
 import kotlinx.coroutines.CompletableDeferred
@@ -52,6 +55,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = QuizRepository(dao)
     private val initialized = CompletableDeferred<Unit>()
     private val sessionPrefs = app.getSharedPreferences(SESSION_PREFS, Context.MODE_PRIVATE)
+    private val historyStore = QuizHistoryStore(app)
 
     private val _state = MutableStateFlow<QuizUiState>(QuizUiState.Loading)
     val state: StateFlow<QuizUiState> = _state.asStateFlow()
@@ -107,6 +111,9 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     private val _finishSummary = MutableStateFlow<QuizFinishSummary?>(null)
     val finishSummary: StateFlow<QuizFinishSummary?> = _finishSummary.asStateFlow()
 
+    private val _quizHistory = MutableStateFlow(historyStore.load())
+    val quizHistory: StateFlow<List<QuizHistoryEntry>> = _quizHistory.asStateFlow()
+
     private val _reviewMode = MutableStateFlow(false)
     val reviewMode: StateFlow<Boolean> = _reviewMode.asStateFlow()
 
@@ -136,6 +143,10 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     private var runAnswered = 0
     private var runCorrect = 0
     private var runXpGained = 0
+    private var runStartedAt = 0L
+    private var runReplayConfig: QuizSessionConfig? = null
+    private var runHistorySaved = false
+    private val runHistoryQuestions = mutableListOf<QuizHistoryQuestion>()
 
     private var configuredSessionRuntime = false
     private var configuredSessionId: String? = null
@@ -167,7 +178,18 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
     fun start(category: Category? = null, quizType: String = CYBERSECURITY) {
         leaveConfiguredRuntime()
-        resetRunScore()
+        resetRunScore(
+            if (quizType == CYBERSECURITY) {
+                QuizSessionConfig(
+                    mode = QuizSessionMode.RANDOM,
+                    categories = category?.let { setOf(it.label) }
+                        ?: Category.entries.map { it.label }.toSet(),
+                    questionCount = 0
+                )
+            } else {
+                null
+            }
+        )
         singleReviewQuestion = false
         selectQuizType(quizType)
         currentCategory = category?.label
@@ -185,7 +207,17 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startCategory(quizType: String, category: String) {
         leaveConfiguredRuntime()
-        resetRunScore()
+        resetRunScore(
+            if (quizType == CYBERSECURITY) {
+                QuizSessionConfig(
+                    mode = QuizSessionMode.RANDOM,
+                    categories = setOf(category),
+                    questionCount = 0
+                )
+            } else {
+                null
+            }
+        )
         singleReviewQuestion = false
         selectQuizType(quizType)
         currentCategory = category
@@ -203,7 +235,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startReviewQuestion(quizType: String, questionId: Long) {
         leaveConfiguredRuntime()
-        resetRunScore()
+        resetRunScore(null)
         singleReviewQuestion = true
         selectQuizType(quizType)
         currentCategory = null
@@ -223,7 +255,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         if (_activeSessions.value.size >= MAX_ACTIVE_SESSIONS) return
 
         saveLastSessionConfig(config)
-        resetRunScore()
+        resetRunScore(config)
         configuredSessionRuntime = true
         configuredSessionId = nextSessionId()
         configuredSessionConfig = config
@@ -307,6 +339,14 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         runAnswered = sessionAnswered
         runCorrect = sessionPrefs.getInt(sessionKey(sessionId, FIELD_CORRECT_COUNT), 0)
         runXpGained = sessionPrefs.getInt(sessionKey(sessionId, FIELD_XP_GAINED), 0)
+        runStartedAt = sessionPrefs
+            .getLong(sessionKey(sessionId, FIELD_STARTED_AT), System.currentTimeMillis())
+        runReplayConfig = configuredSessionConfig
+        runHistorySaved = false
+        runHistoryQuestions.clear()
+        runHistoryQuestions += historyStore.decodeQuestions(
+            sessionPrefs.getString(sessionKey(sessionId, FIELD_ANSWER_HISTORY), null)
+        )
         _finishSummary.value = null
 
         _reviewMode.value = configuredSessionConfig?.mode == QuizSessionMode.DIFFICULTIES
@@ -344,7 +384,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
         if (configuredSessionId == sessionId) {
             leaveConfiguredRuntime()
-            resetRunScore()
+            resetRunScore(null)
             _reviewMode.value = false
             _restoredSelection.value = null
             _result.value = null
@@ -354,6 +394,13 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
     fun restartLastConfiguredQuiz() {
         startConfiguredQuiz(_lastSessionConfig.value)
+    }
+
+    fun restartHistoryQuiz(historyId: String): Boolean {
+        if (_activeSessions.value.size >= MAX_ACTIVE_SESSIONS) return false
+        val entry = _quizHistory.value.firstOrNull { it.id == historyId } ?: return false
+        startConfiguredQuiz(entry.config)
+        return true
     }
 
     fun answer(index: Int) {
@@ -436,6 +483,19 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             runAnswered += 1
             if (ok) runCorrect += 1
             runXpGained += gainedXp
+
+            if (currentQuizType == CYBERSECURITY && !singleReviewQuestion) {
+                runHistoryQuestions += QuizHistoryQuestion(
+                    questionId = current.id,
+                    category = current.category,
+                    difficulty = current.difficulty,
+                    question = current.question,
+                    answers = listOf(current.answerA, current.answerB, current.answerC, current.answerD),
+                    correctIndex = current.correctIndex,
+                    selectedIndex = index,
+                    explanation = current.explanation
+                )
+            }
 
             _restoredSelection.value = index
             _result.value = AnswerResult(ok, gainedXp, current.explanation, current)
@@ -692,6 +752,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         if (question == null) {
             repo.resetSeen(currentQuizType, currentCategory)
             publishFinishSummary()
+            saveHistoryIfEligible()
             _state.value = QuizUiState.Finished
         } else {
             questionNumber++
@@ -699,10 +760,14 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun resetRunScore() {
+    private fun resetRunScore(config: QuizSessionConfig?) {
         runAnswered = 0
         runCorrect = 0
         runXpGained = 0
+        runStartedAt = System.currentTimeMillis()
+        runReplayConfig = config
+        runHistorySaved = false
+        runHistoryQuestions.clear()
         _finishSummary.value = null
     }
 
@@ -712,6 +777,31 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             correct = runCorrect,
             xpGained = runXpGained
         )
+    }
+
+    private fun saveHistoryIfEligible() {
+        if (runHistorySaved) return
+        if (currentQuizType != CYBERSECURITY || singleReviewQuestion || runAnswered <= 0) return
+
+        val originalConfig = configuredSessionConfig ?: runReplayConfig ?: return
+        val replayConfig = if (!configuredSessionRuntime && originalConfig.questionCount == 0) {
+            originalConfig.copy(questionCount = runAnswered)
+        } else {
+            originalConfig
+        }
+        val endedAt = System.currentTimeMillis()
+        val entry = QuizHistoryEntry(
+            id = "history_${endedAt}_${runAnswered}",
+            config = replayConfig,
+            startedAt = runStartedAt.takeIf { it > 0L } ?: endedAt,
+            endedAt = endedAt,
+            answered = runAnswered,
+            correct = runCorrect,
+            xpGained = runXpGained,
+            questions = runHistoryQuestions.toList()
+        )
+        _quizHistory.value = historyStore.add(entry)
+        runHistorySaved = true
     }
 
     private fun saveLastSessionConfig(config: QuizSessionConfig) {
@@ -782,6 +872,11 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             .putInt(sessionKey(id, FIELD_ANSWERED), sessionAnswered)
             .putInt(sessionKey(id, FIELD_CORRECT_COUNT), runCorrect)
             .putInt(sessionKey(id, FIELD_XP_GAINED), runXpGained)
+            .putLong(sessionKey(id, FIELD_STARTED_AT), runStartedAt)
+            .putString(
+                sessionKey(id, FIELD_ANSWER_HISTORY),
+                historyStore.encodeQuestions(runHistoryQuestions)
+            )
             .putLong(sessionKey(id, FIELD_CURRENT_ID), sessionCurrentQuestionId ?: -1L)
             .putBoolean(sessionKey(id, FIELD_PENDING), sessionPendingAnswer)
             .putBoolean(sessionKey(id, FIELD_CORRECT), sessionPendingCorrect)
@@ -793,6 +888,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun finishConfiguredSession() {
         publishFinishSummary()
+        saveHistoryIfEligible()
         val id = configuredSessionId
         if (id != null) removeSessionStorage(id)
         leaveConfiguredRuntime()
@@ -828,6 +924,8 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             .remove(sessionKey(id, FIELD_ANSWERED))
             .remove(sessionKey(id, FIELD_CORRECT_COUNT))
             .remove(sessionKey(id, FIELD_XP_GAINED))
+            .remove(sessionKey(id, FIELD_STARTED_AT))
+            .remove(sessionKey(id, FIELD_ANSWER_HISTORY))
             .remove(sessionKey(id, FIELD_CURRENT_ID))
             .remove(sessionKey(id, FIELD_PENDING))
             .remove(sessionKey(id, FIELD_CORRECT))
@@ -884,6 +982,8 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             .putInt(sessionKey(id, FIELD_ANSWERED), sessionPrefs.getInt(KEY_LEGACY_ANSWERED, 0))
             .putInt(sessionKey(id, FIELD_CORRECT_COUNT), 0)
             .putInt(sessionKey(id, FIELD_XP_GAINED), 0)
+            .putLong(sessionKey(id, FIELD_STARTED_AT), System.currentTimeMillis())
+            .putString(sessionKey(id, FIELD_ANSWER_HISTORY), "[]")
             .putLong(sessionKey(id, FIELD_CURRENT_ID), sessionPrefs.getLong(KEY_LEGACY_CURRENT_ID, -1L))
             .putBoolean(sessionKey(id, FIELD_PENDING), sessionPrefs.getBoolean(KEY_LEGACY_PENDING, false))
             .putBoolean(sessionKey(id, FIELD_CORRECT), sessionPrefs.getBoolean(KEY_LEGACY_CORRECT, false))
@@ -949,6 +1049,8 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         private const val FIELD_ANSWERED = "answered"
         private const val FIELD_CORRECT_COUNT = "correct_count"
         private const val FIELD_XP_GAINED = "xp_gained"
+        private const val FIELD_STARTED_AT = "started_at"
+        private const val FIELD_ANSWER_HISTORY = "answer_history"
         private const val FIELD_CURRENT_ID = "current_id"
         private const val FIELD_PENDING = "pending"
         private const val FIELD_CORRECT = "correct"
