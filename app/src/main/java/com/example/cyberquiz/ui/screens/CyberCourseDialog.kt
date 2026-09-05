@@ -39,7 +39,8 @@ private val CourseMuted = Color(0xFF9FAED3)
 internal fun CyberCourseDialog(
     term: String,
     category: String,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    dismissLabel: String = "Retour à l'analyse"
 ) {
     var activeTerm by remember(term, category) { mutableStateOf(term) }
     var activeCategory by remember(term, category) { mutableStateOf(category) }
@@ -207,7 +208,7 @@ internal fun CyberCourseDialog(
                 contentAlignment = Alignment.Center
             ) {
                 androidx.compose.material3.Text(
-                    "Retour à l'analyse",
+                    dismissLabel,
                     color = CourseText,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
