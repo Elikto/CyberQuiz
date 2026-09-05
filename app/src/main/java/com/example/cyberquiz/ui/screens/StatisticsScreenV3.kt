@@ -14,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,8 +48,15 @@ fun StatisticsScreenV3(
     val p by vm.progress.collectAsState()
     val categories by vm.categoryProgress.collectAsState()
     val concepts by vm.conceptProgress.collectAsState()
+    val reviewItems by vm.reviewItems.collectAsState()
     val accuracy = if (p.answered == 0) 0 else p.correct * 100 / p.answered
+    val reviewQuestionsByConcept = remember(reviewItems) {
+        reviewItems.associate { it.concept to it.question }
+    }
+
     var selectedTheme by remember { mutableStateOf<CategoryProgressEntity?>(null) }
+    var themesExpanded by rememberSaveable { mutableStateOf(true) }
+    var conceptsExpanded by rememberSaveable { mutableStateOf(true) }
 
     Column(
         modifier = Modifier
@@ -75,67 +83,98 @@ fun StatisticsScreenV3(
             bestStreak = p.bestStreak
         )
 
-        StatsSectionV3("PROGRESSION PAR THÈME")
-        if (categories.isEmpty()) {
-            StatsInfoV3(
-                "La progression détaillée commence avec cette version. Réponds à quelques nouvelles questions Cyber pour voir apparaître tes résultats par domaine."
-            )
-        } else {
-            Text(
-                "Appuie sur un thème pour comprendre ce que signifie ton pourcentage et obtenir un exercice ou un cours adapté.",
-                color = S3Muted,
-                fontSize = 10.sp,
-                lineHeight = 15.sp
-            )
-            categories.forEach { item ->
-                CategoryProgressCardV3(
-                    item = item,
-                    onClick = { selectedTheme = item }
+        CollapsibleStatsSectionV3(
+            text = "PROGRESSION PAR THÈME",
+            expanded = themesExpanded,
+            onToggle = { themesExpanded = !themesExpanded }
+        )
+        if (themesExpanded) {
+            if (categories.isEmpty()) {
+                StatsInfoV3(
+                    "La progression détaillée commence avec cette version. Réponds à quelques nouvelles questions Cyber pour voir apparaître tes résultats par domaine."
                 )
-            }
-        }
-
-        StatsSectionV3("MAÎTRISE DES NOTIONS")
-        if (concepts.isEmpty()) {
-            StatsInfoV3(
-                "Les notions apparaîtront ici au fil de tes prochaines réponses. Une révision réussie dans le carnet peut ensuite les faire passer en maîtrisées."
-            )
-        } else {
-            val needsWork = concepts.filter { !it.lastResultCorrect && !it.reviewMastered }
-            val acquired = concepts.filter { it.lastResultCorrect || it.reviewMastered }
-
-            if (needsWork.isNotEmpty()) {
+            } else {
                 Text(
-                    "À RENFORCER",
-                    color = S3Orange,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.4.sp
-                )
-                Text(
-                    "Appuie sur une notion À revoir pour ouvrir directement la question correspondante dans ton carnet.",
+                    "Appuie sur un thème pour comprendre ce que signifie ton pourcentage et obtenir un exercice ou un cours adapté.",
                     color = S3Muted,
                     fontSize = 10.sp,
                     lineHeight = 15.sp
                 )
-                needsWork.take(8).forEach { item ->
-                    ConceptProgressCardV3(
-                        item = item,
-                        onReviewClick = { onReviewConcept(item.concept) }
-                    )
+
+                categories.chunked(2).forEach { rowItems ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        rowItems.forEach { item ->
+                            CategoryProgressCardV3(
+                                item = item,
+                                modifier = Modifier.weight(1f),
+                                onClick = { selectedTheme = item }
+                            )
+                        }
+                        if (rowItems.size == 1) {
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
                 }
             }
+        }
 
-            if (acquired.isNotEmpty()) {
-                Text(
-                    "ACQUISES / EN COURS",
-                    color = S3Green,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.4.sp
+        CollapsibleStatsSectionV3(
+            text = "MAÎTRISE DES NOTIONS",
+            expanded = conceptsExpanded,
+            onToggle = { conceptsExpanded = !conceptsExpanded }
+        )
+        if (conceptsExpanded) {
+            if (concepts.isEmpty()) {
+                StatsInfoV3(
+                    "Les notions apparaîtront ici au fil de tes prochaines réponses. Une révision réussie dans le carnet peut ensuite les faire passer en maîtrisées."
                 )
-                acquired.take(12).forEach { item ->
-                    ConceptProgressCardV3(item = item, onReviewClick = null)
+            } else {
+                val needsWork = concepts.filter { !it.lastResultCorrect && !it.reviewMastered }
+                val acquired = concepts.filter { it.lastResultCorrect || it.reviewMastered }
+
+                if (needsWork.isNotEmpty()) {
+                    Text(
+                        "À RENFORCER",
+                        color = S3Orange,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.4.sp
+                    )
+                    Text(
+                        "Appuie sur une question à revoir pour l'ouvrir directement dans ton carnet.",
+                        color = S3Muted,
+                        fontSize = 10.sp,
+                        lineHeight = 15.sp
+                    )
+                    needsWork.take(8).forEach { item ->
+                        ConceptProgressCardV3(
+                            item = item,
+                            title = reviewQuestionsByConcept[item.concept]
+                                ?.takeIf { it.isNotBlank() }
+                                ?: item.concept,
+                            onReviewClick = { onReviewConcept(item.concept) }
+                        )
+                    }
+                }
+
+                if (acquired.isNotEmpty()) {
+                    Text(
+                        "ACQUISES / EN COURS",
+                        color = S3Green,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.4.sp
+                    )
+                    acquired.take(12).forEach { item ->
+                        ConceptProgressCardV3(
+                            item = item,
+                            title = item.concept,
+                            onReviewClick = null
+                        )
+                    }
                 }
             }
         }
@@ -248,6 +287,7 @@ private fun MiniMetricV3(value: String, label: String, accent: Color, modifier: 
 @Composable
 private fun CategoryProgressCardV3(
     item: CategoryProgressEntity,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val accuracy = if (item.answered == 0) 0 else item.correct * 100 / item.answered
@@ -260,41 +300,58 @@ private fun CategoryProgressCardV3(
     val status = when {
         item.answered < 3 -> "Premières données"
         accuracy >= 85 -> "Très bon niveau"
-        accuracy >= 70 -> "En bonne progression"
+        accuracy >= 70 -> "En progression"
         accuracy >= 50 -> "À consolider"
         else -> "À retravailler"
     }
 
     Column(
-        Modifier
-            .fillMaxWidth()
-            .background(S3Panel, RoundedCornerShape(18.dp))
-            .border(1.dp, accent.copy(alpha = .42f), RoundedCornerShape(18.dp))
+        modifier
+            .aspectRatio(1f)
+            .background(S3Panel, RoundedCornerShape(17.dp))
+            .border(1.dp, accent.copy(alpha = .48f), RoundedCornerShape(17.dp))
             .clickable(onClick = onClick)
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(item.category, color = S3Text, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                Text("${item.correct} bonnes réponses sur ${item.answered}", color = S3Muted, fontSize = 10.sp)
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text("$accuracy%", color = accent, fontSize = 19.sp, fontWeight = FontWeight.Black)
-                Text(status, color = accent, fontSize = 9.sp)
-            }
-        }
-        StatsBarV3(accuracy / 100f, accent)
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
-                "COMPRENDRE CE RÉSULTAT",
-                color = S3Muted,
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = .8.sp,
-                modifier = Modifier.weight(1f)
+                item.category,
+                color = S3Text,
+                fontSize = 12.sp,
+                lineHeight = 15.sp,
+                fontWeight = FontWeight.Black,
+                maxLines = 2
             )
-            Text("›", color = accent, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "${item.correct}/${item.answered} bonnes",
+                color = S3Muted,
+                fontSize = 8.sp
+            )
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text("$accuracy%", color = accent, fontSize = 24.sp, fontWeight = FontWeight.Black)
+            Text(
+                status,
+                color = accent,
+                fontSize = 8.sp,
+                lineHeight = 11.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2
+            )
+            StatsBarV3(accuracy / 100f, accent, height = 7.dp)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "VOIR LE NIVEAU",
+                    color = S3Muted,
+                    fontSize = 7.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = .5.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                Text("›", color = accent, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -302,6 +359,7 @@ private fun CategoryProgressCardV3(
 @Composable
 private fun ConceptProgressCardV3(
     item: ConceptProgressEntity,
+    title: String,
     onReviewClick: (() -> Unit)?
 ) {
     val accuracy = if (item.attempts == 0) 0 else item.correct * 100 / item.attempts
@@ -357,8 +415,20 @@ private fun ConceptProgressCardV3(
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(item.concept, color = S3Text, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold)
-                Text(item.category.uppercase(), color = S3Blue, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text(
+                    title,
+                    color = S3Text,
+                    fontSize = 13.sp,
+                    lineHeight = 17.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    item.category.uppercase(),
+                    color = S3Blue,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
             }
             if (onReviewClick != null) {
                 Text("›", color = S3Orange, fontSize = 24.sp, fontWeight = FontWeight.Bold)
@@ -373,6 +443,38 @@ private fun ConceptProgressCardV3(
                 item.reviewMastered -> Text("Retest validé", color = S3Muted, fontSize = 9.sp)
             }
         }
+    }
+}
+
+@Composable
+private fun CollapsibleStatsSectionV3(
+    text: String,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(S3Cyan.copy(alpha = .045f), RoundedCornerShape(14.dp))
+            .border(1.dp, S3Cyan.copy(alpha = .22f), RoundedCornerShape(14.dp))
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text,
+            color = S3Cyan,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = 1.4.sp,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            if (expanded) "⌃" else "⌄",
+            color = S3Cyan,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Black
+        )
     }
 }
 
@@ -392,16 +494,11 @@ private fun StatsInfoV3(text: String) {
 }
 
 @Composable
-private fun StatsSectionV3(text: String) {
-    Text(text, color = S3Cyan, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.6.sp)
-}
-
-@Composable
-private fun StatsBarV3(progress: Float, accent: Color) {
+private fun StatsBarV3(progress: Float, accent: Color, height: androidx.compose.ui.unit.Dp = 9.dp) {
     Box(
         Modifier
             .fillMaxWidth()
-            .height(9.dp)
+            .height(height)
             .background(Color(0xFF20365E), RoundedCornerShape(50.dp))
     ) {
         if (progress > 0f) {
