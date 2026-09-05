@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: cyberquiz-apk-release
+  cancel-in-progress: true
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
