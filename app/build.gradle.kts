@@ -1,4 +1,27 @@
 import java.util.Base64
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
+
+abstract class GenerateCyberQuizIconTask : DefaultTask() {
+    @get:InputFile
+    abstract val sourceFile: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun generate() {
+        val drawableDir = outputDir.get().dir("drawable-nodpi").asFile
+        drawableDir.mkdirs()
+        val encoded = sourceFile.get().asFile.readText().filterNot { it.isWhitespace() }
+        drawableDir.resolve("cyberquiz_app_icon.jpg")
+            .writeBytes(Base64.getDecoder().decode(encoded))
+    }
+}
 
 plugins {
     alias(libs.plugins.android.application)
@@ -6,19 +29,9 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-val cyberQuizIconBase64 = layout.projectDirectory.file("cyberquiz_app_icon.b64")
-val generatedCyberQuizIconRes = layout.buildDirectory.dir("generated/cyberquizIcon/res")
-val generateCyberQuizIcon by tasks.registering {
-    inputs.file(cyberQuizIconBase64)
-    outputs.dir(generatedCyberQuizIconRes)
-
-    doLast {
-        val drawableDir = generatedCyberQuizIconRes.get().dir("drawable-nodpi").asFile
-        drawableDir.mkdirs()
-        val encoded = cyberQuizIconBase64.asFile.readText().filterNot { it.isWhitespace() }
-        drawableDir.resolve("cyberquiz_app_icon.jpg")
-            .writeBytes(Base64.getDecoder().decode(encoded))
-    }
+val generateCyberQuizIcon = tasks.register<GenerateCyberQuizIconTask>("generateCyberQuizIcon") {
+    sourceFile.set(layout.projectDirectory.file("cyberquiz_app_icon.b64"))
+    outputDir.set(layout.buildDirectory.dir("generated/cyberquizIcon/res"))
 }
 
 android {
@@ -50,13 +63,14 @@ android {
         compose = true
         buildConfig = true
     }
-
-    sourceSets.getByName("main").res.srcDir(generatedCyberQuizIconRes.get().asFile)
 }
 
-tasks.configureEach {
-    if (name.startsWith("merge") && name.endsWith("Resources")) {
-        dependsOn(generateCyberQuizIcon)
+androidComponents {
+    onVariants { variant ->
+        variant.sources.res?.addGeneratedSourceDirectory(
+            generateCyberQuizIcon,
+            GenerateCyberQuizIconTask::outputDir
+        )
     }
 }
 
