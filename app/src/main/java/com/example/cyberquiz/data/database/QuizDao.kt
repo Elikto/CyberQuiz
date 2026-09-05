@@ -15,6 +15,14 @@ interface QuizDao {
     @Query("SELECT * FROM questions WHERE quizType = :quizType AND category = :category AND seen = 0 ORDER BY id LIMIT 1")
     suspend fun nextUnseenInCategory(quizType: String, category: String): QuestionEntity?
 
+    @Query("SELECT * FROM questions WHERE quizType = :quizType ORDER BY id")
+    suspend fun questionsSnapshot(quizType: String): List<QuestionEntity>
+
+    @Query(
+        "SELECT q.* FROM questions q INNER JOIN review_items r ON r.questionId = q.id WHERE r.quizType = :quizType AND r.mastered = 0 ORDER BY r.wrongCount DESC, r.lastWrongAt DESC"
+    )
+    suspend fun activeReviewQuestionsSnapshot(quizType: String): List<QuestionEntity>
+
     @Query("SELECT * FROM questions WHERE id = :id LIMIT 1")
     suspend fun questionById(id: Long): QuestionEntity?
 
