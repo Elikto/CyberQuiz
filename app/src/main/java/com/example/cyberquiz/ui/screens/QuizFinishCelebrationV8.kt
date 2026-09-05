@@ -58,7 +58,8 @@ private data class FinishTier(
 fun QuizFinishCelebrationV8(
     summary: QuizFinishSummary,
     onReplay: () -> Unit,
-    onBack: () -> Unit
+    onOtherQuiz: () -> Unit,
+    onHome: () -> Unit
 ) {
     val answered = summary.answered.coerceAtLeast(0)
     val correct = summary.correct.coerceIn(0, answered)
@@ -99,7 +100,7 @@ fun QuizFinishCelebrationV8(
                 level = tier.level,
                 progress = burst.value,
                 accent = tier.accent,
-                modifier = Modifier.matchParentSize()
+                modifier = Modifier.fillMaxWidth().height(190.dp)
             )
         }
 
@@ -227,40 +228,66 @@ fun QuizFinishCelebrationV8(
                 )
             }
 
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(FinishPurple.copy(alpha = .95f), Color(0xFF234A91))
-                        ),
-                        RoundedCornerShape(17.dp)
-                    )
-                    .border(1.2.dp, FinishPurple, RoundedCornerShape(17.dp))
-                    .clickable(onClick = onReplay),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "REJOUER",
-                    color = FinishText,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = .8.sp
-                )
-            }
-
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(47.dp)
-                    .border(1.dp, Color(0xFF42547D), RoundedCornerShape(15.dp))
-                    .clickable(onClick = onBack),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("RETOUR", color = FinishMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
+            FinishActionButtonV8(
+                text = "REJOUER",
+                accent = FinishPurple,
+                filled = true,
+                onClick = onReplay
+            )
+            FinishActionButtonV8(
+                text = "FAIRE UN AUTRE QUIZ",
+                accent = FinishCyan,
+                filled = false,
+                onClick = onOtherQuiz
+            )
+            FinishActionButtonV8(
+                text = "ACCUEIL",
+                accent = Color(0xFF7184A9),
+                filled = false,
+                onClick = onHome
+            )
         }
+    }
+}
+
+@Composable
+private fun FinishActionButtonV8(
+    text: String,
+    accent: Color,
+    filled: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(if (filled) 56.dp else 47.dp)
+            .background(
+                if (filled) {
+                    Brush.horizontalGradient(
+                        listOf(FinishPurple.copy(alpha = .95f), Color(0xFF234A91))
+                    )
+                } else {
+                    Brush.horizontalGradient(
+                        listOf(accent.copy(alpha = .06f), Color(0xFF071225))
+                    )
+                },
+                RoundedCornerShape(16.dp)
+            )
+            .border(
+                if (filled) 1.2.dp else 1.dp,
+                if (filled) FinishPurple else accent.copy(alpha = .70f),
+                RoundedCornerShape(16.dp)
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text,
+            color = if (filled) FinishText else accent,
+            fontSize = if (filled) 14.sp else 11.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = .8.sp
+        )
     }
 }
 
