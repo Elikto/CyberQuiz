@@ -136,7 +136,13 @@ fun QuizSetupScreen(
                 allCategories = allCategories,
                 categoriesExpanded = categoriesExpanded,
                 onToggleCategoriesExpanded = { categoriesExpanded = !categoriesExpanded },
-                onSelectAllCategories = { selectedCategories = allCategories.toSet() },
+                onSelectAllCategories = {
+                    selectedCategories = if (selectedCategories.size == allCategories.size) {
+                        emptySet()
+                    } else {
+                        allCategories.toSet()
+                    }
+                },
                 onToggleCategory = { category ->
                     selectedCategories = if (category in selectedCategories) {
                         selectedCategories - category
