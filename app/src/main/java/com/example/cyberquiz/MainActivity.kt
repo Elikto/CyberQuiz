@@ -18,6 +18,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cyberquiz.ui.screens.CategoriesScreenV3
 import com.example.cyberquiz.ui.screens.ProfileScreenV3
 import com.example.cyberquiz.ui.screens.QuizScreenV8
+import com.example.cyberquiz.ui.screens.QuizSetupScreen
 import com.example.cyberquiz.ui.screens.QuizType
 import com.example.cyberquiz.ui.screens.QuizUnavailableScreen
 import com.example.cyberquiz.ui.screens.ReviewScreen
@@ -31,6 +32,7 @@ import com.example.cyberquiz.viewmodel.QuizViewModel
 
 enum class AppScreen {
     HOME,
+    QUIZ_SETUP,
     QUIZ,
     STATS,
     CATEGORIES,
@@ -100,11 +102,13 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
             vm = vm,
             selectedQuizType = selectedQuizType,
             onQuiz = {
-                if (selectedQuizType.isPlayableNow()) {
+                if (!selectedQuizType.isPlayableNow()) {
+                    navigateTo(AppScreen.UNAVAILABLE_QUIZ)
+                } else if (selectedQuizType == QuizType.CYBERSECURITY) {
+                    navigateTo(AppScreen.QUIZ_SETUP)
+                } else {
                     vm.start(quizType = selectedQuizType.name)
                     navigateTo(AppScreen.QUIZ)
-                } else {
-                    navigateTo(AppScreen.UNAVAILABLE_QUIZ)
                 }
             },
             onStats = { navigateTo(AppScreen.STATS) },
@@ -123,6 +127,22 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
             },
             onProfile = { navigateTo(AppScreen.PROFILE) },
             onSettings = { navigateTo(AppScreen.SETTINGS) }
+        )
+
+        AppScreen.QUIZ_SETUP -> QuizSetupScreen(
+            vm = vm,
+            onBack = { goBack() },
+            onStart = { config ->
+                vm.startConfiguredQuiz(config)
+                navigateTo(AppScreen.QUIZ)
+            },
+            onResume = {
+                vm.resumeConfiguredQuiz()
+                navigateTo(AppScreen.QUIZ)
+            },
+            onAbandon = {
+                vm.abandonConfiguredQuiz()
+            }
         )
 
         AppScreen.QUIZ -> QuizScreenV8(
