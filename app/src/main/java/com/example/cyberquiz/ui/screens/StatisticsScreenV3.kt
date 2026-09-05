@@ -42,7 +42,7 @@ fun StatisticsScreenV3(
     vm: QuizViewModel,
     onBack: () -> Unit,
     onReviewConcept: (String) -> Unit,
-    onThemeQuiz: (String) -> Unit
+    onThemeQuiz: (String, Int) -> Unit
 ) {
     val p by vm.progress.collectAsState()
     val categories by vm.categoryProgress.collectAsState()
@@ -147,9 +147,9 @@ fun StatisticsScreenV3(
         StatsThemeDetailDialog(
             item = item,
             concepts = concepts,
-            onQuiz = {
+            onQuiz = { questionCount ->
                 selectedTheme = null
-                onThemeQuiz(item.category)
+                onThemeQuiz(item.category, questionCount)
             },
             onDismiss = { selectedTheme = null }
         )
