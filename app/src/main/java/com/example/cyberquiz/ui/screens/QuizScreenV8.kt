@@ -51,6 +51,7 @@ private val Q8Panel = Color(0xFF081226)
 fun QuizScreenV8(
     vm: QuizViewModel,
     configuredSession: Boolean = false,
+    questionTotal: Int? = null,
     onBack: () -> Unit,
     onOtherQuiz: () -> Unit = onBack,
     onHome: () -> Unit = onBack
@@ -144,7 +145,7 @@ fun QuizScreenV8(
                 val answers = listOf(q.answerA, q.answerB, q.answerC, q.answerD)
 
                 QuizTopBarV8(q.category, onBack)
-                QuizStatsRowV8(s.number, progress.xp, progress.streak, q.difficulty)
+                QuizStatsRowV8(s.number, questionTotal, progress.xp, progress.streak, q.difficulty)
                 QuestionCardV8(q.question)
 
                 Text(
@@ -270,7 +271,13 @@ private fun QuizTopBarV8(category: String, onQuit: () -> Unit) {
 }
 
 @Composable
-private fun QuizStatsRowV8(number: Int, xp: Int, streak: Int, difficulty: String) {
+private fun QuizStatsRowV8(number: Int, total: Int?, xp: Int, streak: Int, difficulty: String) {
+    val questionLabel = if (total != null && total > 0) {
+        "QUESTION $number / $total"
+    } else {
+        "QUESTION ${number.toString().padStart(2, '0')}"
+    }
+
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier
@@ -282,11 +289,11 @@ private fun QuizStatsRowV8(number: Int, xp: Int, streak: Int, difficulty: String
             contentAlignment = Alignment.Center
         ) {
             Text(
-                "QUESTION ${number.toString().padStart(2, '0')}",
+                questionLabel,
                 color = Q8Text,
-                fontSize = 10.sp,
+                fontSize = if (total != null && total > 0) 9.sp else 10.sp,
                 fontWeight = FontWeight.Black,
-                letterSpacing = 1.1.sp,
+                letterSpacing = if (total != null && total > 0) .7.sp else 1.1.sp,
                 maxLines = 1
             )
         }
