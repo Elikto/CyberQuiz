@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import com.example.cyberquiz.ui.theme.*
+import com.example.cyberquiz.update.CyberQuizUpdateManager
 import com.example.cyberquiz.viewmodel.QuizViewModel
 import kotlin.math.*
 
@@ -33,6 +34,7 @@ fun HomeScreenV2(
     val p by vm.progress.collectAsState()
     val reviewItems by vm.reviewItems.collectAsState()
     val history by vm.quizHistory.collectAsState()
+    var updateAvailable by remember { mutableStateOf(false) }
     val activeReviewCount = reviewItems.count { !it.mastered }
     val xp = p.xp % 100
     val progress = (xp / 100f).coerceIn(0f, 1f)
@@ -44,6 +46,10 @@ fun HomeScreenV2(
         else -> "Débutant Cyber"
     }
 
+    LaunchedEffect(Unit) {
+        updateAvailable = CyberQuizUpdateManager.checkForUpdate() != null
+    }
+
     Column(
         Modifier.fillMaxSize()
             .background(Brush.verticalGradient(listOf(Color(0xFF020610), Color(0xFF060B19), CyberBackground, Color(0xFF030712))))
@@ -53,7 +59,7 @@ fun HomeScreenV2(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            TopButton(TopIcon.SETTINGS, onSettings)
+            TopButton(TopIcon.SETTINGS, onSettings, showBadge = updateAvailable)
             TopButton(TopIcon.PROFILE, onProfile)
         }
 
@@ -118,7 +124,7 @@ fun HomeScreenV2(
 private enum class TopIcon { SETTINGS, PROFILE }
 
 @Composable
-private fun TopButton(icon: TopIcon, onClick: () -> Unit) {
+private fun TopButton(icon: TopIcon, onClick: () -> Unit, showBadge: Boolean = false) {
     Box(
         Modifier.size(44.dp)
             .background(Brush.radialGradient(listOf(Color(0xFF172A57), Color(0xFF081123))), CircleShape)
@@ -143,6 +149,16 @@ private fun TopButton(icon: TopIcon, onClick: () -> Unit) {
                     drawArc(Color(0xFFE0E7FF), 198f, 144f, false, Offset(size.width * .17f, size.height * .46f), Size(size.width * .66f, size.height * .48f), style = Stroke(3f, cap = StrokeCap.Round))
                 }
             }
+        }
+
+        if (showBadge && icon == TopIcon.SETTINGS) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .size(11.dp)
+                    .background(Color(0xFFFF4F6D), CircleShape)
+                    .border(1.5.dp, Color(0xFF081123), CircleShape)
+            )
         }
     }
 }
