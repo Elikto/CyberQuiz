@@ -4,6 +4,13 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val cyberVersionCode = providers.gradleProperty("cyberVersionCode").orElse("1").get().toInt()
+val cyberVersionName = providers.gradleProperty("cyberVersionName").orElse("1.0").get()
+val updateKeystorePath = System.getenv("CYBERQUIZ_KEYSTORE_PATH")
+val updateKeystorePassword = System.getenv("CYBERQUIZ_KEYSTORE_PASSWORD")
+val updateKeyAlias = System.getenv("CYBERQUIZ_KEY_ALIAS")
+val updateKeyPassword = System.getenv("CYBERQUIZ_KEY_PASSWORD")
+
 android {
     namespace = "com.example.cyberquiz"
     compileSdk = 37
@@ -12,13 +19,34 @@ android {
         applicationId = "com.example.cyberquiz"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = cyberVersionCode
+        versionName = cyberVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "BACKEND_URL", "\"http://10.0.2.2:8000\"")
     }
 
+    val updateSigningConfig = if (
+        !updateKeystorePath.isNullOrBlank() &&
+        !updateKeystorePassword.isNullOrBlank() &&
+        !updateKeyAlias.isNullOrBlank() &&
+        !updateKeyPassword.isNullOrBlank()
+    ) {
+        signingConfigs.create("update") {
+            storeFile = file(updateKeystorePath!!)
+            storePassword = updateKeystorePassword
+            keyAlias = updateKeyAlias
+            keyPassword = updateKeyPassword
+        }
+    } else {
+        null
+    }
+
     buildTypes {
+        debug {
+            if (updateSigningConfig != null) {
+                signingConfig = updateSigningConfig
+            }
+        }
         release {
             isMinifyEnabled = false
         }

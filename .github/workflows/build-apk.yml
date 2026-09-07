@@ -16,6 +16,8 @@ concurrency:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+    env:
+      CYBERQUIZ_DEBUG_KEYSTORE_BASE64: ${{ secrets.CYBERQUIZ_DEBUG_KEYSTORE_BASE64 }}
 
     steps:
       - name: Checkout repository
@@ -33,17 +35,51 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Prepare version and update signing
+        run: |
+          VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))
+          VERSION_NAME="1.0.${GITHUB_RUN_NUMBER}"
+          echo "CYBERQUIZ_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "CYBERQUIZ_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
 
-      - name: Prepare downloadable APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk CyberQuiz.apk
+          if [ -n "$CYBERQUIZ_DEBUG_KEYSTORE_BASE64" ]; then
+            echo "$CYBERQUIZ_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cyberquiz-debug.keystore"
+            echo "CYBERQUIZ_KEYSTORE_PATH=$RUNNER_TEMP/cyberquiz-debug.keystore" >> "$GITHUB_ENV"
+            echo "CYBERQUIZ_KEYSTORE_PASSWORD=android" >> "$GITHUB_ENV"
+            echo "CYBERQUIZ_KEY_ALIAS=androiddebugkey" >> "$GITHUB_ENV"
+            echo "CYBERQUIZ_KEY_PASSWORD=android" >> "$GITHUB_ENV"
+            echo "CYBERQUIZ_UPDATE_READY=true" >> "$GITHUB_ENV"
+          else
+            echo "CYBERQUIZ_UPDATE_READY=false" >> "$GITHUB_ENV"
+            echo "::warning::CYBERQUIZ_DEBUG_KEYSTORE_BASE64 is not configured. APK will be built, but in-app updates stay disabled."
+          fi
+
+      - name: Build debug APK
+        run: |
+          ./gradlew assembleDebug \
+            -PcyberVersionCode="$CYBERQUIZ_VERSION_CODE" \
+            -PcyberVersionName="$CYBERQUIZ_VERSION_NAME" \
+            --stacktrace
+
+      - name: Prepare downloadable APK and update metadata
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk CyberQuiz.apk
+          cat > update.json <<EOF
+          {
+            "versionCode": ${CYBERQUIZ_VERSION_CODE},
+            "versionName": "${CYBERQUIZ_VERSION_NAME}",
+            "apkUrl": "https://github.com/Elikto/CyberQuiz/releases/download/apk-latest/CyberQuiz.apk",
+            "updateReady": ${CYBERQUIZ_UPDATE_READY}
+          }
+          EOF
 
       - name: Upload APK as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: CyberQuiz-APK
-          path: CyberQuiz.apk
+          path: |
+            CyberQuiz.apk
+            update.json
           if-no-files-found: error
           retention-days: 30
 
@@ -54,16 +90,18 @@ jobs:
           git tag -f apk-latest "$GITHUB_SHA"
           git push origin refs/tags/apk-latest --force
 
+          NOTES="APK Android généré automatiquement depuis la branche main. Version ${CYBERQUIZ_VERSION_NAME}. Mise à jour intégrée prête : ${CYBERQUIZ_UPDATE_READY}."
+
           if gh release view apk-latest >/dev/null 2>&1; then
             gh release edit apk-latest \
               --title "CyberQuiz APK - dernière version" \
-              --notes "APK Android généré automatiquement depuis la branche main. Télécharge CyberQuiz.apk dans les fichiers ci-dessous." \
+              --notes "$NOTES" \
               --latest
           else
             gh release create apk-latest \
               --title "CyberQuiz APK - dernière version" \
-              --notes "APK Android généré automatiquement depuis la branche main. Télécharge CyberQuiz.apk dans les fichiers ci-dessous." \
+              --notes "$NOTES" \
               --latest
           fi
 
-          gh release upload apk-latest CyberQuiz.apk --clobber
+          gh release upload apk-latest CyberQuiz.apk update.json --clobber
