@@ -27,6 +27,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cyberquiz.BuildConfig
 import com.example.cyberquiz.ui.theme.CyberBackground
+import com.example.cyberquiz.update.CyberQuizUpdateInfo
 import com.example.cyberquiz.update.CyberQuizUpdateManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -73,11 +75,27 @@ fun SettingsScreenV3(onBack: () -> Unit) {
     val activity = remember(context) { context.findActivity() }
 
     var checkingUpdate by remember { mutableStateOf(false) }
-    var statusMessage by remember { mutableStateOf<String?>(null) }
+    var installingUpdate by remember { mutableStateOf(false) }
+    var updateChecked by remember { mutableStateOf(false) }
+    var availableUpdate by remember { mutableStateOf<CyberQuizUpdateInfo?>(null) }
+    var updateStatusText by remember { mutableStateOf<String?>(null) }
     var showChangesDialog by remember { mutableStateOf(false) }
     var loadingChanges by remember { mutableStateOf(false) }
     var recentChanges by remember { mutableStateOf<List<String>>(emptyList()) }
     var changesLoadError by remember { mutableStateOf<String?>(null) }
+
+    suspend fun refreshUpdateStatus() {
+        if (checkingUpdate || installingUpdate) return
+        checkingUpdate = true
+        updateStatusText = null
+        availableUpdate = CyberQuizUpdateManager.checkForUpdate()
+        updateChecked = true
+        checkingUpdate = false
+    }
+
+    LaunchedEffect(Unit) {
+        refreshUpdateStatus()
+    }
 
     Column(
         modifier = Modifier
@@ -97,22 +115,25 @@ fun SettingsScreenV3(onBack: () -> Unit) {
 
         SettingsUpdateCard(
             checking = checkingUpdate,
-            onCheckUpdate = {
-                if (!checkingUpdate) {
-                    scope.launch {
-                        checkingUpdate = true
-                        val update = CyberQuizUpdateManager.checkForUpdate()
-                        if (update == null) {
-                            statusMessage = "CyberQuiz est déjà à jour.\n\nVersion installée : ${BuildConfig.VERSION_NAME}"
-                            checkingUpdate = false
-                        } else if (activity == null) {
-                            statusMessage = "Impossible d'ouvrir l'installateur Android depuis cet écran."
-                            checkingUpdate = false
-                        } else {
-                            val result = CyberQuizUpdateManager.downloadAndLaunchInstaller(activity, update)
-                            checkingUpdate = false
+            installing = installingUpdate,
+            updateChecked = updateChecked,
+            availableUpdate = availableUpdate,
+            statusText = updateStatusText,
+            onUpdateClick = {
+                if (!checkingUpdate && !installingUpdate) {
+                    val pendingUpdate = availableUpdate
+                    if (pendingUpdate == null) {
+                        scope.launch { refreshUpdateStatus() }
+                    } else if (activity == null) {
+                        updateStatusText = "Impossible d'ouvrir l'installateur Android depuis cet écran."
+                    } else {
+                        scope.launch {
+                            installingUpdate = true
+                            updateStatusText = "Téléchargement de ${pendingUpdate.versionName}…"
+                            val result = CyberQuizUpdateManager.downloadAndLaunchInstaller(activity, pendingUpdate)
+                            installingUpdate = false
                             result.exceptionOrNull()?.let { error ->
-                                statusMessage = error.message ?: "La mise à jour n'a pas pu être installée."
+                                updateStatusText = error.message ?: "La mise à jour n'a pas pu être installée."
                             }
                         }
                     }
@@ -169,24 +190,6 @@ fun SettingsScreenV3(onBack: () -> Unit) {
             )
         }
         Spacer(Modifier.height(6.dp))
-    }
-
-    statusMessage?.let { message ->
-        AlertDialog(
-            onDismissRequest = { statusMessage = null },
-            containerColor = Color(0xFF081329),
-            title = {
-                Text("Mise à jour CyberQuiz", color = SettingsV3Text, fontWeight = FontWeight.Bold)
-            },
-            text = {
-                Text(message, color = SettingsV3Muted, lineHeight = 20.sp)
-            },
-            confirmButton = {
-                TextButton(onClick = { statusMessage = null }) {
-                    Text("OK", color = SettingsV3Cyan, fontWeight = FontWeight.Bold)
-                }
-            }
-        )
     }
 
     if (showChangesDialog) {
@@ -253,9 +256,24 @@ fun SettingsScreenV3(onBack: () -> Unit) {
 @Composable
 private fun SettingsUpdateCard(
     checking: Boolean,
-    onCheckUpdate: () -> Unit,
+    installing: Boolean,
+    updateChecked: Boolean,
+    availableUpdate: CyberQuizUpdateInfo?,
+    statusText: String?,
+    onUpdateClick: () -> Unit,
     onVersionClick: () -> Unit
 ) {
+    val updateAvailable = availableUpdate != null
+    val accent = if (updateAvailable) SettingsV3Green else SettingsV3Blue
+    val inlineStatus = when {
+        statusText != null -> statusText
+        installing -> "Téléchargement en cours…"
+        updateAvailable -> "Version ${availableUpdate?.versionName} disponible"
+        checking -> "Vérification discrète des mises à jour…"
+        updateChecked -> "Aucune mise à jour en attente"
+        else -> "Recherche de mise à jour disponible"
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -263,7 +281,11 @@ private fun SettingsUpdateCard(
                 Brush.horizontalGradient(listOf(Color(0xFF17143D), Color(0xFF07172F))),
                 RoundedCornerShape(22.dp)
             )
-            .border(1.2.dp, Color(0xFF416EC2), RoundedCornerShape(22.dp))
+            .border(
+                if (updateAvailable) 1.6.dp else 1.2.dp,
+                if (updateAvailable) SettingsV3Green.copy(alpha = .85f) else Color(0xFF416EC2),
+                RoundedCornerShape(22.dp)
+            )
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -290,7 +312,19 @@ private fun SettingsUpdateCard(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
                     .clickable(onClick = onVersionClick)
-                    .padding(vertical = 5.dp)
+                    .padding(top = 5.dp, bottom = 2.dp)
+            )
+            Text(
+                inlineStatus,
+                color = when {
+                    statusText != null -> SettingsV3Orange
+                    updateAvailable -> SettingsV3Green
+                    updateChecked -> SettingsV3Muted
+                    else -> SettingsV3Muted
+                },
+                fontSize = 9.5.sp,
+                lineHeight = 12.sp,
+                fontWeight = if (updateAvailable) FontWeight.Bold else FontWeight.Normal
             )
         }
 
@@ -298,17 +332,27 @@ private fun SettingsUpdateCard(
 
         Box(
             modifier = Modifier
-                .width(112.dp)
-                .background(SettingsV3Blue.copy(alpha = .10f), RoundedCornerShape(13.dp))
-                .border(1.dp, SettingsV3Blue.copy(alpha = .72f), RoundedCornerShape(13.dp))
-                .clickable(enabled = !checking, onClick = onCheckUpdate)
+                .width(118.dp)
+                .background(accent.copy(alpha = if (updateAvailable) .18f else .10f), RoundedCornerShape(13.dp))
+                .border(1.dp, accent.copy(alpha = .78f), RoundedCornerShape(13.dp))
+                .clickable(enabled = !checking && !installing, onClick = onUpdateClick)
                 .padding(horizontal = 8.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                if (checking) "VÉRIFICATION…" else "RECHERCHER\nUNE MISE À JOUR",
-                color = if (checking) SettingsV3Muted else SettingsV3Cyan,
-                fontSize = if (checking) 8.5.sp else 8.sp,
+                when {
+                    installing -> "TÉLÉCHARGEMENT…"
+                    checking -> "VÉRIFICATION…"
+                    updateAvailable -> "● MISE À JOUR\nDISPONIBLE"
+                    updateChecked -> "À JOUR\nRECHERCHER"
+                    else -> "RECHERCHER\nUNE MISE À JOUR"
+                },
+                color = when {
+                    installing || checking -> SettingsV3Muted
+                    updateAvailable -> SettingsV3Green
+                    else -> SettingsV3Cyan
+                },
+                fontSize = if (updateAvailable) 8.3.sp else 8.sp,
                 lineHeight = 10.sp,
                 fontWeight = FontWeight.Black,
                 textAlign = TextAlign.Center
