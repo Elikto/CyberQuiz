@@ -52,7 +52,11 @@ jobs:
         shell: bash
         run: |
           set -eu
-          SDKMANAGER="$(command -v sdkmanager)"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "::error::sdkmanager is unavailable on the runner."
+            exit 1
+          fi
           set +o pipefail
           yes | "$SDKMANAGER" --licenses >/dev/null
 
