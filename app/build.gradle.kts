@@ -6,6 +6,7 @@ plugins {
 
 val cyberVersionCode = providers.gradleProperty("cyberVersionCode").orElse("1").get().toInt()
 val cyberVersionName = providers.gradleProperty("cyberVersionName").orElse("1.0").get()
+val roomSchemaLocation = providers.gradleProperty("roomSchemaLocation").orElse("$projectDir/schemas").get()
 val updateKeystorePath = System.getenv("CYBERQUIZ_KEYSTORE_PATH")
 val updateKeystorePassword = System.getenv("CYBERQUIZ_KEYSTORE_PASSWORD")
 val updateKeyAlias = System.getenv("CYBERQUIZ_KEY_ALIAS")
@@ -73,7 +74,7 @@ android {
 }
 
 ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.schemaLocation", roomSchemaLocation)
 }
 
 dependencies {
