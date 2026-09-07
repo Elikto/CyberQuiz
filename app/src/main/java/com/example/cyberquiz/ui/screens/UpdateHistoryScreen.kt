@@ -51,6 +51,23 @@ private data class UpdateHistoryEntry(
 
 private val previousUpdates = listOf(
     UpdateHistoryEntry(
+        version = "1.0.33",
+        date = "7 septembre 2026",
+        changes = listOf(
+            "Suppression complète du pop-up de mise à jour au lancement de l'application.",
+            "Les nouvelles versions sont désormais signalées uniquement par une petite pastille sur l'icône Paramètres.",
+            "La vérification des mises à jour reste silencieuse et aucune installation ne démarre automatiquement."
+        )
+    ),
+    UpdateHistoryEntry(
+        version = "1.0.32",
+        date = "7 septembre 2026",
+        changes = listOf(
+            "La carte Nous contacter des Paramètres affiche maintenant l'adresse elikto@proton.me.",
+            "Un appui sur cette carte ouvre directement l'application de messagerie pour écrire à CyberQuiz."
+        )
+    ),
+    UpdateHistoryEntry(
         version = "1.0.31",
         date = "7 septembre 2026",
         changes = listOf(
@@ -119,8 +136,8 @@ private val previousUpdates = listOf(
 @Composable
 fun UpdateHistoryScreen(onBack: () -> Unit) {
     val currentChanges = listOf(
-        "La carte Nous contacter des Paramètres affiche maintenant l'adresse elikto@proton.me.",
-        "Un appui sur cette carte ouvre directement l'application de messagerie pour écrire à CyberQuiz."
+        "La carte Soutenir CyberQuiz ouvre désormais directement la page PayPal.Me officielle du projet.",
+        "Le lien paypal.me/EliktoCyber est visible dans les Paramètres pour permettre un soutien volontaire."
     )
 
     Column(
@@ -149,7 +166,7 @@ fun UpdateHistoryScreen(onBack: () -> Unit) {
 
         CurrentVersionCard(
             version = BuildConfig.VERSION_NAME,
-            date = "7 septembre 2026",
+            date = "8 septembre 2026",
             changes = currentChanges
         )
 
