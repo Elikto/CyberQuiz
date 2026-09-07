@@ -27,7 +27,7 @@ import com.example.cyberquiz.ui.screens.QuizSetupScreen
 import com.example.cyberquiz.ui.screens.QuizType
 import com.example.cyberquiz.ui.screens.QuizUnavailableScreen
 import com.example.cyberquiz.ui.screens.ReviewScreen
-import com.example.cyberquiz.ui.screens.SettingsScreenV2
+import com.example.cyberquiz.ui.screens.SettingsScreenV3
 import com.example.cyberquiz.ui.screens.StatisticsScreenV2
 import com.example.cyberquiz.ui.screens.StatisticsScreenV3
 import com.example.cyberquiz.ui.screens.UniverseHomeScreen
@@ -295,7 +295,7 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                 onBack = { goBack() }
             )
 
-            AppScreen.SETTINGS -> SettingsScreenV2(
+            AppScreen.SETTINGS -> SettingsScreenV3(
                 onBack = { goBack() }
             )
 
