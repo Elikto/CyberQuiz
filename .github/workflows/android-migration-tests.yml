@@ -48,6 +48,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
 
+      - name: Accept Android SDK licenses
+        shell: bash
+        run: |
+          set -eu
+          SDKMANAGER="$(command -v sdkmanager)"
+          set +o pipefail
+          yes | "$SDKMANAGER" --licenses >/dev/null
+
       - name: Run Room migration tests on Android API 30
         shell: bash
         run: |
