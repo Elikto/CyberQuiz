@@ -1,0 +1,75 @@
+name: Room schema validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "app/src/main/java/com/example/cyberquiz/data/database/**"
+      - "app/build.gradle.kts"
+      - "gradle/libs.versions.toml"
+      - ".github/workflows/room-schema.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "app/src/main/java/com/example/cyberquiz/data/database/**"
+      - "app/build.gradle.kts"
+      - "gradle/libs.versions.toml"
+      - ".github/workflows/room-schema.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: room-schema-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Java
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+
+      - name: Generate Room schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          SCHEMA_DIR="$RUNNER_TEMP/room-schemas"
+          ./gradlew kspDebugKotlin \
+            -ProomSchemaLocation="$SCHEMA_DIR" \
+            --stacktrace
+
+          GENERATED="$SCHEMA_DIR/com.example.cyberquiz.data.database.CyberQuizDatabase/5.json"
+          test -f "$GENERATED"
+          echo "Generated Room schema: $GENERATED"
+          cat "$GENERATED"
+
+          COMMITTED="app/schemas/com.example.cyberquiz.data.database.CyberQuizDatabase/5.json"
+          if [ -f "$COMMITTED" ]; then
+            diff -u "$COMMITTED" "$GENERATED"
+          else
+            echo "::notice::Current Room schema 5.json is not committed yet; generated snapshot is attached as an artifact."
+          fi
+
+      - name: Upload generated Room schema
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: CyberQuiz-Room-schema
+          path: ${{ runner.temp }}/room-schemas/com.example.cyberquiz.data.database.CyberQuizDatabase/5.json
+          if-no-files-found: error
+          retention-days: 7
