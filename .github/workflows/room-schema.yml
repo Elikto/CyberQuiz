@@ -75,7 +75,33 @@ jobs:
           fi
 
           echo "Validating Room schema version $VERSION"
-          diff -u "$COMMITTED" "$GENERATED"
+          python - "$COMMITTED" "$GENERATED" <<'PY'
+          import json
+          import sys
+
+          committed_path, generated_path = sys.argv[1:3]
+          with open(committed_path, encoding="utf-8") as f:
+              committed = json.load(f)
+          with open(generated_path, encoding="utf-8") as f:
+              generated = json.load(f)
+
+          if committed != generated:
+              print("::error::Committed Room schema differs from the compiler-generated schema.")
+              committed_text = json.dumps(committed, indent=2, ensure_ascii=False, sort_keys=True)
+              generated_text = json.dumps(generated, indent=2, ensure_ascii=False, sort_keys=True)
+              import difflib
+              for line in difflib.unified_diff(
+                  committed_text.splitlines(),
+                  generated_text.splitlines(),
+                  fromfile="committed",
+                  tofile="generated",
+                  lineterm="",
+              ):
+                  print(line)
+              sys.exit(1)
+
+          print("Room schema matches the committed snapshot.")
+          PY
 
       - name: Upload generated Room schema
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
