@@ -14,3 +14,19 @@
 .cxx
 local.properties
 /.idea/
+
+# Local secrets and credentials
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+secrets.properties
+keystore.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
