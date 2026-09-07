@@ -51,6 +51,25 @@ private data class UpdateHistoryEntry(
 
 private val previousUpdates = listOf(
     UpdateHistoryEntry(
+        version = "1.0.31",
+        date = "7 septembre 2026",
+        changes = listOf(
+            "CyberQuiz utilise désormais le package Android com.elikto.cyberquiz, enregistré dans Android Developer Console.",
+            "La nouvelle identité Android correspond à une installation propre et repart donc à zéro.",
+            "La chaîne de publication vérifie désormais le nom de package de l'APK avant sa publication."
+        )
+    ),
+    UpdateHistoryEntry(
+        version = "1.0.30",
+        date = "7 septembre 2026",
+        changes = listOf(
+            "La consultation des mises à jour ouvre désormais une page complète au lieu d'une petite fenêtre.",
+            "Tous les changements sont présentés en français, avec la date de chaque mise à jour.",
+            "Les anciennes versions sont regroupées sous la dernière version et restent repliées par défaut.",
+            "Le contrôle de mise à jour dans Paramètres est devenu un simple bouton circulaire et discret."
+        )
+    ),
+    UpdateHistoryEntry(
         version = "1.0.29",
         date = "7 septembre 2026",
         changes = listOf(
@@ -100,10 +119,8 @@ private val previousUpdates = listOf(
 @Composable
 fun UpdateHistoryScreen(onBack: () -> Unit) {
     val currentChanges = listOf(
-        "La consultation des mises à jour ouvre désormais une page complète au lieu d'une petite fenêtre.",
-        "Tous les changements sont présentés en français, avec la date de chaque mise à jour.",
-        "Les anciennes versions sont regroupées sous la dernière version et restent repliées par défaut.",
-        "Le contrôle de mise à jour dans Paramètres est maintenant un simple bouton circulaire et discret."
+        "La carte Nous contacter des Paramètres affiche maintenant l'adresse elikto@proton.me.",
+        "Un appui sur cette carte ouvre directement l'application de messagerie pour écrire à CyberQuiz."
     )
 
     Column(
