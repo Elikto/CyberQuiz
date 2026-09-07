@@ -137,7 +137,9 @@ fun SettingsScreenV4(
 
         SettingsV4SectionLabel("AIDE & SOUTIEN")
         SettingsV4Item("?", "FAQ", "Questions fréquentes et aide", "BIENTÔT", SettingsV4Cyan)
-        SettingsV4Item("✉", "Nous contacter", "Signaler un problème ou proposer une idée", "BIENTÔT", SettingsV4Purple)
+        SettingsV4Item("✉", "Nous contacter", "elikto@proton.me", "›", SettingsV4Purple) {
+            uriHandler.openUri("mailto:elikto@proton.me?subject=CyberQuiz%20-%20Contact")
+        }
         SettingsV4Item("♥", "Soutenir CyberQuiz", "Un lien de don sera ajouté plus tard", "BIENTÔT", Color(0xFFFF678A))
 
         Column(
