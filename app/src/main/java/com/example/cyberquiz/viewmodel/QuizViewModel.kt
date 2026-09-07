@@ -860,7 +860,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         val ids = loadSessionIds().toMutableList()
         ids.remove(id)
         ids.add(0, id)
-        while (ids.size > MAX_ACTIVE_SESSIONS) ids.removeLast()
+        while (ids.size > MAX_ACTIVE_SESSIONS) ids.removeAt(ids.lastIndex)
 
         sessionPrefs.edit()
             .putString(KEY_ACTIVE_SESSION_IDS, ids.joinToString(","))
