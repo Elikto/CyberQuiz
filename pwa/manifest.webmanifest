@@ -1,0 +1,20 @@
+{
+  "name": "CyberQuiz",
+  "short_name": "CyberQuiz",
+  "description": "Quiz de cybersécurité installable sur iPhone et Android.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#020611",
+  "theme_color": "#020611",
+  "icons": [
+    {
+      "src": "./icon.jpg",
+      "sizes": "any",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
