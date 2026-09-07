@@ -258,8 +258,9 @@ internal object CyberQuizUpdateManager {
         }
 
         return signatures
-            .map { signature -> sha256(signature.toByteArray()) }
-            .toSet()
+            ?.map { signature -> sha256(signature.toByteArray()) }
+            ?.toSet()
+            .orEmpty()
     }
 
     @Suppress("DEPRECATION")
