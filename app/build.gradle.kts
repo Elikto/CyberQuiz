@@ -13,11 +13,13 @@ val updateKeyAlias = System.getenv("CYBERQUIZ_KEY_ALIAS")
 val updateKeyPassword = System.getenv("CYBERQUIZ_KEY_PASSWORD")
 
 android {
+    // Keep the Kotlin/Android namespace stable to avoid an unnecessary source-code move.
+    // The install identity registered in Android Developer Console is applicationId below.
     namespace = "com.example.cyberquiz"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.example.cyberquiz"
+        applicationId = "com.elikto.cyberquiz"
         minSdk = 26
         targetSdk = 37
         versionCode = cyberVersionCode
