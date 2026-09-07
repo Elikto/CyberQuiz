@@ -1,10 +1,11 @@
 import json
 import logging
 import os
+from secrets import compare_digest
 from typing import Literal
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
@@ -28,19 +29,46 @@ class Question(BaseModel):
     explanation: str
 
 
+def _generation_enabled() -> bool:
+    return os.getenv("CYBERQUIZ_ENABLE_GENERATION", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _require_generation_access(provided_key: str | None) -> None:
+    if not _generation_enabled():
+        raise HTTPException(404, "Not found")
+
+    expected_key = os.getenv("CYBERQUIZ_ADMIN_KEY", "")
+    if not expected_key:
+        logger.error("Question generation enabled without CYBERQUIZ_ADMIN_KEY")
+        raise HTTPException(503, "Service de génération indisponible")
+
+    if provided_key is None or not compare_digest(provided_key, expected_key):
+        raise HTTPException(403, "Accès refusé")
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 
 @app.post("/api/questions", response_model=list[Question])
-def generate(req: GenerateRequest):
+def generate(
+    req: GenerateRequest,
+    admin_key: str | None = Header(default=None, alias="X-CyberQuiz-Admin-Key"),
+):
+    _require_generation_access(admin_key)
+
     key = os.getenv("OPENAI_API_KEY")
     if not key:
         logger.error("Question generation requested without server API credentials")
         raise HTTPException(503, "Service de génération indisponible")
 
-    client = OpenAI(api_key=key)
+    client = OpenAI(api_key=key, timeout=30.0)
     prompt = f"""Génère {req.count} question(s) de quiz de cybersécurité en français.\nCatégorie: {req.category}\nDifficulté: {req.difficulty}\nChaque question doit avoir exactement 4 réponses et une seule correcte.\nRetourne uniquement un JSON valide sous la forme {{\"questions\":[{{\"category\":...,\"difficulty\":...,\"question\":...,\"answers\":[...4...],\"correctIndex\":0-3,\"explanation\":...}}]}}.\nLes questions doivent être techniquement exactes et pédagogiques."""
 
     try:
