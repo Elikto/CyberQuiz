@@ -22,7 +22,6 @@ android {
         versionCode = cyberVersionCode
         versionName = cyberVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "BACKEND_URL", "\"http://10.0.2.2:8000\"")
     }
 
     val updateSigningConfig = if (
@@ -48,8 +47,18 @@ android {
             }
         }
         release {
+            isDebuggable = false
+            isJniDebuggable = false
             isMinifyEnabled = false
+            if (updateSigningConfig != null) {
+                signingConfig = updateSigningConfig
+            }
         }
+    }
+
+    lint {
+        abortOnError = true
+        checkReleaseBuilds = true
     }
 
     compileOptions {

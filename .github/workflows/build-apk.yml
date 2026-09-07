@@ -35,51 +35,63 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Prepare version and update signing
+      - name: Prepare version and signing
         run: |
           VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))
           VERSION_NAME="1.0.${GITHUB_RUN_NUMBER}"
           echo "CYBERQUIZ_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "CYBERQUIZ_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
 
-          if [ -n "$CYBERQUIZ_DEBUG_KEYSTORE_BASE64" ]; then
-            echo "$CYBERQUIZ_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cyberquiz-debug.keystore"
-            echo "CYBERQUIZ_KEYSTORE_PATH=$RUNNER_TEMP/cyberquiz-debug.keystore" >> "$GITHUB_ENV"
-            echo "CYBERQUIZ_KEYSTORE_PASSWORD=android" >> "$GITHUB_ENV"
-            echo "CYBERQUIZ_KEY_ALIAS=androiddebugkey" >> "$GITHUB_ENV"
-            echo "CYBERQUIZ_KEY_PASSWORD=android" >> "$GITHUB_ENV"
-            echo "CYBERQUIZ_UPDATE_READY=true" >> "$GITHUB_ENV"
-          else
-            echo "CYBERQUIZ_UPDATE_READY=false" >> "$GITHUB_ENV"
-            echo "::warning::CYBERQUIZ_DEBUG_KEYSTORE_BASE64 is not configured. APK will be built, but in-app updates stay disabled."
+          if [ -z "$CYBERQUIZ_DEBUG_KEYSTORE_BASE64" ]; then
+            echo "::error::CYBERQUIZ_DEBUG_KEYSTORE_BASE64 is required for secure signed releases."
+            exit 1
           fi
 
-      - name: Build debug APK
+          echo "$CYBERQUIZ_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cyberquiz-update.keystore"
+          chmod 600 "$RUNNER_TEMP/cyberquiz-update.keystore"
+          echo "CYBERQUIZ_KEYSTORE_PATH=$RUNNER_TEMP/cyberquiz-update.keystore" >> "$GITHUB_ENV"
+          echo "CYBERQUIZ_KEYSTORE_PASSWORD=android" >> "$GITHUB_ENV"
+          echo "CYBERQUIZ_KEY_ALIAS=androiddebugkey" >> "$GITHUB_ENV"
+          echo "CYBERQUIZ_KEY_PASSWORD=android" >> "$GITHUB_ENV"
+
+      - name: Run Android security-quality checks
         run: |
-          ./gradlew assembleDebug \
+          ./gradlew lintRelease testDebugUnitTest \
             -PcyberVersionCode="$CYBERQUIZ_VERSION_CODE" \
             -PcyberVersionName="$CYBERQUIZ_VERSION_NAME" \
             --stacktrace
 
-      - name: Prepare downloadable APK and update metadata
+      - name: Build signed release APK
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk CyberQuiz.apk
+          ./gradlew assembleRelease \
+            -PcyberVersionCode="$CYBERQUIZ_VERSION_CODE" \
+            -PcyberVersionName="$CYBERQUIZ_VERSION_NAME" \
+            --stacktrace
+
+      - name: Prepare downloadable APK and signed metadata
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk CyberQuiz.apk
+          APK_SHA256="$(sha256sum CyberQuiz.apk | awk '{print $1}')"
+
           cat > update.json <<EOF
           {
+            "packageName": "com.example.cyberquiz",
             "versionCode": ${CYBERQUIZ_VERSION_CODE},
             "versionName": "${CYBERQUIZ_VERSION_NAME}",
             "apkUrl": "https://github.com/Elikto/CyberQuiz/releases/download/apk-latest/CyberQuiz.apk",
-            "updateReady": ${CYBERQUIZ_UPDATE_READY}
+            "sha256": "${APK_SHA256}",
+            "updateReady": true
           }
           EOF
 
-      - name: Upload APK as workflow artifact
+      - name: Upload APK and metadata as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: CyberQuiz-APK
           path: |
             CyberQuiz.apk
             update.json
+            app/build/reports/lint-results-release.html
           if-no-files-found: error
           retention-days: 30
 
@@ -90,7 +102,7 @@ jobs:
           git tag -f apk-latest "$GITHUB_SHA"
           git push origin refs/tags/apk-latest --force
 
-          NOTES="APK Android généré automatiquement depuis la branche main. Version ${CYBERQUIZ_VERSION_NAME}. Mise à jour intégrée prête : ${CYBERQUIZ_UPDATE_READY}."
+          NOTES="APK Android Release signé généré automatiquement depuis main. Version ${CYBERQUIZ_VERSION_NAME}. Lint Android et tests unitaires validés. Mise à jour vérifiée par SHA-256 et signature Android."
 
           if gh release view apk-latest >/dev/null 2>&1; then
             gh release edit apk-latest \
