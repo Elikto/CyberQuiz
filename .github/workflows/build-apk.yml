@@ -82,11 +82,20 @@ jobs:
             exit 1
           fi
 
-      - name: Run Android security-quality checks
+      - name: Run Android release lint
         run: |
-          ./gradlew lintRelease testDebugUnitTest \
+          ./gradlew lintRelease \
             -PcyberVersionCode="$CYBERQUIZ_VERSION_CODE" \
             -PcyberVersionName="$CYBERQUIZ_VERSION_NAME" \
+            -ProomSchemaLocation="$RUNNER_TEMP/room-schemas-release" \
+            --stacktrace
+
+      - name: Run Android unit tests
+        run: |
+          ./gradlew testDebugUnitTest \
+            -PcyberVersionCode="$CYBERQUIZ_VERSION_CODE" \
+            -PcyberVersionName="$CYBERQUIZ_VERSION_NAME" \
+            -ProomSchemaLocation="$RUNNER_TEMP/room-schemas-debug" \
             --stacktrace
 
       - name: Build signed release APK
@@ -94,6 +103,7 @@ jobs:
           ./gradlew assembleRelease \
             -PcyberVersionCode="$CYBERQUIZ_VERSION_CODE" \
             -PcyberVersionName="$CYBERQUIZ_VERSION_NAME" \
+            -ProomSchemaLocation="$RUNNER_TEMP/room-schemas-assemble" \
             --stacktrace
 
       - name: Verify APK signature
