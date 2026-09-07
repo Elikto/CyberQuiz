@@ -48,6 +48,20 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
 
+      - name: Inspect androidTest serialization runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew :app:dependencyInsight \
+            --configuration debugAndroidTestRuntimeClasspath \
+            --dependency kotlinx-serialization-core \
+            --stacktrace
+          ./gradlew :app:dependencyInsight \
+            --configuration debugAndroidTestRuntimeClasspath \
+            --dependency kotlinx-serialization-json \
+            --stacktrace
+
       - name: Enable KVM acceleration
         shell: bash
         run: |
