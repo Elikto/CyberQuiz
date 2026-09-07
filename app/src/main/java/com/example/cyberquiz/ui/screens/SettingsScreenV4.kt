@@ -140,7 +140,9 @@ fun SettingsScreenV4(
         SettingsV4Item("✉", "Nous contacter", "elikto@proton.me", "›", SettingsV4Purple) {
             uriHandler.openUri("mailto:elikto@proton.me?subject=CyberQuiz%20-%20Contact")
         }
-        SettingsV4Item("♥", "Soutenir CyberQuiz", "Un lien de don sera ajouté plus tard", "BIENTÔT", Color(0xFFFF678A))
+        SettingsV4Item("♥", "Soutenir CyberQuiz", "paypal.me/EliktoCyber", "›", Color(0xFFFF678A)) {
+            uriHandler.openUri("https://paypal.me/EliktoCyber")
+        }
 
         Column(
             modifier = Modifier
