@@ -116,6 +116,8 @@ jobs:
         run: |
           set -euo pipefail
 
+          EXPECTED_SIGNER_SHA256="2de78206305bac6f95b631b0cf5f8eebc2bcba583fdf93544ead1cefa9d031a2"
+
           if [ -z "$CYBERQUIZ_EXISTING_KEYSTORE_BASE64" ]; then
             echo "::error::The existing CyberQuiz signing key is required to preserve Android update compatibility."
             exit 1
@@ -149,8 +151,16 @@ jobs:
             CyberQuiz-aligned.apk
           rm -f CyberQuiz-aligned.apk
 
-          "$APKSIGNER" verify --verbose --print-certs CyberQuiz.apk
-          echo "signing_mode=existing-key-isolated" >> "$GITHUB_OUTPUT"
+          SIGNER_REPORT="$("$APKSIGNER" verify --verbose --print-certs CyberQuiz.apk)"
+          printf '%s\n' "$SIGNER_REPORT"
+          ACTUAL_SIGNER_SHA256="$(printf '%s\n' "$SIGNER_REPORT" | awk -F': ' '/certificate SHA-256 digest:/ {print tolower($2); exit}')"
+          if [ "$ACTUAL_SIGNER_SHA256" != "$EXPECTED_SIGNER_SHA256" ]; then
+            echo "::error::Android signer identity mismatch. Expected $EXPECTED_SIGNER_SHA256 but got ${ACTUAL_SIGNER_SHA256:-unknown}."
+            rm -f CyberQuiz.apk
+            exit 1
+          fi
+
+          echo "signing_mode=existing-key-isolated-and-pinned" >> "$GITHUB_OUTPUT"
 
       - name: Prepare signed update metadata
         env:
@@ -210,7 +220,7 @@ jobs:
           git tag -f apk-latest "$GITHUB_SHA"
           git push origin refs/tags/apk-latest --force
 
-          NOTES="APK Android Release généré automatiquement depuis main. Version ${VERSION_NAME}. Lint Android et tests unitaires validés avant signature. La clé privée de distribution est isolée du build Gradle, puis l'APK est aligné, signé et vérifié avec apksigner. Identité de signature conservée pour compatibilité des mises à jour: ${SIGNING_MODE}."
+          NOTES="APK Android Release généré automatiquement depuis main. Version ${VERSION_NAME}. Lint Android et tests unitaires validés avant signature. La clé privée de distribution est isolée du build Gradle, puis l'APK est aligné, signé et vérifié avec apksigner. L'empreinte SHA-256 du certificat Android attendu est épinglée. Identité de signature: ${SIGNING_MODE}."
 
           if gh release view apk-latest >/dev/null 2>&1; then
             gh release edit apk-latest \
