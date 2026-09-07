@@ -1,0 +1,70 @@
+name: Android Room migration tests
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "app/src/main/java/com/example/cyberquiz/data/database/**"
+      - "app/src/androidTest/**"
+      - "app/schemas/**"
+      - "app/build.gradle.kts"
+      - "gradle/libs.versions.toml"
+      - ".github/workflows/android-migration-tests.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "app/src/main/java/com/example/cyberquiz/data/database/**"
+      - "app/src/androidTest/**"
+      - "app/schemas/**"
+      - "app/build.gradle.kts"
+      - "gradle/libs.versions.toml"
+      - ".github/workflows/android-migration-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-migration-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  room-migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Java
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+
+      - name: Run Room migration tests on Android API 30
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew pixel2api30DebugAndroidTest \
+            -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
+            -ProomSchemaLocation="$RUNNER_TEMP/room-schemas-migration-test" \
+            --stacktrace
+
+      - name: Upload migration test reports
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: CyberQuiz-Room-migration-test-report
+          path: |
+            app/build/reports/androidTests/**
+            app/build/outputs/androidTest-results/**
+          if-no-files-found: warn
+          retention-days: 14
