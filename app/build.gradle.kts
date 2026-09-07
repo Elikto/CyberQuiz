@@ -43,9 +43,8 @@ android {
 
     buildTypes {
         debug {
-            if (updateSigningConfig != null) {
-                signingConfig = updateSigningConfig
-            }
+            // Keep debug builds on the standard Android debug identity.
+            // The distribution/update signing key is reserved for release artifacts only.
         }
         release {
             isDebuggable = false
