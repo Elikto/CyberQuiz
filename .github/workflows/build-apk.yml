@@ -171,7 +171,7 @@ jobs:
           APK_SHA256="$(sha256sum CyberQuiz.apk | awk '{print $1}')"
           cat > update.json <<EOF
           {
-            "packageName": "com.example.cyberquiz",
+            "packageName": "com.elikto.cyberquiz",
             "versionCode": ${VERSION_CODE},
             "versionName": "${VERSION_NAME}",
             "apkUrl": "https://github.com/Elikto/CyberQuiz/releases/download/apk-latest/CyberQuiz.apk",
@@ -217,7 +217,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          NOTES="APK Android Release généré automatiquement depuis main. Version ${VERSION_NAME}. Commit source ${SOURCE_SHA}. Lint Android et tests unitaires validés avant signature. La clé privée de distribution est isolée du build Gradle, puis l'APK est aligné, signé et vérifié avec apksigner. L'empreinte SHA-256 du certificat Android attendu est épinglée. Identité de signature: ${SIGNING_MODE}."
+          NOTES="APK Android Release généré automatiquement depuis main. Version ${VERSION_NAME}. Package com.elikto.cyberquiz. Commit source ${SOURCE_SHA}. Lint Android et tests unitaires validés avant signature. La clé privée de distribution est isolée du build Gradle, puis l'APK est aligné, signé et vérifié avec apksigner. L'empreinte SHA-256 du certificat Android attendu est épinglée. Identité de signature: ${SIGNING_MODE}."
 
           if ! gh release view apk-latest >/dev/null 2>&1; then
             echo "::error::The stable apk-latest GitHub Release is missing. Create it once before automated asset updates."
