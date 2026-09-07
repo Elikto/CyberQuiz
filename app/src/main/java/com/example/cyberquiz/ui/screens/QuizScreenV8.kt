@@ -278,31 +278,56 @@ private fun QuizStatsRowV8(number: Int, total: Int?, xp: Int, streak: Int, diffi
         "QUESTION ${number.toString().padStart(2, '0')}"
     }
 
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier
-                .background(
-                    Brush.horizontalGradient(listOf(Color(0xFF4C167D), Color(0xFF172659))),
-                    RoundedCornerShape(50.dp)
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .background(
+                        Brush.horizontalGradient(listOf(Color(0xFF4C167D), Color(0xFF172659))),
+                        RoundedCornerShape(50.dp)
+                    )
+                    .padding(horizontal = 11.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    questionLabel,
+                    color = Q8Text,
+                    fontSize = if (total != null && total > 0) 9.sp else 10.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = if (total != null && total > 0) .7.sp else 1.1.sp,
+                    maxLines = 1
                 )
-                .padding(horizontal = 11.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                questionLabel,
-                color = Q8Text,
-                fontSize = if (total != null && total > 0) 9.sp else 10.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = if (total != null && total > 0) .7.sp else 1.1.sp,
-                maxLines = 1
-            )
+            }
+            Spacer(Modifier.weight(1f))
+            CompactMetricV8("$xp XP", Q8Cyan)
+            Spacer(Modifier.width(5.dp))
+            CompactMetricV8("🔥 $streak", Q8Orange)
+            Spacer(Modifier.width(5.dp))
+            DifficultyChipV8(difficulty)
         }
-        Spacer(Modifier.weight(1f))
-        CompactMetricV8("$xp XP", Q8Cyan)
-        Spacer(Modifier.width(5.dp))
-        CompactMetricV8("🔥 $streak", Q8Orange)
-        Spacer(Modifier.width(5.dp))
-        DifficultyChipV8(difficulty)
+
+        if (total != null && total > 0) {
+            val progressFraction = (number.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(7.dp)
+                    .background(Color(0xFF11203D), RoundedCornerShape(50.dp))
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(progressFraction)
+                        .fillMaxHeight()
+                        .background(
+                            Brush.horizontalGradient(listOf(Q8Purple, Q8Blue, Q8Cyan)),
+                            RoundedCornerShape(50.dp)
+                        )
+                )
+            }
+        }
     }
 }
 
