@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Generate PWA question bank from Android Cyber questions
         run: python3 pwa/build_questions.py pwa/questions.json
