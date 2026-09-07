@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  analyze:
+  analyze-android:
     name: Analyze Java/Kotlin
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -51,6 +51,24 @@ jobs:
 
       - name: Build for CodeQL
         run: ./gradlew assembleDebug -ProomSchemaLocation="$RUNNER_TEMP/room-schemas-codeql" --stacktrace
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
+
+  analyze-web-backend:
+    name: Analyze Python/JavaScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
+        with:
+          languages: python,javascript-typescript
+          queries: security-extended
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
