@@ -201,11 +201,6 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout repository for release tag
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-
       - name: Download validated APK artifact
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
@@ -215,25 +210,24 @@ jobs:
       - name: Publish latest APK in GitHub Releases
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: Elikto/CyberQuiz
           VERSION_NAME: ${{ needs.build-apk.outputs.version_name }}
           SIGNING_MODE: ${{ needs.sign-apk.outputs.signing_mode }}
+          SOURCE_SHA: ${{ github.sha }}
         run: |
-          git tag -f apk-latest "$GITHUB_SHA"
-          git push origin refs/tags/apk-latest --force
+          set -euo pipefail
 
-          NOTES="APK Android Release généré automatiquement depuis main. Version ${VERSION_NAME}. Lint Android et tests unitaires validés avant signature. La clé privée de distribution est isolée du build Gradle, puis l'APK est aligné, signé et vérifié avec apksigner. L'empreinte SHA-256 du certificat Android attendu est épinglée. Identité de signature: ${SIGNING_MODE}."
+          NOTES="APK Android Release généré automatiquement depuis main. Version ${VERSION_NAME}. Commit source ${SOURCE_SHA}. Lint Android et tests unitaires validés avant signature. La clé privée de distribution est isolée du build Gradle, puis l'APK est aligné, signé et vérifié avec apksigner. L'empreinte SHA-256 du certificat Android attendu est épinglée. Identité de signature: ${SIGNING_MODE}."
 
-          if gh release view apk-latest >/dev/null 2>&1; then
-            gh release edit apk-latest \
-              --title "CyberQuiz APK - dernière version" \
-              --notes "$NOTES" \
-              --latest
-          else
-            gh release create apk-latest \
-              --title "CyberQuiz APK - dernière version" \
-              --notes "$NOTES" \
-              --latest
+          if ! gh release view apk-latest >/dev/null 2>&1; then
+            echo "::error::The stable apk-latest GitHub Release is missing. Create it once before automated asset updates."
+            exit 1
           fi
+
+          gh release edit apk-latest \
+            --title "CyberQuiz APK - dernière version" \
+            --notes "$NOTES" \
+            --latest
 
           gh release upload apk-latest \
             release-artifact/CyberQuiz.apk \
