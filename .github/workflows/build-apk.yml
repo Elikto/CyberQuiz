@@ -117,6 +117,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          EXPECTED_PACKAGE="com.elikto.cyberquiz"
           EXPECTED_SIGNER_SHA256="2de78206305bac6f95b631b0cf5f8eebc2bcba583fdf93544ead1cefa9d031a2"
 
           if [ -z "$CYBERQUIZ_EXISTING_KEYSTORE_BASE64" ]; then
@@ -132,8 +133,9 @@ jobs:
 
           ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -type f -name zipalign | sort -V | tail -n 1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
-          if [ -z "$ZIPALIGN" ] || [ -z "$APKSIGNER" ]; then
-            echo "::error::Android signing tools are unavailable on the runner."
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          if [ -z "$ZIPALIGN" ] || [ -z "$APKSIGNER" ] || [ -z "$AAPT" ]; then
+            echo "::error::Android packaging/signing tools are unavailable on the runner."
             exit 1
           fi
 
@@ -151,6 +153,13 @@ jobs:
             --out CyberQuiz.apk \
             CyberQuiz-aligned.apk
           rm -f CyberQuiz-aligned.apk
+
+          PACKAGE_NAME="$("$AAPT" dump badging CyberQuiz.apk | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n 1)"
+          if [ "$PACKAGE_NAME" != "$EXPECTED_PACKAGE" ]; then
+            echo "::error::Android package mismatch. Expected $EXPECTED_PACKAGE but got ${PACKAGE_NAME:-unknown}."
+            rm -f CyberQuiz.apk
+            exit 1
+          fi
 
           SIGNER_REPORT="$("$APKSIGNER" verify --verbose --print-certs CyberQuiz.apk)"
           printf '%s\n' "$SIGNER_REPORT"
@@ -171,7 +180,7 @@ jobs:
           APK_SHA256="$(sha256sum CyberQuiz.apk | awk '{print $1}')"
           cat > update.json <<EOF
           {
-            "packageName": "com.example.cyberquiz",
+            "packageName": "com.elikto.cyberquiz",
             "versionCode": ${VERSION_CODE},
             "versionName": "${VERSION_NAME}",
             "apkUrl": "https://github.com/Elikto/CyberQuiz/releases/download/apk-latest/CyberQuiz.apk",
@@ -217,7 +226,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          NOTES="APK Android Release généré automatiquement depuis main. Version ${VERSION_NAME}. Commit source ${SOURCE_SHA}. Lint Android et tests unitaires validés avant signature. La clé privée de distribution est isolée du build Gradle, puis l'APK est aligné, signé et vérifié avec apksigner. L'empreinte SHA-256 du certificat Android attendu est épinglée. Identité de signature: ${SIGNING_MODE}."
+          NOTES="APK Android Release généré automatiquement depuis main. Version ${VERSION_NAME}. Package com.elikto.cyberquiz. Commit source ${SOURCE_SHA}. Lint Android et tests unitaires validés avant signature. La clé privée de distribution est isolée du build Gradle, puis l'APK est aligné, signé et vérifié avec apksigner. L'empreinte SHA-256 du certificat Android attendu est épinglée. Identité de signature: ${SIGNING_MODE}."
 
           if ! gh release view apk-latest >/dev/null 2>&1; then
             echo "::error::The stable apk-latest GitHub Release is missing. Create it once before automated asset updates."
