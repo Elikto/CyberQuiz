@@ -30,3 +30,6 @@ keystore.properties
 *.pfx
 *.pem
 *.key
+
+# Android Developer Console ownership proof (injected only in CI)
+app/src/main/assets/adi-registration.properties
