@@ -15,8 +15,7 @@ on:
       - ".github/workflows/build-apk.yml"
   workflow_dispatch:
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
   group: cyberquiz-apk-release
@@ -25,6 +24,11 @@ concurrency:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version_name: ${{ steps.release_meta.outputs.version_name }}
+      signing_mode: ${{ steps.release_meta.outputs.signing_mode }}
     env:
       CYBERQUIZ_RELEASE_KEYSTORE_BASE64: ${{ secrets.CYBERQUIZ_RELEASE_KEYSTORE_BASE64 }}
       CYBERQUIZ_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.CYBERQUIZ_RELEASE_KEYSTORE_PASSWORD }}
@@ -49,6 +53,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Prepare version and signing
+        id: release_meta
         shell: bash
         run: |
           set -euo pipefail
@@ -75,7 +80,7 @@ jobs:
             echo "CYBERQUIZ_KEYSTORE_PASSWORD=$CYBERQUIZ_RELEASE_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
             echo "CYBERQUIZ_KEY_ALIAS=$CYBERQUIZ_RELEASE_KEY_ALIAS" >> "$GITHUB_ENV"
             echo "CYBERQUIZ_KEY_PASSWORD=$CYBERQUIZ_RELEASE_KEY_PASSWORD" >> "$GITHUB_ENV"
-            echo "CYBERQUIZ_SIGNING_MODE=release" >> "$GITHUB_ENV"
+            SIGNING_MODE="release"
             echo "Using dedicated CyberQuiz release signing key."
           elif [ -n "$CYBERQUIZ_LEGACY_DEBUG_KEYSTORE_BASE64" ]; then
             echo "::warning::Legacy Android debug signing key is still in use. Configure the four CYBERQUIZ_RELEASE_* secrets to migrate to a dedicated release key."
@@ -85,11 +90,15 @@ jobs:
             echo "CYBERQUIZ_KEYSTORE_PASSWORD=android" >> "$GITHUB_ENV"
             echo "CYBERQUIZ_KEY_ALIAS=androiddebugkey" >> "$GITHUB_ENV"
             echo "CYBERQUIZ_KEY_PASSWORD=android" >> "$GITHUB_ENV"
-            echo "CYBERQUIZ_SIGNING_MODE=legacy-debug" >> "$GITHUB_ENV"
+            SIGNING_MODE="legacy-debug"
           else
             echo "::error::No Android signing key is configured. Prefer the four CYBERQUIZ_RELEASE_* secrets."
             exit 1
           fi
+
+          echo "CYBERQUIZ_SIGNING_MODE=$SIGNING_MODE" >> "$GITHUB_ENV"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "signing_mode=$SIGNING_MODE" >> "$GITHUB_OUTPUT"
 
       - name: Run Android release lint
         run: |
@@ -161,14 +170,35 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  publish-apk:
+    runs-on: ubuntu-latest
+    needs: build-apk
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Checkout repository for release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Download validated APK artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: CyberQuiz-APK
+          path: release-artifact
+
       - name: Publish latest APK in GitHub Releases
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION_NAME: ${{ needs.build-apk.outputs.version_name }}
+          SIGNING_MODE: ${{ needs.build-apk.outputs.signing_mode }}
         run: |
           git tag -f apk-latest "$GITHUB_SHA"
           git push origin refs/tags/apk-latest --force
 
-          NOTES="APK Android Release signé généré automatiquement depuis main. Version ${CYBERQUIZ_VERSION_NAME}. Lint Android, tests unitaires et vérification de signature APK validés. Mise à jour vérifiée par SHA-256 et signature Android. Mode de signature: ${CYBERQUIZ_SIGNING_MODE}."
+          NOTES="APK Android Release signé généré automatiquement depuis main. Version ${VERSION_NAME}. Lint Android, tests unitaires et vérification de signature APK validés. Mise à jour vérifiée par SHA-256 et signature Android. Mode de signature: ${SIGNING_MODE}."
 
           if gh release view apk-latest >/dev/null 2>&1; then
             gh release edit apk-latest \
@@ -182,4 +212,7 @@ jobs:
               --latest
           fi
 
-          gh release upload apk-latest CyberQuiz.apk update.json --clobber
+          gh release upload apk-latest \
+            release-artifact/CyberQuiz.apk \
+            release-artifact/update.json \
+            --clobber
