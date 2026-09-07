@@ -26,24 +26,24 @@ abstract class CyberQuizDatabase : RoomDatabase() {
         private var INSTANCE: CyberQuizDatabase? = null
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
                     "ALTER TABLE questions ADD COLUMN quizType TEXT NOT NULL DEFAULT 'CYBERSECURITY'"
                 )
             }
         }
 
         private val MIGRATION_2_3 = object : Migration(2, 3) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
                     "ALTER TABLE progress ADD COLUMN quizType TEXT NOT NULL DEFAULT 'CYBERSECURITY'"
                 )
             }
         }
 
         private val MIGRATION_3_4 = object : Migration(3, 4) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS review_items (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -61,15 +61,15 @@ abstract class CyberQuizDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
-                database.execSQL(
+                db.execSQL(
                     "CREATE UNIQUE INDEX IF NOT EXISTS index_review_items_quizType_concept ON review_items (quizType, concept)"
                 )
             }
         }
 
         private val MIGRATION_4_5 = object : Migration(4, 5) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS category_progress (
                         quizType TEXT NOT NULL,
@@ -81,7 +81,7 @@ abstract class CyberQuizDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
-                database.execSQL(
+                db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS concept_progress (
                         quizType TEXT NOT NULL,
@@ -99,13 +99,20 @@ abstract class CyberQuizDatabase : RoomDatabase() {
             }
         }
 
+        val ALL_MIGRATIONS: Array<Migration> = arrayOf(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5
+        )
+
         fun get(context: Context): CyberQuizDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context,
                 CyberQuizDatabase::class.java,
                 "cyberquiz.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(*ALL_MIGRATIONS)
                 .build()
                 .also { INSTANCE = it }
         }
