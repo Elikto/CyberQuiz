@@ -30,11 +30,7 @@ jobs:
       version_name: ${{ steps.release_meta.outputs.version_name }}
       signing_mode: ${{ steps.release_meta.outputs.signing_mode }}
     env:
-      CYBERQUIZ_RELEASE_KEYSTORE_BASE64: ${{ secrets.CYBERQUIZ_RELEASE_KEYSTORE_BASE64 }}
-      CYBERQUIZ_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.CYBERQUIZ_RELEASE_KEYSTORE_PASSWORD }}
-      CYBERQUIZ_RELEASE_KEY_ALIAS: ${{ secrets.CYBERQUIZ_RELEASE_KEY_ALIAS }}
-      CYBERQUIZ_RELEASE_KEY_PASSWORD: ${{ secrets.CYBERQUIZ_RELEASE_KEY_PASSWORD }}
-      CYBERQUIZ_LEGACY_DEBUG_KEYSTORE_BASE64: ${{ secrets.CYBERQUIZ_DEBUG_KEYSTORE_BASE64 }}
+      CYBERQUIZ_EXISTING_KEYSTORE_BASE64: ${{ secrets.CYBERQUIZ_DEBUG_KEYSTORE_BASE64 }}
 
     steps:
       - name: Checkout repository
@@ -63,42 +59,21 @@ jobs:
           echo "CYBERQUIZ_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "CYBERQUIZ_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
 
-          RELEASE_ANY="${CYBERQUIZ_RELEASE_KEYSTORE_BASE64}${CYBERQUIZ_RELEASE_KEYSTORE_PASSWORD}${CYBERQUIZ_RELEASE_KEY_ALIAS}${CYBERQUIZ_RELEASE_KEY_PASSWORD}"
-
-          if [ -n "$RELEASE_ANY" ]; then
-            if [ -z "$CYBERQUIZ_RELEASE_KEYSTORE_BASE64" ] || \
-               [ -z "$CYBERQUIZ_RELEASE_KEYSTORE_PASSWORD" ] || \
-               [ -z "$CYBERQUIZ_RELEASE_KEY_ALIAS" ] || \
-               [ -z "$CYBERQUIZ_RELEASE_KEY_PASSWORD" ]; then
-              echo "::error::Dedicated release signing is only partially configured. Configure all four CYBERQUIZ_RELEASE_* secrets."
-              exit 1
-            fi
-
-            echo "$CYBERQUIZ_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cyberquiz-release.keystore"
-            chmod 600 "$RUNNER_TEMP/cyberquiz-release.keystore"
-            echo "CYBERQUIZ_KEYSTORE_PATH=$RUNNER_TEMP/cyberquiz-release.keystore" >> "$GITHUB_ENV"
-            echo "CYBERQUIZ_KEYSTORE_PASSWORD=$CYBERQUIZ_RELEASE_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-            echo "CYBERQUIZ_KEY_ALIAS=$CYBERQUIZ_RELEASE_KEY_ALIAS" >> "$GITHUB_ENV"
-            echo "CYBERQUIZ_KEY_PASSWORD=$CYBERQUIZ_RELEASE_KEY_PASSWORD" >> "$GITHUB_ENV"
-            SIGNING_MODE="release"
-            echo "Using dedicated CyberQuiz release signing key."
-          elif [ -n "$CYBERQUIZ_LEGACY_DEBUG_KEYSTORE_BASE64" ]; then
-            echo "::warning::Legacy Android debug signing key is still in use. Configure the four CYBERQUIZ_RELEASE_* secrets to migrate to a dedicated release key."
-            echo "$CYBERQUIZ_LEGACY_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cyberquiz-legacy.keystore"
-            chmod 600 "$RUNNER_TEMP/cyberquiz-legacy.keystore"
-            echo "CYBERQUIZ_KEYSTORE_PATH=$RUNNER_TEMP/cyberquiz-legacy.keystore" >> "$GITHUB_ENV"
-            echo "CYBERQUIZ_KEYSTORE_PASSWORD=android" >> "$GITHUB_ENV"
-            echo "CYBERQUIZ_KEY_ALIAS=androiddebugkey" >> "$GITHUB_ENV"
-            echo "CYBERQUIZ_KEY_PASSWORD=android" >> "$GITHUB_ENV"
-            SIGNING_MODE="legacy-debug"
-          else
-            echo "::error::No Android signing key is configured. Prefer the four CYBERQUIZ_RELEASE_* secrets."
+          if [ -z "$CYBERQUIZ_EXISTING_KEYSTORE_BASE64" ]; then
+            echo "::error::The existing CyberQuiz signing key is required to preserve Android update compatibility."
             exit 1
           fi
 
-          echo "CYBERQUIZ_SIGNING_MODE=$SIGNING_MODE" >> "$GITHUB_ENV"
+          echo "::notice::Keeping the existing signing identity intentionally. Do not replace it with an unrelated key without an Android signing-key rotation plan."
+          echo "$CYBERQUIZ_EXISTING_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cyberquiz-existing.keystore"
+          chmod 600 "$RUNNER_TEMP/cyberquiz-existing.keystore"
+          echo "CYBERQUIZ_KEYSTORE_PATH=$RUNNER_TEMP/cyberquiz-existing.keystore" >> "$GITHUB_ENV"
+          echo "CYBERQUIZ_KEYSTORE_PASSWORD=android" >> "$GITHUB_ENV"
+          echo "CYBERQUIZ_KEY_ALIAS=androiddebugkey" >> "$GITHUB_ENV"
+          echo "CYBERQUIZ_KEY_PASSWORD=android" >> "$GITHUB_ENV"
+          echo "CYBERQUIZ_SIGNING_MODE=existing-key" >> "$GITHUB_ENV"
           echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
-          echo "signing_mode=$SIGNING_MODE" >> "$GITHUB_OUTPUT"
+          echo "signing_mode=existing-key" >> "$GITHUB_OUTPUT"
 
       - name: Run Android release lint
         run: |
@@ -135,13 +110,6 @@ jobs:
             exit 1
           fi
           "$APKSIGNER" verify --verbose --print-certs "$APK"
-
-          if [ "$CYBERQUIZ_SIGNING_MODE" = "release" ]; then
-            if "$APKSIGNER" verify --print-certs "$APK" | grep -qi "Android Debug"; then
-              echo "::error::A dedicated release key was requested, but the APK appears to use an Android debug certificate."
-              exit 1
-            fi
-          fi
 
       - name: Prepare downloadable APK and signed metadata
         run: |
@@ -198,7 +166,7 @@ jobs:
           git tag -f apk-latest "$GITHUB_SHA"
           git push origin refs/tags/apk-latest --force
 
-          NOTES="APK Android Release signé généré automatiquement depuis main. Version ${VERSION_NAME}. Lint Android, tests unitaires et vérification de signature APK validés. Mise à jour vérifiée par SHA-256 et signature Android. Mode de signature: ${SIGNING_MODE}."
+          NOTES="APK Android Release signé généré automatiquement depuis main. Version ${VERSION_NAME}. Lint Android, tests unitaires et vérification de signature APK validés. Mise à jour vérifiée par SHA-256 et signature Android. Identité de signature conservée pour compatibilité des mises à jour: ${SIGNING_MODE}."
 
           if gh release view apk-latest >/dev/null 2>&1; then
             gh release edit apk-latest \
