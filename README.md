@@ -4,7 +4,7 @@
 
 # CyberQuiz
 
-### Apprends. Joue. Progresse.
+### Apprends Joue Progresse
 
 **Une application Android de quiz moderne pour apprendre la cybersécurité, la nutrition et bientôt bien plus encore.**
 
@@ -44,19 +44,6 @@ Réseaux, Linux, Windows, cryptographie, Web, malware, ingénierie sociale, OSIN
 
 > Idéal pour apprendre, réviser ou tester régulièrement ses connaissances en cyber.
 
-### 🥗 Nutrition
-
-Macronutriments, micronutriments, hydratation, équilibre alimentaire et digestion.
-
-> Un deuxième univers avec sa propre ambiance visuelle et sa progression dédiée.
-
-### 🔮 Prochainement
-
-**Tarot · Lithothérapie · Culture générale**
-
-CyberQuiz est conçu pour accueillir progressivement de nouveaux univers sans transformer l'application en catalogue compliqué.
-
----
 
 ## Une interface faite pour donner envie de revenir
 
@@ -122,8 +109,6 @@ Avant installation, l'application vérifie notamment :
 
 CyberQuiz fonctionne principalement avec des données locales : progression, historique, révisions et sessions sont conservés sur l'appareil.
 
-L'application Android n'a pas besoin du backend FastAPI pour lancer les quiz présents dans sa banque locale.
-
 Le trafic HTTP en clair est désactivé dans l'application Android.
 
 ---
@@ -140,29 +125,6 @@ CyberQuiz est construit avec :
 
 Les builds Android passent par des contrôles automatisés avant publication : lint, tests, construction de l'APK, signature et vérification de la signature.
 
-<details>
-<summary><strong>Développement local / backend</strong></summary>
-
-### Backend optionnel
-
-1. Installer Python 3.11+.
-2. Dans `backend/`, créer puis activer un environnement virtuel.
-3. Installer les dépendances avec `pip install -r requirements.txt`.
-4. Copier `.env.example` vers `.env`.
-5. Renseigner `OPENAI_API_KEY` uniquement côté serveur.
-6. Pour activer volontairement la génération administrative de questions, définir `CYBERQUIZ_ENABLE_GENERATION=true` et une longue valeur aléatoire dans `CYBERQUIZ_ADMIN_KEY`.
-7. Lancer `python main.py`.
-
-Le endpoint `POST /api/questions` est désactivé par défaut. Lorsqu'il est activé, il exige le header `X-CyberQuiz-Admin-Key`. Ce secret ne doit jamais être intégré à l'APK, à la PWA ou au dépôt Git.
-
-Le endpoint `/health` reste disponible pour les contrôles de disponibilité.
-
-### Scripts Windows
-
-- `setup_cyberquiz.ps1` prépare l'environnement de développement ;
-- `run_cyberquiz.ps1` permet de démarrer les composants locaux, construire l'APK et l'installer sur un appareil ADB autorisé.
-
-</details>
 
 ---
 
