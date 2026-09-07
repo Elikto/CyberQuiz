@@ -27,10 +27,11 @@ import com.example.cyberquiz.ui.screens.QuizSetupScreen
 import com.example.cyberquiz.ui.screens.QuizType
 import com.example.cyberquiz.ui.screens.QuizUnavailableScreen
 import com.example.cyberquiz.ui.screens.ReviewScreen
-import com.example.cyberquiz.ui.screens.SettingsScreenV3
+import com.example.cyberquiz.ui.screens.SettingsScreenV4
 import com.example.cyberquiz.ui.screens.StatisticsScreenV2
 import com.example.cyberquiz.ui.screens.StatisticsScreenV3
 import com.example.cyberquiz.ui.screens.UniverseHomeScreen
+import com.example.cyberquiz.ui.screens.UpdateHistoryScreen
 import com.example.cyberquiz.ui.screens.isPlayableNow
 import com.example.cyberquiz.ui.theme.CyberQuizTheme
 import com.example.cyberquiz.viewmodel.QuizViewModel
@@ -45,6 +46,7 @@ enum class AppScreen {
     HISTORY,
     PROFILE,
     SETTINGS,
+    UPDATE_HISTORY,
     UNAVAILABLE_QUIZ
 }
 
@@ -295,7 +297,12 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                 onBack = { goBack() }
             )
 
-            AppScreen.SETTINGS -> SettingsScreenV3(
+            AppScreen.SETTINGS -> SettingsScreenV4(
+                onBack = { goBack() },
+                onVersionClick = { navigateTo(AppScreen.UPDATE_HISTORY) }
+            )
+
+            AppScreen.UPDATE_HISTORY -> UpdateHistoryScreen(
                 onBack = { goBack() }
             )
 
