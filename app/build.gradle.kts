@@ -89,20 +89,6 @@ android {
     }
 }
 
-// Room 2.8.3's migration-test schema serializers were generated against
-// kotlinx.serialization 1.7.3. Keep this compatibility override scoped to
-// Android instrumented tests so the production application classpath is untouched.
-configurations.configureEach {
-    if (name.contains("AndroidTest", ignoreCase = true)) {
-        resolutionStrategy.force(
-            "org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3",
-            "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.7.3",
-            "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3",
-            "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.7.3"
-        )
-    }
-}
-
 ksp {
     arg("room.schemaLocation", roomSchemaLocation)
 }
