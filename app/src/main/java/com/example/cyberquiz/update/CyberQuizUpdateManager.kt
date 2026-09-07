@@ -33,6 +33,8 @@ internal object CyberQuizUpdateManager {
         "https://github.com/Elikto/CyberQuiz/releases/download/apk-latest/update.json"
     private const val APK_MIME = "application/vnd.android.package-archive"
     private const val MAX_METADATA_CHARS = 32_768
+    private const val MAX_VERSION_NAME_CHARS = 80
+    private const val MAX_APK_BYTES = 150L * 1024L * 1024L
     private val SHA256_PATTERN = Regex("^[a-f0-9]{64}$")
 
     suspend fun checkForUpdate(): CyberQuizUpdateInfo? = withContext(Dispatchers.IO) {
@@ -50,17 +52,16 @@ internal object CyberQuizUpdateManager {
             try {
                 if (connection.responseCode !in 200..299) return@runCatching null
 
-                val body = connection.inputStream.bufferedReader().use { reader ->
-                    val text = reader.readText()
-                    if (text.length > MAX_METADATA_CHARS) error("Métadonnées de mise à jour trop volumineuses.")
-                    text
-                }
+                val body = readBoundedMetadata(connection)
                 val json = JSONObject(body)
                 if (!json.optBoolean("updateReady", false)) return@runCatching null
                 if (json.optString("packageName") != BuildConfig.APPLICATION_ID) return@runCatching null
 
                 val remoteCode = json.optInt("versionCode", 0)
                 val remoteName = json.optString("versionName", "Nouvelle version")
+                    .trim()
+                    .take(MAX_VERSION_NAME_CHARS)
+                    .ifBlank { "Nouvelle version" }
                 val apkUrl = json.optString("apkUrl", "")
                 val expectedSha256 = json.optString("sha256", "")
                     .lowercase(Locale.US)
@@ -124,6 +125,15 @@ internal object CyberQuizUpdateManager {
                 manager.query(DownloadManager.Query().setFilterById(downloadId)).use { cursor ->
                     if (!cursor.moveToFirst()) return@use
 
+                    val totalSize = cursor.getLong(
+                        cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+                    )
+                    if (totalSize > MAX_APK_BYTES) {
+                        manager.remove(downloadId)
+                        targetFile.delete()
+                        error("La mise à jour annoncée est anormalement volumineuse.")
+                    }
+
                     val status = cursor.getInt(
                         cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)
                     )
@@ -161,9 +171,26 @@ internal object CyberQuizUpdateManager {
                 }
             }
 
+            manager.remove(downloadId)
+            targetFile.delete()
             error("Le téléchargement de la mise à jour a expiré.")
         }
     }
+
+    private fun readBoundedMetadata(connection: HttpsURLConnection): String =
+        connection.inputStream.bufferedReader().use { reader ->
+            val output = StringBuilder()
+            val buffer = CharArray(4_096)
+            while (true) {
+                val read = reader.read(buffer)
+                if (read < 0) break
+                if (output.length + read > MAX_METADATA_CHARS) {
+                    error("Métadonnées de mise à jour trop volumineuses.")
+                }
+                output.append(buffer, 0, read)
+            }
+            output.toString()
+        }
 
     private fun isTrustedDownloadUrl(rawUrl: String): Boolean {
         val uri = runCatching { Uri.parse(rawUrl) }.getOrNull() ?: return false
@@ -177,7 +204,8 @@ internal object CyberQuizUpdateManager {
         file: File,
         update: CyberQuizUpdateInfo
     ) {
-        if (!file.isFile || file.length() <= 0L) {
+        if (!file.isFile || file.length() <= 0L || file.length() > MAX_APK_BYTES) {
+            file.delete()
             error("APK téléchargé invalide.")
         }
 
