@@ -5,6 +5,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,8 +30,8 @@ fun ResumableQuizScreen(
     onOtherQuiz: () -> Unit,
     onHome: () -> Unit
 ) {
+    val currentState by vm.state.collectAsState()
     var showExitConfirmation by remember { mutableStateOf(false) }
-    val currentState = vm.state.value
 
     fun requestExit() {
         if (currentState is QuizUiState.Finished) {
