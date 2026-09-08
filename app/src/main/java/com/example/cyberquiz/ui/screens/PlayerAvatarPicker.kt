@@ -112,7 +112,8 @@ private fun avatarSecondary(style: PlayerAvatarStyle): Color = when (style) {
 internal fun PlayerAvatarButton(
     style: PlayerAvatarStyle,
     onClick: () -> Unit,
-    size: Dp = 62.dp
+    size: Dp = 62.dp,
+    syncWithStoredSelection: Boolean = true
 ) {
     val context = LocalContext.current
     val preferences = remember(context) { playerCosmeticsPreferences(context) }
@@ -141,7 +142,11 @@ internal fun PlayerAvatarButton(
         onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
     }
 
-    val effectiveStyle = playerAvatarFromStorage(storedKey)
+    val effectiveStyle = if (syncWithStoredSelection) {
+        playerAvatarFromStorage(storedKey)
+    } else {
+        style
+    }
     val accent = avatarAccent(effectiveStyle)
     val customBitmap = remember(customPath, effectiveStyle) {
         if (effectiveStyle == PlayerAvatarStyle.CUSTOM && !customPath.isNullOrBlank()) {
@@ -235,67 +240,26 @@ private fun AvatarArtwork(style: PlayerAvatarStyle, modifier: Modifier = Modifie
                     size = Size(w * .40f, h * .105f),
                     cornerRadius = CornerRadius(5f, 5f)
                 )
-                drawLine(
-                    Color.White.copy(alpha = .75f),
-                    Offset(w * .38f, h * .47f),
-                    Offset(w * .62f, h * .47f),
-                    1.4f,
-                    StrokeCap.Round
-                )
+                drawLine(Color.White.copy(alpha = .75f), Offset(w * .38f, h * .47f), Offset(w * .62f, h * .47f), 1.4f, StrokeCap.Round)
             }
             PlayerAvatarStyle.SOC -> {
-                drawRoundRect(
-                    color = accent.copy(alpha = .88f),
-                    topLeft = Offset(w * .31f, h * .43f),
-                    size = Size(w * .38f, h * .095f),
-                    cornerRadius = CornerRadius(5f, 5f)
-                )
-                drawArc(
-                    color = secondary,
-                    startAngle = 205f,
-                    sweepAngle = 130f,
-                    useCenter = false,
-                    topLeft = Offset(w * .18f, h * .25f),
-                    size = Size(w * .64f, h * .48f),
-                    style = Stroke(2.5f, cap = StrokeCap.Round)
-                )
-                drawLine(
-                    secondary,
-                    Offset(w * .73f, h * .57f),
-                    Offset(w * .80f, h * .64f),
-                    2.2f,
-                    StrokeCap.Round
-                )
+                drawRoundRect(color = accent.copy(alpha = .88f), topLeft = Offset(w * .31f, h * .43f), size = Size(w * .38f, h * .095f), cornerRadius = CornerRadius(5f, 5f))
+                drawArc(color = secondary, startAngle = 205f, sweepAngle = 130f, useCenter = false, topLeft = Offset(w * .18f, h * .25f), size = Size(w * .64f, h * .48f), style = Stroke(2.5f, cap = StrokeCap.Round))
+                drawLine(secondary, Offset(w * .73f, h * .57f), Offset(w * .80f, h * .64f), 2.2f, StrokeCap.Round)
                 drawCircle(secondary, 2.6f, Offset(w * .80f, h * .64f))
             }
             PlayerAvatarStyle.PENTEST -> {
-                drawRoundRect(
-                    color = Color(0xFF15101F),
-                    topLeft = Offset(w * .29f, h * .39f),
-                    size = Size(w * .42f, h * .22f),
-                    cornerRadius = CornerRadius(8f, 8f)
-                )
+                drawRoundRect(color = Color(0xFF15101F), topLeft = Offset(w * .29f, h * .39f), size = Size(w * .42f, h * .22f), cornerRadius = CornerRadius(8f, 8f))
                 drawLine(secondary, Offset(w * .35f, h * .47f), Offset(w * .46f, h * .45f), 2.8f, StrokeCap.Round)
                 drawLine(accent, Offset(w * .54f, h * .45f), Offset(w * .65f, h * .47f), 2.8f, StrokeCap.Round)
                 drawLine(accent.copy(alpha = .65f), Offset(w * .42f, h * .60f), Offset(w * .58f, h * .60f), 1.7f, StrokeCap.Round)
             }
             PlayerAvatarStyle.GHOST -> {
-                drawRoundRect(
-                    color = Color(0xFF111827),
-                    topLeft = Offset(w * .30f, h * .40f),
-                    size = Size(w * .40f, h * .22f),
-                    cornerRadius = CornerRadius(9f, 9f)
-                )
+                drawRoundRect(color = Color(0xFF111827), topLeft = Offset(w * .30f, h * .40f), size = Size(w * .40f, h * .22f), cornerRadius = CornerRadius(9f, 9f))
                 drawCircle(accent, 2.5f, Offset(w * .40f, h * .48f))
                 drawCircle(accent, 2.5f, Offset(w * .60f, h * .48f))
                 listOf(.37f, .46f, .55f).forEachIndexed { i, start ->
-                    drawLine(
-                        secondary.copy(alpha = .70f),
-                        Offset(w * start, h * (.57f + i * .035f)),
-                        Offset(w * (start + .11f), h * (.57f + i * .035f)),
-                        1.4f,
-                        StrokeCap.Round
-                    )
+                    drawLine(secondary.copy(alpha = .70f), Offset(w * start, h * (.57f + i * .035f)), Offset(w * (start + .11f), h * (.57f + i * .035f)), 1.4f, StrokeCap.Round)
                 }
             }
             PlayerAvatarStyle.ARCHITECT -> {
@@ -307,38 +271,17 @@ private fun AvatarArtwork(style: PlayerAvatarStyle, modifier: Modifier = Modifie
                     close()
                 }
                 drawPath(badge, brush = Brush.linearGradient(listOf(accent, secondary)))
-                drawRoundRect(
-                    brush = Brush.horizontalGradient(listOf(accent, secondary)),
-                    topLeft = Offset(w * .31f, h * .48f),
-                    size = Size(w * .38f, h * .085f),
-                    cornerRadius = CornerRadius(5f, 5f)
-                )
+                drawRoundRect(brush = Brush.horizontalGradient(listOf(accent, secondary)), topLeft = Offset(w * .31f, h * .48f), size = Size(w * .38f, h * .085f), cornerRadius = CornerRadius(5f, 5f))
                 drawCircle(accent.copy(alpha = .45f), 4f, Offset(cx, h * .67f), style = Stroke(1.5f))
             }
             PlayerAvatarStyle.CUSTOM -> {
                 drawCircle(accent.copy(alpha = .35f), w * .17f, Offset(cx, h * .42f))
-                drawArc(
-                    accent,
-                    205f,
-                    130f,
-                    false,
-                    Offset(w * .28f, h * .50f),
-                    Size(w * .44f, h * .25f),
-                    style = Stroke(2.4f, cap = StrokeCap.Round)
-                )
+                drawArc(accent, 205f, 130f, false, Offset(w * .28f, h * .50f), Size(w * .44f, h * .25f), style = Stroke(2.4f, cap = StrokeCap.Round))
             }
         }
 
         if (style != PlayerAvatarStyle.CUSTOM) {
-            drawArc(
-                color = secondary.copy(alpha = .72f),
-                startAngle = 205f,
-                sweepAngle = 130f,
-                useCenter = false,
-                topLeft = Offset(w * .33f, h * .57f),
-                size = Size(w * .34f, h * .17f),
-                style = Stroke(1.5f, cap = StrokeCap.Round)
-            )
+            drawArc(color = secondary.copy(alpha = .72f), startAngle = 205f, sweepAngle = 130f, useCenter = false, topLeft = Offset(w * .33f, h * .57f), size = Size(w * .34f, h * .17f), style = Stroke(1.5f, cap = StrokeCap.Round))
         }
     }
 }
@@ -354,33 +297,16 @@ internal fun PlayerAvatarPickerDialog(
         containerColor = Color(0xFF081225),
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(
-                    "Choisis ton avatar",
-                    color = Color(0xFFF5F7FF),
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Black
-                )
-                Text(
-                    "5 avatars CyberQuiz · les skins arriveront ensuite.",
-                    color = Color(0xFF9FAED3),
-                    fontSize = 10.sp
-                )
+                Text("Choisis ton avatar", color = Color(0xFFF5F7FF), fontSize = 20.sp, fontWeight = FontWeight.Black)
+                Text("5 avatars CyberQuiz · les skins arriveront ensuite.", color = Color(0xFF9FAED3), fontSize = 10.sp)
             }
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 builtInPlayerAvatarStyles.chunked(2).forEach { rowItems ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(9.dp)
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                         rowItems.forEach { avatarStyle ->
-                            AvatarChoiceCard(
-                                style = avatarStyle,
-                                selected = avatarStyle == selected,
-                                modifier = Modifier.weight(1f),
-                                onClick = { onSelect(avatarStyle) }
-                            )
+                            AvatarChoiceCard(style = avatarStyle, selected = avatarStyle == selected, modifier = Modifier.weight(1f), onClick = { onSelect(avatarStyle) })
                         }
                         if (rowItems.size == 1) Spacer(Modifier.weight(1f))
                     }
@@ -407,39 +333,17 @@ internal fun AvatarChoiceCard(
     Column(
         modifier = modifier
             .aspectRatio(.92f)
-            .background(
-                Brush.verticalGradient(
-                    listOf(accent.copy(alpha = if (selected) .16f else .07f), Color(0xFF0A152A))
-                ),
-                RoundedCornerShape(18.dp)
-            )
-            .border(
-                if (selected) 1.7.dp else 1.dp,
-                accent.copy(alpha = if (selected) .95f else .36f),
-                RoundedCornerShape(18.dp)
-            )
+            .background(Brush.verticalGradient(listOf(accent.copy(alpha = if (selected) .16f else .07f), Color(0xFF0A152A))), RoundedCornerShape(18.dp))
+            .border(if (selected) 1.7.dp else 1.dp, accent.copy(alpha = if (selected) .95f else .36f), RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
             .padding(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        PlayerAvatarButton(style = style, onClick = onClick, size = 54.dp)
+        PlayerAvatarButton(style = style, onClick = onClick, size = 54.dp, syncWithStoredSelection = false)
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                style.displayName,
-                color = Color(0xFFF5F7FF),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Black,
-                textAlign = TextAlign.Center,
-                maxLines = 2
-            )
-            Text(
-                if (selected) "SÉLECTIONNÉ" else style.subtitle,
-                color = if (selected) accent else Color(0xFF9FAED3),
-                fontSize = 7.sp,
-                fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
-                textAlign = TextAlign.Center
-            )
+            Text(style.displayName, color = Color(0xFFF5F7FF), fontSize = 11.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center, maxLines = 2)
+            Text(if (selected) "SÉLECTIONNÉ" else style.subtitle, color = if (selected) accent else Color(0xFF9FAED3), fontSize = 7.sp, fontWeight = if (selected) FontWeight.Black else FontWeight.Medium, textAlign = TextAlign.Center)
         }
     }
 }
