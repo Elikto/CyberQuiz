@@ -50,6 +50,7 @@ fun ProfileScreenV5(
 
     when {
         showCosmetics -> {
+            EngagementStore.sync(context, metrics)
             CosmeticsScreen(
                 playerLevel = progress.level,
                 onBack = { showCosmetics = false }
@@ -66,7 +67,7 @@ fun ProfileScreenV5(
         else -> {
             val engagement = EngagementStore.sync(context, metrics)
             Box {
-                ProfileScreenV5(
+                ProfileScreenV6(
                     selectedQuizType = selectedQuizType,
                     onQuizTypeSelected = onQuizTypeSelected,
                     onCosmetics = { showCosmetics = true },
