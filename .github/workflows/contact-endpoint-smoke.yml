@@ -14,13 +14,19 @@ jobs:
     steps:
       - name: Check health
         run: curl --fail --show-error --silent https://cyberquiz-api.onrender.com/health
-      - name: Send contact test
+      - name: Send contact test and retry same submission
         shell: bash
         run: |
           set -euo pipefail
-          RESPONSE="$(curl --fail-with-body --show-error --silent \
+          BODY='{"reason":"other","message":"Test automatique CyberQuiz envoi arrière-plan après PR 37. Aucun retour nécessaire.","appVersion":"deployment-test-pr37","platform":"github-actions-smoke","submissionId":"00000000-0000-4000-8000-000000000037"}'
+          RESPONSE1="$(curl --max-time 20 --fail-with-body --show-error --silent \
             -X POST https://cyberquiz-api.onrender.com/api/contact \
             -H 'Content-Type: application/json' \
-            --data '{"reason":"other","message":"Test automatique CyberQuiz persistance Inbox après PR 36. Aucun retour nécessaire.","appVersion":"deployment-test-pr36","platform":"github-actions-smoke"}')"
-          printf '%s\n' "$RESPONSE"
-          test "$RESPONSE" = '{"sent":true}'
+            --data "$BODY")"
+          RESPONSE2="$(curl --max-time 20 --fail-with-body --show-error --silent \
+            -X POST https://cyberquiz-api.onrender.com/api/contact \
+            -H 'Content-Type: application/json' \
+            --data "$BODY")"
+          printf 'first=%s\nsecond=%s\n' "$RESPONSE1" "$RESPONSE2"
+          test "$RESPONSE1" = '{"sent":true}'
+          test "$RESPONSE2" = '{"sent":true}'
