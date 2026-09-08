@@ -9,16 +9,8 @@ services:
     envVars:
       - key: CYBERQUIZ_CONTACT_ENABLED
         value: "true"
-      - key: CYBERQUIZ_SMTP_HOST
-        value: smtp.resend.com
-      - key: CYBERQUIZ_SMTP_PORT
-        value: "465"
-      - key: CYBERQUIZ_SMTP_USERNAME
-        value: resend
-      - key: CYBERQUIZ_SMTP_PASSWORD
+      - key: RESEND_API_KEY
         sync: false
-      - key: CYBERQUIZ_SMTP_SECURITY
-        value: ssl
       - key: CYBERQUIZ_CONTACT_FROM
         sync: false
       - key: CYBERQUIZ_CONTACT_TO
