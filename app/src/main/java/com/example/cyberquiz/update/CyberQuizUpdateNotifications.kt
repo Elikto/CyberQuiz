@@ -76,9 +76,9 @@ internal object CyberQuizUpdateNotificationManager {
             return
         }
 
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            ?: Intent(context, MainActivity::class.java)
-        launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val launchIntent = Intent(context, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
 
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -87,7 +87,7 @@ internal object CyberQuizUpdateNotificationManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val message = "Version ${update.versionName} disponible. Appuie pour ouvrir CyberQuiz et l'installer."
+        val message = "Version ${update.versionName} disponible. Appuie pour ouvrir CyberQuiz."
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_update_notification)
             .setContentTitle("Mise à jour CyberQuiz disponible")
