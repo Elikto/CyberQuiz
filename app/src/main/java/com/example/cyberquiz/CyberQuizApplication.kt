@@ -1,6 +1,7 @@
 package com.example.cyberquiz
 
 import android.app.Application
+import com.example.cyberquiz.engagement.EngagementStore
 import com.example.cyberquiz.update.CyberQuizUpdateNotificationManager
 import com.example.cyberquiz.update.CyberQuizUpdateNotificationScheduler
 
@@ -13,6 +14,7 @@ import com.example.cyberquiz.update.CyberQuizUpdateNotificationScheduler
 class CyberQuizApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        EngagementStore.recordDailyLogin(this)
         CyberQuizUpdateNotificationManager.createNotificationChannel(this)
         CyberQuizUpdateNotificationScheduler.schedule(this)
     }
