@@ -27,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      CYBERQUIZ_CONTACT_API_URL: ${{ vars.CYBERQUIZ_CONTACT_API_URL }}
     outputs:
       version_code: ${{ steps.release_meta.outputs.version_code }}
       version_name: ${{ steps.release_meta.outputs.version_name }}
