@@ -8,14 +8,21 @@ import org.junit.Test
 class PlayerFrameStyleTest {
     @Test
     fun `frame catalog keeps unique keys`() {
-        assertEquals(12, PlayerFrameStyle.entries.size)
-        assertEquals(12, PlayerFrameStyle.entries.map { it.storageKey }.toSet().size)
+        assertEquals(18, PlayerFrameStyle.entries.size)
+        assertEquals(18, PlayerFrameStyle.entries.map { it.storageKey }.toSet().size)
     }
 
     @Test
-    fun `starter frames are immediately unlocked`() {
+    fun `three starter frames are immediately unlocked`() {
         assertTrue(isFrameUnlocked(PlayerFrameStyle.CYAN_PULSE, 1, emptySet(), emptySet()))
         assertTrue(isFrameUnlocked(PlayerFrameStyle.PURPLE_NODE, 1, emptySet(), emptySet()))
+        assertTrue(isFrameUnlocked(PlayerFrameStyle.DYNAMIC_BEAM, 1, emptySet(), emptySet()))
+    }
+
+    @Test
+    fun `shop contains exactly five ten coin frames`() {
+        assertEquals(5, shopPlayerFrameStyles.size)
+        assertTrue(shopPlayerFrameStyles.all { it.coinCost == SHOP_COSMETIC_COST })
     }
 
     @Test

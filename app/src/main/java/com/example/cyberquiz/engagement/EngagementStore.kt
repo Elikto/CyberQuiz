@@ -19,7 +19,9 @@ data class EngagementSnapshot(
     val missions: List<com.example.cyberquiz.model.DailyMissionProgress>,
     val claimedMissionIds: Set<String>,
     val unlockedAchievementIds: Set<String>,
-    val purchasedFrameKeys: Set<String>
+    val purchasedFrameKeys: Set<String>,
+    val purchasedAvatarKeys: Set<String>,
+    val purchasedBannerKeys: Set<String>
 )
 
 object EngagementStore {
@@ -35,6 +37,8 @@ object EngagementStore {
     private const val KEY_CLAIMED_MISSIONS = "claimed_missions"
     private const val KEY_UNLOCKED_ACHIEVEMENTS = "unlocked_achievements"
     private const val KEY_PURCHASED_FRAMES = "purchased_frames"
+    private const val KEY_PURCHASED_AVATARS = "purchased_avatars"
+    private const val KEY_PURCHASED_BANNERS = "purchased_banners"
 
     fun recordDailyLogin(context: Context, nowMillis: Long = System.currentTimeMillis()): Int {
         val prefs = prefs(context)
@@ -156,18 +160,31 @@ object EngagementStore {
         return prefs.edit().putInt(KEY_COINS, current - amount).commit()
     }
 
-    fun purchaseFrame(context: Context, frameKey: String, cost: Int): Boolean {
+    private fun purchaseKey(context: Context, storageKey: String, cost: Int, setKey: String): Boolean {
         val prefs = prefs(context)
-        val purchased = prefs.getStringSet(KEY_PURCHASED_FRAMES, emptySet())?.toSet().orEmpty()
-        if (frameKey in purchased) return true
+        val purchased = prefs.getStringSet(setKey, emptySet())?.toSet().orEmpty()
+        if (storageKey in purchased) return true
         if (!spendCoins(context, cost)) return false
-        return prefs.edit()
-            .putStringSet(KEY_PURCHASED_FRAMES, purchased + frameKey)
-            .commit()
+        return prefs.edit().putStringSet(setKey, purchased + storageKey).commit()
     }
+
+    fun purchaseFrame(context: Context, frameKey: String, cost: Int): Boolean =
+        purchaseKey(context, frameKey, cost, KEY_PURCHASED_FRAMES)
+
+    fun purchaseAvatar(context: Context, avatarKey: String, cost: Int): Boolean =
+        purchaseKey(context, avatarKey, cost, KEY_PURCHASED_AVATARS)
+
+    fun purchaseBanner(context: Context, bannerKey: String, cost: Int): Boolean =
+        purchaseKey(context, bannerKey, cost, KEY_PURCHASED_BANNERS)
 
     fun purchasedFrameKeys(context: Context): Set<String> =
         prefs(context).getStringSet(KEY_PURCHASED_FRAMES, emptySet())?.toSet().orEmpty()
+
+    fun purchasedAvatarKeys(context: Context): Set<String> =
+        prefs(context).getStringSet(KEY_PURCHASED_AVATARS, emptySet())?.toSet().orEmpty()
+
+    fun purchasedBannerKeys(context: Context): Set<String> =
+        prefs(context).getStringSet(KEY_PURCHASED_BANNERS, emptySet())?.toSet().orEmpty()
 
     private fun snapshotFromPrefs(
         context: Context,
@@ -182,7 +199,9 @@ object EngagementStore {
             missions = dailyMissionProgress(metrics, baseline),
             claimedMissionIds = prefs.getStringSet(KEY_CLAIMED_MISSIONS, emptySet())?.toSet().orEmpty(),
             unlockedAchievementIds = prefs.getStringSet(KEY_UNLOCKED_ACHIEVEMENTS, emptySet())?.toSet().orEmpty(),
-            purchasedFrameKeys = prefs.getStringSet(KEY_PURCHASED_FRAMES, emptySet())?.toSet().orEmpty()
+            purchasedFrameKeys = prefs.getStringSet(KEY_PURCHASED_FRAMES, emptySet())?.toSet().orEmpty(),
+            purchasedAvatarKeys = prefs.getStringSet(KEY_PURCHASED_AVATARS, emptySet())?.toSet().orEmpty(),
+            purchasedBannerKeys = prefs.getStringSet(KEY_PURCHASED_BANNERS, emptySet())?.toSet().orEmpty()
         )
     }
 
