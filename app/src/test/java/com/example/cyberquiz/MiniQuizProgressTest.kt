@@ -36,6 +36,7 @@ class MiniQuizProgressTest {
                 endedAt = 400L,
                 correct = 4
             ),
+            entry(id = "partial", category = "Linux", questionCount = 5, endedAt = 450L, correct = 2, answered = 3),
             entry(id = "empty", category = "Linux", questionCount = 5, endedAt = 500L, correct = 0, answered = 0)
         )
 
