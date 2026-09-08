@@ -294,7 +294,7 @@ fun ContactScreen(onBack: () -> Unit) {
                     lineHeight = 14.sp
                 )
             }
-        )
+        }
 
         sendError?.let { error ->
             ContactStatusMessage(
