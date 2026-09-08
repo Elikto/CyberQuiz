@@ -3,7 +3,21 @@ package com.example.cyberquiz.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,10 +36,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cyberquiz.data.database.CategoryProgressEntity
 import com.example.cyberquiz.data.database.ConceptProgressEntity
+import com.example.cyberquiz.model.categoryLevelProgress
 import com.example.cyberquiz.viewmodel.QuizViewModel
 
 private val S3Purple = Color(0xFFD652FF)
@@ -45,18 +61,18 @@ fun StatisticsScreenV3(
     onReviewConcept: (String) -> Unit,
     onThemeQuiz: (String, Int) -> Unit
 ) {
-    val p by vm.progress.collectAsState()
+    val progress by vm.progress.collectAsState()
     val categories by vm.categoryProgress.collectAsState()
     val concepts by vm.conceptProgress.collectAsState()
     val reviewItems by vm.reviewItems.collectAsState()
-    val accuracy = if (p.answered == 0) 0 else p.correct * 100 / p.answered
+    val accuracy = if (progress.answered == 0) 0 else progress.correct * 100 / progress.answered
     val reviewQuestionsByConcept = remember(reviewItems) {
         reviewItems.associate { it.concept to it.question }
     }
 
     var selectedTheme by remember { mutableStateOf<CategoryProgressEntity?>(null) }
-    var themesExpanded by rememberSaveable { mutableStateOf(true) }
-    var conceptsExpanded by rememberSaveable { mutableStateOf(true) }
+    var themesExpanded by rememberSaveable { mutableStateOf(false) }
+    var conceptsExpanded by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -75,35 +91,36 @@ fun StatisticsScreenV3(
         StatsHeaderV3(onBack)
         GlobalProgressCardV3(
             accuracy = accuracy,
-            level = p.level,
-            xp = p.xp,
-            answered = p.answered,
-            correct = p.correct,
-            streak = p.streak,
-            bestStreak = p.bestStreak
+            level = progress.level,
+            xp = progress.xp,
+            answered = progress.answered,
+            correct = progress.correct,
+            streak = progress.streak,
+            bestStreak = progress.bestStreak
         )
 
         CollapsibleStatsSectionV3(
             text = "PROGRESSION PAR THÈME",
+            detail = if (categories.isEmpty()) "Aucune donnée" else "${categories.size} thèmes",
             expanded = themesExpanded,
             onToggle = { themesExpanded = !themesExpanded }
         )
         if (themesExpanded) {
             if (categories.isEmpty()) {
                 StatsInfoV3(
-                    "La progression détaillée commence avec cette version. Réponds à quelques nouvelles questions Cyber pour voir apparaître tes résultats par domaine."
+                    "Réponds à quelques questions pour créer tes premiers niveaux par thème. Chaque réponse fait progresser l'XP de la catégorie."
                 )
             } else {
                 Text(
-                    "Appuie sur un thème pour comprendre ce que signifie ton pourcentage et obtenir un exercice ou un cours adapté.",
+                    "Chaque réponse donne 5 XP dans son thème, avec 5 XP bonus si elle est correcte. Le niveau augmente tous les 100 XP.",
                     color = S3Muted,
                     fontSize = 10.sp,
                     lineHeight = 15.sp
                 )
 
-                categories.chunked(2).forEach { rowItems ->
+                categories.sortedBy { it.category }.chunked(2).forEach { rowItems ->
                     Row(
-                        Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         rowItems.forEach { item ->
@@ -113,28 +130,26 @@ fun StatisticsScreenV3(
                                 onClick = { selectedTheme = item }
                             )
                         }
-                        if (rowItems.size == 1) {
-                            Spacer(Modifier.weight(1f))
-                        }
+                        if (rowItems.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }
         }
 
+        val needsWork = concepts.filter { !it.lastResultCorrect && !it.reviewMastered }
+        val acquired = concepts.filter { it.lastResultCorrect || it.reviewMastered }
         CollapsibleStatsSectionV3(
             text = "MAÎTRISE DES NOTIONS",
+            detail = if (concepts.isEmpty()) "Aucune donnée" else "${concepts.size} notions",
             expanded = conceptsExpanded,
             onToggle = { conceptsExpanded = !conceptsExpanded }
         )
         if (conceptsExpanded) {
             if (concepts.isEmpty()) {
                 StatsInfoV3(
-                    "Les notions apparaîtront ici au fil de tes prochaines réponses. Une révision réussie dans le carnet peut ensuite les faire passer en maîtrisées."
+                    "Les notions apparaîtront ici au fil de tes réponses. Une révision réussie peut ensuite les faire passer en maîtrisées."
                 )
             } else {
-                val needsWork = concepts.filter { !it.lastResultCorrect && !it.reviewMastered }
-                val acquired = concepts.filter { it.lastResultCorrect || it.reviewMastered }
-
                 if (needsWork.isNotEmpty()) {
                     Text(
                         "À RENFORCER",
@@ -142,12 +157,6 @@ fun StatisticsScreenV3(
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 1.4.sp
-                    )
-                    Text(
-                        "Appuie sur une question à revoir pour l'ouvrir directement dans ton carnet.",
-                        color = S3Muted,
-                        fontSize = 10.sp,
-                        lineHeight = 15.sp
                     )
                     needsWork.take(8).forEach { item ->
                         ConceptProgressCardV3(
@@ -200,13 +209,13 @@ private fun StatsHeaderV3(onBack: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier
-                .size(44.dp)
+                .size(40.dp)
                 .background(Color(0xFF101A34), CircleShape)
-                .border(1.2.dp, Color(0xFF718CE2), CircleShape)
+                .border(1.1.dp, Color(0xFF718CE2), CircleShape)
                 .clickable(onClick = onBack),
             contentAlignment = Alignment.Center
         ) {
-            Text("‹", color = S3Text, fontSize = 34.sp, fontWeight = FontWeight.Light)
+            Text("‹", color = S3Text, fontSize = 30.sp, fontWeight = FontWeight.Light)
         }
         Spacer(Modifier.width(12.dp))
         Column {
@@ -227,34 +236,34 @@ private fun GlobalProgressCardV3(
     bestStreak: Int
 ) {
     Column(
-        Modifier
+        modifier = Modifier
             .fillMaxWidth()
             .background(
                 Brush.verticalGradient(listOf(Color(0xFF11183A), Color(0xFF071225))),
-                RoundedCornerShape(24.dp)
+                RoundedCornerShape(22.dp)
             )
-            .border(1.2.dp, Color(0xFF3B6FD1), RoundedCornerShape(24.dp))
-            .padding(17.dp),
+            .border(1.2.dp, Color(0xFF3B6FD1), RoundedCornerShape(22.dp))
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
-                    .size(78.dp)
+                    .size(72.dp)
                     .background(S3Purple.copy(alpha = .10f), CircleShape)
-                    .border(5.dp, S3Purple.copy(alpha = .60f), CircleShape),
+                    .border(4.dp, S3Purple.copy(alpha = .60f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("$accuracy%", color = S3Text, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                    Text("$accuracy%", color = S3Text, fontSize = 19.sp, fontWeight = FontWeight.Black)
                     Text("RÉUSSITE", color = S3Muted, fontSize = 7.sp)
                 }
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text("NIVEAU $level", color = S3Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-                Text("Progression globale", color = S3Text, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                Text("$xp XP accumulés", color = S3Muted, fontSize = 12.sp)
+                Text("Progression globale", color = S3Text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("$xp XP accumulés", color = S3Muted, fontSize = 11.sp)
                 Spacer(Modifier.height(8.dp))
                 StatsBarV3((xp % 100) / 100f, S3Purple)
                 Text("${xp % 100} / 100 XP vers le niveau suivant", color = Color(0xFFB9C5E8), fontSize = 9.sp)
@@ -273,7 +282,7 @@ private fun GlobalProgressCardV3(
 @Composable
 private fun MiniMetricV3(value: String, label: String, accent: Color, modifier: Modifier) {
     Column(
-        modifier
+        modifier = modifier
             .background(Color(0xFF08152B), RoundedCornerShape(14.dp))
             .border(1.dp, accent.copy(alpha = .28f), RoundedCornerShape(14.dp))
             .padding(vertical = 9.dp, horizontal = 4.dp),
@@ -291,29 +300,44 @@ private fun CategoryProgressCardV3(
     onClick: () -> Unit
 ) {
     val accuracy = if (item.answered == 0) 0 else item.correct * 100 / item.answered
-    val accent = when {
-        accuracy >= 85 -> S3Green
-        accuracy >= 70 -> S3Cyan
-        accuracy >= 50 -> S3Orange
-        else -> S3Red
-    }
-    val status = when {
-        item.answered < 3 -> "Premières données"
-        accuracy >= 85 -> "Très bon niveau"
-        accuracy >= 70 -> "En progression"
-        accuracy >= 50 -> "À consolider"
-        else -> "À retravailler"
-    }
+    val categoryProgress = categoryLevelProgress(item.answered, item.correct)
+    val accent = statsThemeAccent(item.category)
 
     Column(
-        modifier
+        modifier = modifier
             .aspectRatio(1f)
-            .background(S3Panel, RoundedCornerShape(17.dp))
-            .border(1.dp, accent.copy(alpha = .48f), RoundedCornerShape(17.dp))
+            .background(
+                Brush.linearGradient(listOf(accent.copy(alpha = .11f), S3Panel)),
+                RoundedCornerShape(18.dp)
+            )
+            .border(1.dp, accent.copy(alpha = .48f), RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
             .padding(12.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(accent.copy(alpha = .14f), RoundedCornerShape(11.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    statsThemeSymbol(item.category),
+                    color = accent,
+                    fontSize = if (item.category.equals("Active Directory", true)) 9.sp else 16.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            Text(
+                "NIV. ${categoryProgress.level}",
+                color = accent,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Black
+            )
+        }
+
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
                 item.category,
@@ -324,30 +348,24 @@ private fun CategoryProgressCardV3(
                 maxLines = 2
             )
             Text(
-                "${item.correct}/${item.answered} bonnes",
+                "${item.correct}/${item.answered} bonnes · $accuracy%",
                 color = S3Muted,
                 fontSize = 8.sp
             )
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text("$accuracy%", color = accent, fontSize = 24.sp, fontWeight = FontWeight.Black)
-            Text(
-                status,
-                color = accent,
-                fontSize = 8.sp,
-                lineHeight = 11.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2
-            )
-            StatsBarV3(accuracy / 100f, accent, height = 7.dp)
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("${categoryProgress.xp}", color = S3Text, fontSize = 19.sp, fontWeight = FontWeight.Black)
+                Spacer(Modifier.width(4.dp))
+                Text("XP", color = accent, fontSize = 9.sp, fontWeight = FontWeight.Black)
+            }
+            StatsBarV3(categoryProgress.progress, accent, height = 7.dp)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "VOIR LE NIVEAU",
+                    "${categoryProgress.xpIntoLevel}/100 XP",
                     color = S3Muted,
-                    fontSize = 7.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = .5.sp,
+                    fontSize = 8.sp,
                     modifier = Modifier.weight(1f)
                 )
                 Text("›", color = accent, fontSize = 17.sp, fontWeight = FontWeight.Bold)
@@ -376,7 +394,7 @@ private fun ConceptProgressCardV3(
         else -> "À revoir"
     }
 
-    val modifier = if (onReviewClick != null) {
+    val clickableModifier = if (onReviewClick != null) {
         Modifier
             .fillMaxWidth()
             .clickable(onClick = onReviewClick)
@@ -385,7 +403,7 @@ private fun ConceptProgressCardV3(
     }
 
     Column(
-        modifier
+        modifier = clickableModifier
             .background(
                 if (onReviewClick != null) {
                     Brush.horizontalGradient(
@@ -422,13 +440,17 @@ private fun ConceptProgressCardV3(
                     lineHeight = 17.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Text(
-                    item.category.uppercase(),
-                    color = S3Blue,
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(statsThemeSymbol(item.category), color = S3Blue, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        item.category.uppercase(),
+                        color = S3Blue,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                }
             }
             if (onReviewClick != null) {
                 Text("›", color = S3Orange, fontSize = 24.sp, fontWeight = FontWeight.Bold)
@@ -449,11 +471,12 @@ private fun ConceptProgressCardV3(
 @Composable
 private fun CollapsibleStatsSectionV3(
     text: String,
+    detail: String,
     expanded: Boolean,
     onToggle: () -> Unit
 ) {
     Row(
-        Modifier
+        modifier = Modifier
             .fillMaxWidth()
             .background(S3Cyan.copy(alpha = .045f), RoundedCornerShape(14.dp))
             .border(1.dp, S3Cyan.copy(alpha = .22f), RoundedCornerShape(14.dp))
@@ -461,14 +484,16 @@ private fun CollapsibleStatsSectionV3(
             .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text,
-            color = S3Cyan,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Black,
-            letterSpacing = 1.4.sp,
-            modifier = Modifier.weight(1f)
-        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                text,
+                color = S3Cyan,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.4.sp
+            )
+            Text(detail, color = S3Muted, fontSize = 8.sp)
+        }
         Text(
             if (expanded) "⌃" else "⌄",
             color = S3Cyan,
@@ -494,7 +519,7 @@ private fun StatsInfoV3(text: String) {
 }
 
 @Composable
-private fun StatsBarV3(progress: Float, accent: Color, height: androidx.compose.ui.unit.Dp = 9.dp) {
+private fun StatsBarV3(progress: Float, accent: Color, height: Dp = 9.dp) {
     Box(
         Modifier
             .fillMaxWidth()
@@ -506,8 +531,36 @@ private fun StatsBarV3(progress: Float, accent: Color, height: androidx.compose.
                 Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(progress.coerceIn(0f, 1f))
-                    .background(accent, RoundedCornerShape(50.dp))
+                    .background(
+                        Brush.horizontalGradient(listOf(accent.copy(alpha = .75f), accent)),
+                        RoundedCornerShape(50.dp)
+                    )
             )
         }
     }
+}
+
+private fun statsThemeAccent(category: String): Color = when ((category.hashCode() and Int.MAX_VALUE) % 4) {
+    0 -> S3Purple
+    1 -> S3Blue
+    2 -> S3Cyan
+    else -> S3Green
+}
+
+private fun statsThemeSymbol(category: String): String = when (category.lowercase()) {
+    "réseaux" -> "⌁"
+    "linux" -> ">_"
+    "windows" -> "▦"
+    "cryptographie" -> "◇"
+    "sécurité web" -> "◎"
+    "malware" -> "!"
+    "ingénierie sociale" -> "◌"
+    "osint" -> "⌖"
+    "forensics" -> "⌕"
+    "pentest" -> "⚡"
+    "active directory" -> "AD"
+    "cloud security" -> "☁"
+    "mobile security" -> "▯"
+    "sécurité système" -> "⚙"
+    else -> "◆"
 }
