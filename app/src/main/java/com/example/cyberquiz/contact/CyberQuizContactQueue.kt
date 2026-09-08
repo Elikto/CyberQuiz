@@ -20,7 +20,7 @@ internal object CyberQuizContactQueue {
     private const val WORK_SUBMISSION_ID = "submission_id"
     private const val MAX_ATTEMPTS = 6
 
-    fun enqueue(context: Context, reason: String, message: String): Result<String> {
+    fun enqueue(context: Context, reason: String, message: String, urgent: Boolean): Result<String> {
         val appContext = context.applicationContext
         val submissionId = UUID.randomUUID().toString()
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -29,6 +29,7 @@ internal object CyberQuizContactQueue {
             val payload = JSONObject()
                 .put("reason", reason)
                 .put("message", message.trim())
+                .put("urgent", urgent)
                 .toString()
 
             check(prefs.edit().putString(submissionId, payload).commit()) {
@@ -56,7 +57,13 @@ internal object CyberQuizContactQueue {
         }
     }
 
-    internal fun load(context: Context, submissionId: String): Pair<String, String>? {
+    internal data class QueuedContact(
+        val reason: String,
+        val message: String,
+        val urgent: Boolean,
+    )
+
+    internal fun load(context: Context, submissionId: String): QueuedContact? {
         val raw = context.applicationContext
             .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(submissionId, null)
@@ -66,7 +73,8 @@ internal object CyberQuizContactQueue {
             val json = JSONObject(raw)
             val reason = json.getString("reason")
             val message = json.getString("message")
-            reason to message
+            val urgent = json.optBoolean("urgent", false)
+            QueuedContact(reason = reason, message = message, urgent = urgent)
         }.getOrNull()
     }
 
@@ -96,11 +104,10 @@ class CyberQuizContactWorker(
             ?: return Result.failure()
         val queued = CyberQuizContactQueue.load(applicationContext, submissionId)
             ?: return Result.failure()
-        val (reason, message) = queued
-
         val sendResult = CyberQuizContactClient.send(
-            reason = reason,
-            message = message,
+            reason = queued.reason,
+            message = queued.message,
+            urgent = queued.urgent,
             submissionId = submissionId
         )
 
