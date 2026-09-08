@@ -68,11 +68,17 @@ fun SettingsScreenV4(
     val activity = remember(context) { context.findActivityV4() }
 
     var showContactForm by rememberSaveable { mutableStateOf(false) }
+    var showFaq by rememberSaveable { mutableStateOf(false) }
     var checkingUpdate by remember { mutableStateOf(false) }
     var installingUpdate by remember { mutableStateOf(false) }
     var updateChecked by remember { mutableStateOf(false) }
     var availableUpdate by remember { mutableStateOf<CyberQuizUpdateInfo?>(null) }
     var updateStatusText by remember { mutableStateOf<String?>(null) }
+
+    if (showFaq) {
+        FaqScreen(onBack = { showFaq = false })
+        return
+    }
 
     if (showContactForm) {
         ContactScreen(onBack = { showContactForm = false })
@@ -143,7 +149,9 @@ fun SettingsScreenV4(
         }
 
         SettingsV4SectionLabel("AIDE & SOUTIEN")
-        SettingsV4Item("?", "FAQ", "Questions fréquentes et aide", "BIENTÔT", SettingsV4Cyan)
+        SettingsV4Item("?", "FAQ", "Questions fréquentes et aide", "›", SettingsV4Cyan) {
+            showFaq = true
+        }
         SettingsV4Item("✉", "Nous contacter", "Formulaire de contact", "›", SettingsV4Purple) {
             showContactForm = true
         }
@@ -265,11 +273,7 @@ private fun SettingsV4UpdateCard(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                when {
-                    installing -> "…"
-                    checking -> "…"
-                    else -> "↻"
-                },
+                if (checking || installing) "…" else "↻",
                 color = if (checking || installing) SettingsV4Muted else accent,
                 fontSize = if (checking || installing) 20.sp else 25.sp,
                 fontWeight = FontWeight.Bold
@@ -352,8 +356,8 @@ private fun SettingsV4Item(
         }
         Text(
             trailing,
-            color = if (trailing == "BIENTÔT") SettingsV4Orange else accent,
-            fontSize = if (trailing == "BIENTÔT") 8.sp else 20.sp,
+            color = accent,
+            fontSize = 20.sp,
             fontWeight = FontWeight.Bold
         )
     }

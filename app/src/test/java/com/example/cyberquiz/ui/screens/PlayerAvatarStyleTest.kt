@@ -11,6 +11,10 @@ class PlayerAvatarStyleTest {
             PlayerAvatarStyle.PENTEST,
             playerAvatarFromStorage(PlayerAvatarStyle.PENTEST.storageKey)
         )
+        assertEquals(
+            PlayerAvatarStyle.CUSTOM,
+            playerAvatarFromStorage(PlayerAvatarStyle.CUSTOM.storageKey)
+        )
     }
 
     @Test
@@ -20,8 +24,15 @@ class PlayerAvatarStyleTest {
     }
 
     @Test
-    fun `five avatar choices expose unique storage keys`() {
-        assertEquals(5, PlayerAvatarStyle.entries.size)
-        assertTrue(PlayerAvatarStyle.entries.map { it.storageKey }.toSet().size == 5)
+    fun `five built in avatar choices keep unique storage keys`() {
+        assertEquals(5, builtInPlayerAvatarStyles.size)
+        assertTrue(builtInPlayerAvatarStyles.none { it == PlayerAvatarStyle.CUSTOM })
+        assertTrue(builtInPlayerAvatarStyles.map { it.storageKey }.toSet().size == 5)
+    }
+
+    @Test
+    fun `custom avatar uses its own storage key`() {
+        assertEquals("custom", PlayerAvatarStyle.CUSTOM.storageKey)
+        assertEquals(6, PlayerAvatarStyle.entries.size)
     }
 }
