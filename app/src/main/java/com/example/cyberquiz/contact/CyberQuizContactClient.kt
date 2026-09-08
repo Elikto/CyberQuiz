@@ -5,13 +5,20 @@ import com.example.cyberquiz.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.IOException
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
+
+internal class ContactRetryableException(message: String) : IOException(message)
 
 internal object CyberQuizContactClient {
     private const val MAX_RESPONSE_CHARS = 16_384
 
-    suspend fun send(reason: String, message: String): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun send(
+        reason: String,
+        message: String,
+        submissionId: String
+    ): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val endpoint = BuildConfig.CONTACT_API_URL.trim()
             if (endpoint.isBlank()) {
@@ -28,13 +35,16 @@ internal object CyberQuizContactClient {
                 .put("message", message.trim())
                 .put("appVersion", BuildConfig.VERSION_NAME)
                 .put("platform", "Android ${Build.VERSION.RELEASE}")
+                .put("submissionId", submissionId)
                 .toString()
                 .toByteArray(Charsets.UTF_8)
 
             val connection = (url.openConnection() as HttpsURLConnection).apply {
                 requestMethod = "POST"
-                connectTimeout = 8_000
-                readTimeout = 12_000
+                // This request runs in WorkManager, so it can tolerate a Render free-tier cold start
+                // without keeping the contact screen blocked.
+                connectTimeout = 30_000
+                readTimeout = 30_000
                 doOutput = true
                 instanceFollowRedirects = false
                 setRequestProperty("Content-Type", "application/json; charset=utf-8")
@@ -50,7 +60,12 @@ internal object CyberQuizContactClient {
                     val detail = readErrorDetail(connection)
                     when (status) {
                         429 -> error("Trop de messages envoyés. Réessaie plus tard.")
-                        503 -> error("Le service de contact est temporairement indisponible.")
+                        502, 503, 504 -> throw ContactRetryableException(
+                            detail ?: "Le service de contact est temporairement indisponible."
+                        )
+                        in 500..599 -> throw ContactRetryableException(
+                            detail ?: "Le service de contact est temporairement indisponible."
+                        )
                         else -> error(detail ?: "Le message n'a pas pu être envoyé.")
                     }
                 }
