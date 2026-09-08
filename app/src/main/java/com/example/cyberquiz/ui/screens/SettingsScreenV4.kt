@@ -3,6 +3,7 @@ package com.example.cyberquiz.ui.screens
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,15 +35,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cyberquiz.BuildConfig
+import com.example.cyberquiz.R
 import com.example.cyberquiz.ui.theme.CyberBackground
 import com.example.cyberquiz.update.CyberQuizUpdateInfo
 import com.example.cyberquiz.update.CyberQuizUpdateManager
@@ -222,14 +226,13 @@ private fun SettingsV4UpdateCard(
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            Modifier
+        Image(
+            painter = painterResource(R.mipmap.ic_launcher),
+            contentDescription = "Logo CyberQuiz",
+            modifier = Modifier
                 .size(56.dp)
-                .background(SettingsV4Purple.copy(alpha = .15f), RoundedCornerShape(17.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("CQ", color = SettingsV4Purple, fontSize = 19.sp, fontWeight = FontWeight.Black)
-        }
+                .clip(RoundedCornerShape(17.dp))
+        )
 
         Spacer(Modifier.width(14.dp))
 
