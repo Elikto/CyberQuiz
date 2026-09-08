@@ -278,7 +278,7 @@ private fun LevelRoadmapCard(
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Stretch
+        verticalAlignment = Alignment.Top
     ) {
         Column(
             modifier = Modifier.width(42.dp),
