@@ -12,7 +12,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,7 +47,6 @@ fun ProfileScreenV5(
     )
     var showCosmetics by rememberSaveable { mutableStateOf(false) }
     var showRewards by rememberSaveable { mutableStateOf(false) }
-    val engagement = remember(metrics) { EngagementStore.sync(context, metrics) }
 
     when {
         showCosmetics -> {
@@ -66,6 +64,7 @@ fun ProfileScreenV5(
         }
 
         else -> {
+            val engagement = EngagementStore.sync(context, metrics)
             Box {
                 ProfileScreenV5(
                     selectedQuizType = selectedQuizType,
