@@ -28,7 +28,7 @@ jobs:
     permissions:
       contents: read
     env:
-      CYBERQUIZ_CONTACT_API_URL: ${{ vars.CYBERQUIZ_CONTACT_API_URL }}
+      CYBERQUIZ_CONTACT_API_URL: https://cyberquiz-api.onrender.com/api/contact
     outputs:
       version_code: ${{ steps.release_meta.outputs.version_code }}
       version_name: ${{ steps.release_meta.outputs.version_name }}
@@ -51,7 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "$CYBERQUIZ_CONTACT_API_URL" || "$CYBERQUIZ_CONTACT_API_URL" != https://* ]]; then
-            echo "::error::Set repository variable CYBERQUIZ_CONTACT_API_URL to the deployed HTTPS /api/contact endpoint before publishing CyberQuiz."
+            echo "::error::CyberQuiz contact API URL must be HTTPS before publishing."
             exit 1
           fi
 
