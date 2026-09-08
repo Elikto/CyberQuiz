@@ -1,11 +1,9 @@
 import json
 import logging
 import os
-import smtplib
-import ssl
 import threading
 import time
-from email.message import EmailMessage
+import urllib.request
 from secrets import compare_digest
 from typing import Literal
 
@@ -20,6 +18,7 @@ app = FastAPI(title="CyberQuiz AI Backend", version="1.1.0")
 
 CONTACT_RATE_LIMIT = 5
 CONTACT_RATE_WINDOW_SECONDS = 60 * 60
+RESEND_EMAILS_URL = "https://api.resend.com/emails"
 _contact_attempts: dict[str, list[float]] = {}
 _contact_rate_lock = threading.Lock()
 
@@ -107,42 +106,22 @@ def _contact_enabled() -> bool:
     }
 
 
-def _contact_configuration() -> dict[str, object]:
+def _contact_configuration() -> dict[str, str]:
     if not _contact_enabled():
         raise HTTPException(503, "Le service de contact est temporairement indisponible")
 
-    host = os.getenv("CYBERQUIZ_SMTP_HOST", "").strip()
+    api_key = os.getenv("RESEND_API_KEY", "").strip()
     to_address = os.getenv("CYBERQUIZ_CONTACT_TO", "").strip()
     from_address = os.getenv("CYBERQUIZ_CONTACT_FROM", "").strip()
-    username = os.getenv("CYBERQUIZ_SMTP_USERNAME", "").strip()
-    password = os.getenv("CYBERQUIZ_SMTP_PASSWORD", "")
-    security = os.getenv("CYBERQUIZ_SMTP_SECURITY", "starttls").strip().lower()
 
-    try:
-        port = int(os.getenv("CYBERQUIZ_SMTP_PORT", "587"))
-    except ValueError:
-        port = 0
-
-    if not host or not to_address or not from_address or port not in range(1, 65536):
-        logger.error("Contact service enabled with incomplete SMTP configuration")
-        raise HTTPException(503, "Le service de contact est temporairement indisponible")
-
-    if security not in {"starttls", "ssl"}:
-        logger.error("Unsupported SMTP security mode for contact service")
-        raise HTTPException(503, "Le service de contact est temporairement indisponible")
-
-    if bool(username) != bool(password):
-        logger.error("SMTP username/password configuration is incomplete")
+    if not api_key or not to_address or not from_address:
+        logger.error("Contact service enabled with incomplete Resend configuration")
         raise HTTPException(503, "Le service de contact est temporairement indisponible")
 
     return {
-        "host": host,
-        "port": port,
+        "api_key": api_key,
         "to_address": to_address,
         "from_address": from_address,
-        "username": username,
-        "password": password,
-        "security": security,
     }
 
 
@@ -159,42 +138,39 @@ def _check_contact_rate_limit(client_id: str, now: float | None = None) -> None:
         _contact_attempts[client_id] = recent
 
 
-def _send_contact_email(req: ContactRequest, config: dict[str, object]) -> None:
-    email = EmailMessage()
-    email["Subject"] = CONTACT_SUBJECTS[req.reason]
-    email["From"] = str(config["from_address"])
-    email["To"] = str(config["to_address"])
-    email.set_content(
-        "\n".join(
-            [
-                f"Motif : {CONTACT_LABELS[req.reason]}",
-                f"Version CyberQuiz : {req.appVersion}",
-                f"Plateforme : {req.platform}",
-                "",
-                req.message,
-            ]
-        )
+def _send_contact_email(req: ContactRequest, config: dict[str, str]) -> None:
+    text = "\n".join(
+        [
+            f"Motif : {CONTACT_LABELS[req.reason]}",
+            f"Version CyberQuiz : {req.appVersion}",
+            f"Plateforme : {req.platform}",
+            "",
+            req.message,
+        ]
+    )
+    payload = json.dumps(
+        {
+            "from": config["from_address"],
+            "to": [config["to_address"]],
+            "subject": CONTACT_SUBJECTS[req.reason],
+            "text": text,
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        RESEND_EMAILS_URL,
+        data=payload,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {config['api_key']}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "CyberQuiz-Backend/1.1",
+        },
     )
 
-    tls_context = ssl.create_default_context()
-    host = str(config["host"])
-    port = int(config["port"])
-    username = str(config["username"])
-    password = str(config["password"])
-
-    if config["security"] == "ssl":
-        with smtplib.SMTP_SSL(host, port, timeout=10, context=tls_context) as server:
-            if username:
-                server.login(username, password)
-            server.send_message(email)
-    else:
-        with smtplib.SMTP(host, port, timeout=10) as server:
-            server.ehlo()
-            server.starttls(context=tls_context)
-            server.ehlo()
-            if username:
-                server.login(username, password)
-            server.send_message(email)
+    with urllib.request.urlopen(request, timeout=10) as response:
+        if response.status < 200 or response.status >= 300:
+            raise RuntimeError(f"Resend returned HTTP {response.status}")
 
 
 @app.get("/health")
