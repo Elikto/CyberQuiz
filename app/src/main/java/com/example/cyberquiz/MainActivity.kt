@@ -21,13 +21,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.cyberquiz.model.CATEGORY_MINI_QUIZ_SIZE
 import com.example.cyberquiz.model.QuizSessionConfig
 import com.example.cyberquiz.model.QuizSessionMode
 import com.example.cyberquiz.ui.screens.CategoriesScreenV3
 import com.example.cyberquiz.ui.screens.CyberMiniQuizCategoriesScreen
 import com.example.cyberquiz.ui.screens.HomeScreenV2
-import com.example.cyberquiz.ui.screens.ProfileScreenV3
+import com.example.cyberquiz.ui.screens.ProfileScreenV4
 import com.example.cyberquiz.ui.screens.QuizHistoryScreen
 import com.example.cyberquiz.ui.screens.QuizSetupScreenUx
 import com.example.cyberquiz.ui.screens.QuizType
@@ -271,12 +270,12 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                     CyberMiniQuizCategoriesScreen(
                         vm = vm,
                         onBack = { goBack() },
-                        onCategoryQuiz = { category ->
+                        onCategoryQuiz = { category, questionCount ->
                             startConfigured(
                                 QuizSessionConfig(
                                     mode = QuizSessionMode.RANDOM,
                                     categories = setOf(category),
-                                    questionCount = CATEGORY_MINI_QUIZ_SIZE
+                                    questionCount = questionCount
                                 )
                             )
                         },
@@ -341,7 +340,7 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                 }
             )
 
-            AppScreen.PROFILE -> ProfileScreenV3(
+            AppScreen.PROFILE -> ProfileScreenV4(
                 selectedQuizType = selectedQuizType,
                 onQuizTypeSelected = { type ->
                     selectedQuizTypeName = type.name
