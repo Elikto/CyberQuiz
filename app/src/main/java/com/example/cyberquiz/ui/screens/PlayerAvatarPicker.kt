@@ -1,5 +1,9 @@
 package com.example.cyberquiz.ui.screens
 
+import android.content.Context
+import android.content.SharedPreferences
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,8 +23,14 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -27,12 +38,20 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+internal const val PLAYER_COSMETICS_PREFERENCES = "cyberquiz_player_cosmetics"
+internal const val PLAYER_SELECTED_AVATAR_KEY = "selected_avatar"
+internal const val PLAYER_CUSTOM_AVATAR_PATH_KEY = "custom_avatar_path"
+internal const val PLAYER_CUSTOM_AVATAR_FILE = "cyberquiz_custom_avatar.jpg"
 
 internal enum class PlayerAvatarStyle(
     val storageKey: String,
@@ -43,11 +62,33 @@ internal enum class PlayerAvatarStyle(
     SOC("soc", "Analyste SOC", "Veille & défense"),
     PENTEST("pentest", "Pentester", "Mode offensif"),
     GHOST("ghost", "Ghost", "Discret & anonyme"),
-    ARCHITECT("architect", "Architecte cyber", "Expert système")
+    ARCHITECT("architect", "Architecte cyber", "Expert système"),
+    CUSTOM("custom", "Image personnelle", "Ton avatar")
 }
+
+internal val builtInPlayerAvatarStyles: List<PlayerAvatarStyle>
+    get() = PlayerAvatarStyle.entries.filter { it != PlayerAvatarStyle.CUSTOM }
 
 internal fun playerAvatarFromStorage(value: String?): PlayerAvatarStyle =
     PlayerAvatarStyle.entries.firstOrNull { it.storageKey == value } ?: PlayerAvatarStyle.BEGINNER
+
+internal fun playerCosmeticsPreferences(context: Context): SharedPreferences =
+    context.getSharedPreferences(PLAYER_COSMETICS_PREFERENCES, Context.MODE_PRIVATE)
+
+internal fun storedPlayerAvatar(context: Context): PlayerAvatarStyle =
+    playerAvatarFromStorage(
+        playerCosmeticsPreferences(context).getString(
+            PLAYER_SELECTED_AVATAR_KEY,
+            PlayerAvatarStyle.BEGINNER.storageKey
+        )
+    )
+
+internal fun storePlayerAvatar(context: Context, style: PlayerAvatarStyle) {
+    playerCosmeticsPreferences(context)
+        .edit()
+        .putString(PLAYER_SELECTED_AVATAR_KEY, style.storageKey)
+        .apply()
+}
 
 private fun avatarAccent(style: PlayerAvatarStyle): Color = when (style) {
     PlayerAvatarStyle.BEGINNER -> Color(0xFF27E9FF)
@@ -55,6 +96,7 @@ private fun avatarAccent(style: PlayerAvatarStyle): Color = when (style) {
     PlayerAvatarStyle.PENTEST -> Color(0xFFE35BFF)
     PlayerAvatarStyle.GHOST -> Color(0xFFD8E2FF)
     PlayerAvatarStyle.ARCHITECT -> Color(0xFFFFC857)
+    PlayerAvatarStyle.CUSTOM -> Color(0xFF19F2E5)
 }
 
 private fun avatarSecondary(style: PlayerAvatarStyle): Color = when (style) {
@@ -63,6 +105,7 @@ private fun avatarSecondary(style: PlayerAvatarStyle): Color = when (style) {
     PlayerAvatarStyle.PENTEST -> Color(0xFFFF5D8F)
     PlayerAvatarStyle.GHOST -> Color(0xFF7E8FB5)
     PlayerAvatarStyle.ARCHITECT -> Color(0xFF21D8FF)
+    PlayerAvatarStyle.CUSTOM -> Color(0xFFD652FF)
 }
 
 @Composable
@@ -71,27 +114,74 @@ internal fun PlayerAvatarButton(
     onClick: () -> Unit,
     size: Dp = 62.dp
 ) {
-    val accent = avatarAccent(style)
+    val context = LocalContext.current
+    val preferences = remember(context) { playerCosmeticsPreferences(context) }
+    var storedKey by remember {
+        mutableStateOf(
+            preferences.getString(PLAYER_SELECTED_AVATAR_KEY, style.storageKey) ?: style.storageKey
+        )
+    }
+    var customPath by remember {
+        mutableStateOf(preferences.getString(PLAYER_CUSTOM_AVATAR_PATH_KEY, null))
+    }
+
+    DisposableEffect(preferences) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+            when (key) {
+                PLAYER_SELECTED_AVATAR_KEY -> {
+                    storedKey = prefs.getString(PLAYER_SELECTED_AVATAR_KEY, style.storageKey)
+                        ?: style.storageKey
+                }
+                PLAYER_CUSTOM_AVATAR_PATH_KEY -> {
+                    customPath = prefs.getString(PLAYER_CUSTOM_AVATAR_PATH_KEY, null)
+                }
+            }
+        }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
+    val effectiveStyle = playerAvatarFromStorage(storedKey)
+    val accent = avatarAccent(effectiveStyle)
+    val customBitmap = remember(customPath, effectiveStyle) {
+        if (effectiveStyle == PlayerAvatarStyle.CUSTOM && !customPath.isNullOrBlank()) {
+            BitmapFactory.decodeFile(customPath)?.asImageBitmap()
+        } else {
+            null
+        }
+    }
+    val shape = RoundedCornerShape(20.dp)
+
     Box(
         modifier = Modifier
             .size(size)
+            .clip(shape)
             .background(
                 Brush.radialGradient(
                     listOf(accent.copy(alpha = .20f), Color(0xFF0A1730), Color(0xFF050A15))
-                ),
-                RoundedCornerShape(20.dp)
+                )
             )
-            .border(1.4.dp, accent.copy(alpha = .78f), RoundedCornerShape(20.dp))
+            .border(1.4.dp, accent.copy(alpha = .78f), shape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        AvatarArtwork(style = style, modifier = Modifier.size(size - 10.dp))
+        if (customBitmap != null) {
+            Image(
+                bitmap = customBitmap,
+                contentDescription = "Avatar personnel",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            AvatarArtwork(style = effectiveStyle, modifier = Modifier.size(size - 10.dp))
+        }
+
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(4.dp)
                 .size(15.dp)
-                .background(Color(0xFF071221), CircleShape)
+                .background(Color(0xCC071221), CircleShape)
                 .border(1.dp, accent, CircleShape),
             contentAlignment = Alignment.Center
         ) {
@@ -126,11 +216,7 @@ private fun AvatarArtwork(style: PlayerAvatarStyle, modifier: Modifier = Modifie
         drawPath(
             hood,
             brush = Brush.verticalGradient(
-                listOf(
-                    secondary.copy(alpha = .48f),
-                    Color(0xFF1C2743),
-                    Color(0xFF090F1E)
-                )
+                listOf(secondary.copy(alpha = .48f), Color(0xFF1C2743), Color(0xFF090F1E))
             )
         )
         drawPath(hood, accent.copy(alpha = .72f), style = Stroke(2.1f))
@@ -157,7 +243,6 @@ private fun AvatarArtwork(style: PlayerAvatarStyle, modifier: Modifier = Modifie
                     StrokeCap.Round
                 )
             }
-
             PlayerAvatarStyle.SOC -> {
                 drawRoundRect(
                     color = accent.copy(alpha = .88f),
@@ -183,7 +268,6 @@ private fun AvatarArtwork(style: PlayerAvatarStyle, modifier: Modifier = Modifie
                 )
                 drawCircle(secondary, 2.6f, Offset(w * .80f, h * .64f))
             }
-
             PlayerAvatarStyle.PENTEST -> {
                 drawRoundRect(
                     color = Color(0xFF15101F),
@@ -195,7 +279,6 @@ private fun AvatarArtwork(style: PlayerAvatarStyle, modifier: Modifier = Modifie
                 drawLine(accent, Offset(w * .54f, h * .45f), Offset(w * .65f, h * .47f), 2.8f, StrokeCap.Round)
                 drawLine(accent.copy(alpha = .65f), Offset(w * .42f, h * .60f), Offset(w * .58f, h * .60f), 1.7f, StrokeCap.Round)
             }
-
             PlayerAvatarStyle.GHOST -> {
                 drawRoundRect(
                     color = Color(0xFF111827),
@@ -215,7 +298,6 @@ private fun AvatarArtwork(style: PlayerAvatarStyle, modifier: Modifier = Modifie
                     )
                 }
             }
-
             PlayerAvatarStyle.ARCHITECT -> {
                 val badge = Path().apply {
                     moveTo(cx, h * .31f)
@@ -233,17 +315,31 @@ private fun AvatarArtwork(style: PlayerAvatarStyle, modifier: Modifier = Modifie
                 )
                 drawCircle(accent.copy(alpha = .45f), 4f, Offset(cx, h * .67f), style = Stroke(1.5f))
             }
+            PlayerAvatarStyle.CUSTOM -> {
+                drawCircle(accent.copy(alpha = .35f), w * .17f, Offset(cx, h * .42f))
+                drawArc(
+                    accent,
+                    205f,
+                    130f,
+                    false,
+                    Offset(w * .28f, h * .50f),
+                    Size(w * .44f, h * .25f),
+                    style = Stroke(2.4f, cap = StrokeCap.Round)
+                )
+            }
         }
 
-        drawArc(
-            color = secondary.copy(alpha = .72f),
-            startAngle = 205f,
-            sweepAngle = 130f,
-            useCenter = false,
-            topLeft = Offset(w * .33f, h * .57f),
-            size = Size(w * .34f, h * .17f),
-            style = Stroke(1.5f, cap = StrokeCap.Round)
-        )
+        if (style != PlayerAvatarStyle.CUSTOM) {
+            drawArc(
+                color = secondary.copy(alpha = .72f),
+                startAngle = 205f,
+                sweepAngle = 130f,
+                useCenter = false,
+                topLeft = Offset(w * .33f, h * .57f),
+                size = Size(w * .34f, h * .17f),
+                style = Stroke(1.5f, cap = StrokeCap.Round)
+            )
+        }
     }
 }
 
@@ -265,7 +361,7 @@ internal fun PlayerAvatarPickerDialog(
                     fontWeight = FontWeight.Black
                 )
                 Text(
-                    "Les skins et déblocages arriveront ensuite.",
+                    "5 avatars CyberQuiz · les skins arriveront ensuite.",
                     color = Color(0xFF9FAED3),
                     fontSize = 10.sp
                 )
@@ -273,22 +369,20 @@ internal fun PlayerAvatarPickerDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                PlayerAvatarStyle.entries.chunked(2).forEach { rowItems ->
+                builtInPlayerAvatarStyles.chunked(2).forEach { rowItems ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(9.dp)
                     ) {
-                        rowItems.forEach { style ->
+                        rowItems.forEach { avatarStyle ->
                             AvatarChoiceCard(
-                                style = style,
-                                selected = style == selected,
+                                style = avatarStyle,
+                                selected = avatarStyle == selected,
                                 modifier = Modifier.weight(1f),
-                                onClick = { onSelect(style) }
+                                onClick = { onSelect(avatarStyle) }
                             )
                         }
-                        if (rowItems.size == 1) {
-                            Spacer(Modifier.weight(1f))
-                        }
+                        if (rowItems.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }
@@ -303,7 +397,7 @@ internal fun PlayerAvatarPickerDialog(
 }
 
 @Composable
-private fun AvatarChoiceCard(
+internal fun AvatarChoiceCard(
     style: PlayerAvatarStyle,
     selected: Boolean,
     modifier: Modifier,
