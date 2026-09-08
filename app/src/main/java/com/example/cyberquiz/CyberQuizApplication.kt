@@ -1,12 +1,19 @@
 package com.example.cyberquiz
 
 import android.app.Application
+import com.example.cyberquiz.update.CyberQuizUpdateNotificationManager
+import com.example.cyberquiz.update.CyberQuizUpdateNotificationScheduler
 
 /**
  * Application process entry point.
  *
- * Update discovery is intentionally handled by the UI as a silent, passive check.
- * No dialog, toast, installer flow, or Android settings screen is ever launched from
- * the application lifecycle.
+ * Update checks stay passive: they never download or install an APK automatically.
+ * A background worker only posts a notification when a newer trusted CyberQuiz release exists.
  */
-class CyberQuizApplication : Application()
+class CyberQuizApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        CyberQuizUpdateNotificationManager.createNotificationChannel(this)
+        CyberQuizUpdateNotificationScheduler.schedule(this)
+    }
+}

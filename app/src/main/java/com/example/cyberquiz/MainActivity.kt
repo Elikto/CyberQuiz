@@ -1,11 +1,15 @@
 package com.example.cyberquiz
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -15,6 +19,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cyberquiz.model.CATEGORY_MINI_QUIZ_SIZE
 import com.example.cyberquiz.model.QuizSessionConfig
@@ -38,6 +43,10 @@ import com.example.cyberquiz.ui.screens.isPlayableNow
 import com.example.cyberquiz.ui.theme.CyberQuizTheme
 import com.example.cyberquiz.viewmodel.QuizViewModel
 
+private const val CYBERQUIZ_PREFERENCES = "cyberquiz_preferences"
+private const val KEY_UPDATE_NOTIFICATION_PERMISSION_REQUESTED =
+    "update_notification_permission_requested"
+
 enum class AppScreen {
     HOME,
     QUIZ_SETUP,
@@ -53,6 +62,9 @@ enum class AppScreen {
 }
 
 class MainActivity : ComponentActivity() {
+    private val updateNotificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -62,6 +74,28 @@ class MainActivity : ComponentActivity() {
                 CyberQuizApp()
             }
         }
+
+        requestUpdateNotificationPermissionIfNeeded()
+    }
+
+    private fun requestUpdateNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+
+        val preferences = getSharedPreferences(CYBERQUIZ_PREFERENCES, Context.MODE_PRIVATE)
+        if (preferences.getBoolean(KEY_UPDATE_NOTIFICATION_PERMISSION_REQUESTED, false)) return
+
+        preferences.edit()
+            .putBoolean(KEY_UPDATE_NOTIFICATION_PERMISSION_REQUESTED, true)
+            .apply()
+        updateNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }
 
@@ -69,7 +103,7 @@ class MainActivity : ComponentActivity() {
 private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
     val context = LocalContext.current
     val preferences = remember(context) {
-        context.getSharedPreferences("cyberquiz_preferences", Context.MODE_PRIVATE)
+        context.getSharedPreferences(CYBERQUIZ_PREFERENCES, Context.MODE_PRIVATE)
     }
     val storedQuizTypeName = remember {
         preferences.getString("selected_quiz_type", QuizType.CYBERSECURITY.name)
