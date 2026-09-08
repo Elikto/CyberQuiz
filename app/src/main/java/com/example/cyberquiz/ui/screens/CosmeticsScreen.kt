@@ -1,6 +1,5 @@
 package com.example.cyberquiz.ui.screens
 
-import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,10 +22,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,9 +56,7 @@ fun CosmeticsScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val preferences = remember(context) {
-        context.getSharedPreferences(PLAYER_COSMETICS_PREFERENCES, Context.MODE_PRIVATE)
-    }
+    val preferences = remember(context) { playerCosmeticsPreferences(context) }
     var selectedTab by rememberSaveable { mutableStateOf(CosmeticsTab.AVATARS) }
     var selectedAvatarKey by rememberSaveable {
         mutableStateOf(
@@ -95,13 +92,8 @@ fun CosmeticsScreen(
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        CosmeticsHeader(onBack = onBack)
-
-        CosmeticsPreview(
-            playerLevel = playerLevel,
-            avatar = selectedAvatar,
-            banner = selectedBanner
-        )
+        CosmeticsHeader(onBack)
+        CosmeticsPreview(playerLevel, selectedAvatar, selectedBanner)
 
         Row(
             modifier = Modifier
@@ -271,43 +263,44 @@ private fun AvatarCatalog(
     onSelect: (PlayerAvatarStyle) -> Unit
 ) {
     CosmeticsSectionTitle("DISPONIBLES", "5 avatars offerts dès le départ")
-    CosmeticsGrid {
-        starterPlayerAvatarStyles.forEach { style ->
-            AvatarCosmeticCard(
-                style = style,
-                playerLevel = playerLevel,
-                selected = style == selected,
-                selectedBanner = selectedBanner,
-                onSelect = onSelect
-            )
-        }
-    }
+    AvatarGrid(starterPlayerAvatarStyles, playerLevel, selected, selectedBanner, onSelect)
 
     Spacer(Modifier.height(7.dp))
     CosmeticsSectionTitle("PAR NIVEAU", "Continue à jouer pour les débloquer")
-    CosmeticsGrid {
-        levelPlayerAvatarStyles.forEach { style ->
-            AvatarCosmeticCard(
-                style = style,
-                playerLevel = playerLevel,
-                selected = style == selected,
-                selectedBanner = selectedBanner,
-                onSelect = onSelect
-            )
-        }
-    }
+    AvatarGrid(levelPlayerAvatarStyles, playerLevel, selected, selectedBanner, onSelect)
 
     Spacer(Modifier.height(7.dp))
     CosmeticsSectionTitle("SECRETS", "10 avatars rares à découvrir")
-    CosmeticsGrid {
-        mysteryPlayerAvatarStyles.forEach { style ->
-            AvatarCosmeticCard(
-                style = style,
-                playerLevel = playerLevel,
-                selected = false,
-                selectedBanner = selectedBanner,
-                onSelect = onSelect
-            )
+    AvatarGrid(mysteryPlayerAvatarStyles, playerLevel, selected, selectedBanner, onSelect)
+}
+
+@Composable
+private fun AvatarGrid(
+    styles: List<PlayerAvatarStyle>,
+    playerLevel: Int,
+    selected: PlayerAvatarStyle,
+    selectedBanner: PlayerBannerStyle,
+    onSelect: (PlayerAvatarStyle) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        styles.chunked(2).forEach { rowItems ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(9.dp)
+            ) {
+                rowItems.forEach { style ->
+                    Box(Modifier.weight(1f)) {
+                        AvatarCosmeticCard(
+                            style = style,
+                            playerLevel = playerLevel,
+                            selected = style == selected,
+                            selectedBanner = selectedBanner,
+                            onSelect = onSelect
+                        )
+                    }
+                }
+                if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+            }
         }
     }
 }
@@ -319,25 +312,42 @@ private fun BannerCatalog(
     onSelect: (PlayerBannerStyle) -> Unit
 ) {
     CosmeticsSectionTitle("DISPONIBLES", "Arrière-plans utilisables immédiatement")
-    CosmeticsGrid {
-        starterPlayerBannerStyles.forEach { style ->
-            BannerCosmeticCard(style, playerLevel, style == selected, onSelect)
-        }
-    }
+    BannerGrid(starterPlayerBannerStyles, playerLevel, selected, onSelect)
 
     Spacer(Modifier.height(7.dp))
     CosmeticsSectionTitle("PAR NIVEAU", "De nouvelles ambiances avec ta progression")
-    CosmeticsGrid {
-        levelPlayerBannerStyles.forEach { style ->
-            BannerCosmeticCard(style, playerLevel, style == selected, onSelect)
-        }
-    }
+    BannerGrid(levelPlayerBannerStyles, playerLevel, selected, onSelect)
 
     Spacer(Modifier.height(7.dp))
     CosmeticsSectionTitle("SECRÈTES", "Bannières rares pour les futures récompenses")
-    CosmeticsGrid {
-        mysteryPlayerBannerStyles.forEach { style ->
-            BannerCosmeticCard(style, playerLevel, false, onSelect)
+    BannerGrid(mysteryPlayerBannerStyles, playerLevel, selected, onSelect)
+}
+
+@Composable
+private fun BannerGrid(
+    styles: List<PlayerBannerStyle>,
+    playerLevel: Int,
+    selected: PlayerBannerStyle,
+    onSelect: (PlayerBannerStyle) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        styles.chunked(2).forEach { rowItems ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(9.dp)
+            ) {
+                rowItems.forEach { style ->
+                    Box(Modifier.weight(1f)) {
+                        BannerCosmeticCard(
+                            style = style,
+                            playerLevel = playerLevel,
+                            selected = style == selected,
+                            onSelect = onSelect
+                        )
+                    }
+                }
+                if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+            }
         }
     }
 }
@@ -347,20 +357,6 @@ private fun CosmeticsSectionTitle(title: String, subtitle: String) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(title, color = CosmeticsBlue, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.5.sp)
         Text(subtitle, color = CosmeticsMuted, fontSize = 10.sp)
-    }
-}
-
-@Composable
-private fun CosmeticsGrid(content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        val marker = remember { mutableStateOf(0) }
-        marker.value = 0
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(9.dp)
-        ) {
-            Box(Modifier.weight(1f)) { content() }
-        }
     }
 }
 
@@ -402,25 +398,18 @@ private fun AvatarCosmeticCard(
         verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         Box(contentAlignment = Alignment.Center) {
-            PlayerAvatarButton(
-                style = style,
-                onClick = { if (unlocked) onSelect(style) },
-                size = 68.dp,
-                syncWithStoredSelection = false,
-                bannerStyle = selectedBanner,
-                syncBannerWithStoredSelection = false,
-                showEditBadge = false,
-                modifier = Modifier
-            )
+            Box(modifier = if (mystery) Modifier.blur(7.dp) else Modifier) {
+                PlayerAvatarButton(
+                    style = style,
+                    onClick = { if (unlocked) onSelect(style) },
+                    size = 68.dp,
+                    syncWithStoredSelection = false,
+                    bannerStyle = selectedBanner,
+                    syncBannerWithStoredSelection = false,
+                    showEditBadge = false
+                )
+            }
             if (!unlocked) {
-                if (mystery) {
-                    Box(
-                        Modifier
-                            .size(68.dp)
-                            .blur(7.dp)
-                            .background(Color(0x55000000), RoundedCornerShape(20.dp))
-                    )
-                }
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -480,12 +469,13 @@ private fun BannerCosmeticCard(
                 .background(Color(0xFF040811), RoundedCornerShape(13.dp)),
             contentAlignment = Alignment.Center
         ) {
-            PlayerBannerBackdrop(
-                style = style,
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(if (mystery) Modifier.blur(7.dp) else Modifier)
-            )
+            ) {
+                PlayerBannerBackdrop(style = style, modifier = Modifier.fillMaxSize())
+            }
             if (!unlocked) {
                 Box(
                     modifier = Modifier
