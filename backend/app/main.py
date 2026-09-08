@@ -4,8 +4,10 @@ import os
 import threading
 import time
 import urllib.request
+from datetime import datetime, timezone
 from secrets import compare_digest
 from typing import Literal
+from uuid import uuid4
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -14,11 +16,13 @@ from pydantic import BaseModel, Field, field_validator
 
 load_dotenv()
 logger = logging.getLogger("cyberquiz.backend")
-app = FastAPI(title="CyberQuiz AI Backend", version="1.1.0")
+app = FastAPI(title="CyberQuiz AI Backend", version="1.2.0")
 
 CONTACT_RATE_LIMIT = 5
 CONTACT_RATE_WINDOW_SECONDS = 60 * 60
+CONTACT_MESSAGE_PART_SIZE = 1500
 RESEND_EMAILS_URL = "https://api.resend.com/emails"
+RESEND_CONTACTS_URL = "https://api.resend.com/contacts"
 _contact_attempts: dict[str, list[float]] = {}
 _contact_rate_lock = threading.Lock()
 
@@ -111,15 +115,22 @@ def _contact_configuration() -> dict[str, str]:
         raise HTTPException(503, "Le service de contact est temporairement indisponible")
 
     api_key = os.getenv("RESEND_API_KEY", "").strip()
+    inbox_segment_id = os.getenv("CYBERQUIZ_CONTACT_INBOX_SEGMENT_ID", "").strip()
     to_address = os.getenv("CYBERQUIZ_CONTACT_TO", "").strip()
     from_address = os.getenv("CYBERQUIZ_CONTACT_FROM", "").strip()
 
-    if not api_key or not to_address or not from_address:
-        logger.error("Contact service enabled with incomplete Resend configuration")
+    if not api_key or not inbox_segment_id:
+        logger.error("Contact service enabled without Resend inbox configuration")
         raise HTTPException(503, "Le service de contact est temporairement indisponible")
+
+    if bool(to_address) != bool(from_address):
+        logger.warning("Contact email notification configuration is incomplete; notifications disabled")
+        to_address = ""
+        from_address = ""
 
     return {
         "api_key": api_key,
+        "inbox_segment_id": inbox_segment_id,
         "to_address": to_address,
         "from_address": from_address,
     }
@@ -138,7 +149,55 @@ def _check_contact_rate_limit(client_id: str, now: float | None = None) -> None:
         _contact_attempts[client_id] = recent
 
 
+def _resend_post(url: str, payload: dict[str, object], api_key: str) -> dict[str, object]:
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "CyberQuiz-Backend/1.2",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        if response.status < 200 or response.status >= 300:
+            raise RuntimeError(f"Resend returned HTTP {response.status}")
+        raw = response.read()
+        if not raw:
+            return {}
+        return json.loads(raw.decode("utf-8"))
+
+
+def _store_contact_submission(req: ContactRequest, config: dict[str, str]) -> str:
+    submission_id = uuid4().hex
+    message_part_1 = req.message[:CONTACT_MESSAGE_PART_SIZE]
+    message_part_2 = req.message[CONTACT_MESSAGE_PART_SIZE:]
+    payload: dict[str, object] = {
+        "email": f"cyberquiz-contact-{submission_id}@example.com",
+        "unsubscribed": True,
+        "properties": {
+            "cq_reason": CONTACT_LABELS[req.reason],
+            "cq_message_1": message_part_1,
+            "cq_message_2": message_part_2,
+            "cq_app_version": req.appVersion,
+            "cq_platform": req.platform,
+            "cq_submitted_at": datetime.now(timezone.utc).isoformat(),
+        },
+        "segments": [{"id": config["inbox_segment_id"]}],
+    }
+    result = _resend_post(RESEND_CONTACTS_URL, payload, config["api_key"])
+    contact_id = str(result.get("id", "")).strip()
+    if not contact_id:
+        raise RuntimeError("Resend did not return a contact id")
+    return contact_id
+
+
 def _send_contact_email(req: ContactRequest, config: dict[str, str]) -> None:
+    if not config.get("from_address") or not config.get("to_address"):
+        return
+
     text = "\n".join(
         [
             f"Motif : {CONTACT_LABELS[req.reason]}",
@@ -148,29 +207,16 @@ def _send_contact_email(req: ContactRequest, config: dict[str, str]) -> None:
             req.message,
         ]
     )
-    payload = json.dumps(
+    _resend_post(
+        RESEND_EMAILS_URL,
         {
             "from": config["from_address"],
             "to": [config["to_address"]],
             "subject": CONTACT_SUBJECTS[req.reason],
             "text": text,
-        }
-    ).encode("utf-8")
-    request = urllib.request.Request(
-        RESEND_EMAILS_URL,
-        data=payload,
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {config['api_key']}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "CyberQuiz-Backend/1.1",
         },
+        config["api_key"],
     )
-
-    with urllib.request.urlopen(request, timeout=10) as response:
-        if response.status < 200 or response.status >= 300:
-            raise RuntimeError(f"Resend returned HTTP {response.status}")
 
 
 @app.get("/health")
@@ -185,10 +231,16 @@ def contact(req: ContactRequest, request: Request):
     _check_contact_rate_limit(client_id)
 
     try:
+        _store_contact_submission(req, config)
+    except Exception:
+        logger.exception("Contact message persistence failed")
+        raise HTTPException(502, "Le message n'a pas pu être enregistré. Réessaie plus tard.") from None
+
+    try:
         _send_contact_email(req, config)
     except Exception:
-        logger.exception("Contact message delivery failed")
-        raise HTTPException(502, "Le message n'a pas pu être envoyé. Réessaie plus tard.") from None
+        # The durable inbox entry is the source of truth. Email is a best-effort notification only.
+        logger.warning("Contact email notification failed after message persistence", exc_info=True)
 
     return ContactResponse(sent=True)
 
