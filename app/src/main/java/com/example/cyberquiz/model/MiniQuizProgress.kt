@@ -20,7 +20,7 @@ fun categoryMiniQuizAttempts(
         entry.config.questionCount == CATEGORY_MINI_QUIZ_SIZE &&
             entry.config.categories.size == 1 &&
             category in entry.config.categories &&
-            entry.answered > 0
+            entry.answered == CATEGORY_MINI_QUIZ_SIZE
     }
     .sortedWith(compareBy<QuizHistoryEntry> { it.endedAt }.thenBy { it.id })
     .mapIndexed { index, entry ->

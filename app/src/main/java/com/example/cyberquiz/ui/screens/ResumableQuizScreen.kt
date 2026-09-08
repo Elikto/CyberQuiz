@@ -68,7 +68,7 @@ fun ResumableQuizScreen(
             text = {
                 Text(
                     if (configuredSession) {
-                        "Ta progression est déjà enregistrée. Tu pourras reprendre ce quiz exactement là où tu l'as laissé depuis l'écran Commencer."
+                        "Ta progression est déjà enregistrée. En quittant, tu reviendras à l'écran Commencer et tu pourras reprendre ce quiz exactement là où tu l'as laissé."
                     } else {
                         "Cette session n'est pas enregistrée comme quiz à reprendre. Si tu quittes maintenant, cette série sera interrompue."
                     },
@@ -79,10 +79,18 @@ fun ResumableQuizScreen(
                 TextButton(
                     onClick = {
                         showExitConfirmation = false
-                        onBack()
+                        if (configuredSession) {
+                            onOtherQuiz()
+                        } else {
+                            onBack()
+                        }
                     }
                 ) {
-                    Text("QUITTER", color = ExitDialogRed, fontWeight = FontWeight.Black)
+                    Text(
+                        if (configuredSession) "QUITTER ET GARDER" else "QUITTER",
+                        color = ExitDialogRed,
+                        fontWeight = FontWeight.Black
+                    )
                 }
             },
             dismissButton = {
