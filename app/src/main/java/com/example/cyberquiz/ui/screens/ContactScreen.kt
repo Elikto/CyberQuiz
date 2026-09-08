@@ -1,8 +1,5 @@
 package com.example.cyberquiz.ui.screens
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,19 +31,21 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cyberquiz.BuildConfig
+import com.example.cyberquiz.contact.CyberQuizContactClient
 import com.example.cyberquiz.ui.theme.CyberBackground
+import kotlinx.coroutines.launch
 
 private const val CONTACT_EMAIL = "elikto@proton.me"
 private const val MAX_CONTACT_MESSAGE_CHARS = 3000
@@ -61,28 +60,31 @@ private val ContactMuted = Color(0xFF9FAED3)
 private val ContactBorder = Color(0xFF244777)
 
 private data class ContactReason(
+    val code: String,
     val label: String,
     val subject: String
 )
 
 private val contactReasons = listOf(
-    ContactReason("Signaler un bug", "[CyberQuiz] Signalement de bug"),
-    ContactReason("Proposer une amélioration", "[CyberQuiz] Proposition d'amélioration"),
-    ContactReason("Problème de mise à jour", "[CyberQuiz] Problème de mise à jour"),
-    ContactReason("Question sur un quiz / contenu", "[CyberQuiz] Question sur un quiz ou contenu"),
-    ContactReason("Aide / support", "[CyberQuiz] Demande d'aide"),
-    ContactReason("Autre", "[CyberQuiz] Contact")
+    ContactReason("bug", "Signaler un bug", "[CyberQuiz] Signalement de bug"),
+    ContactReason("improvement", "Proposer une amélioration", "[CyberQuiz] Proposition d'amélioration"),
+    ContactReason("update", "Problème de mise à jour", "[CyberQuiz] Problème de mise à jour"),
+    ContactReason("content", "Question sur un quiz / contenu", "[CyberQuiz] Question sur un quiz ou contenu"),
+    ContactReason("support", "Aide / support", "[CyberQuiz] Demande d'aide"),
+    ContactReason("other", "Autre", "[CyberQuiz] Contact")
 )
 
 @Composable
 fun ContactScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var selectedReasonIndex by rememberSaveable { mutableStateOf(0) }
     var reasonMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var message by rememberSaveable { mutableStateOf("") }
     var sendError by rememberSaveable { mutableStateOf<String?>(null) }
+    var sendSuccess by rememberSaveable { mutableStateOf<String?>(null) }
+    var sending by remember { mutableStateOf(false) }
     val selectedReason = contactReasons[selectedReasonIndex]
-    val canSend = message.isNotBlank()
+    val canSend = message.isNotBlank() && !sending
 
     BackHandler(onBack = onBack)
 
@@ -127,7 +129,7 @@ fun ContactScreen(onBack: () -> Unit) {
                 fontWeight = FontWeight.Black
             )
             Text(
-                "Choisis le motif du message puis décris ta demande. Le bouton Envoyer ouvrira ton application de messagerie avec tout déjà rempli.",
+                "Choisis le motif puis décris ta demande. Le message est envoyé directement depuis l'application, sans ouvrir ta messagerie.",
                 color = ContactMuted,
                 fontSize = 12.sp,
                 lineHeight = 17.sp
@@ -142,7 +144,7 @@ fun ContactScreen(onBack: () -> Unit) {
                     .fillMaxWidth()
                     .background(Color(0xFF081329), RoundedCornerShape(18.dp))
                     .border(1.dp, ContactBorder, RoundedCornerShape(18.dp))
-                    .clickable { reasonMenuExpanded = true }
+                    .clickable(enabled = !sending) { reasonMenuExpanded = true }
                     .padding(horizontal = 15.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -187,6 +189,7 @@ fun ContactScreen(onBack: () -> Unit) {
                             selectedReasonIndex = index
                             reasonMenuExpanded = false
                             sendError = null
+                            sendSuccess = null
                         }
                     )
                 }
@@ -194,7 +197,7 @@ fun ContactScreen(onBack: () -> Unit) {
         }
 
         Text(
-            "Objet de l'e-mail : ${selectedReason.subject}",
+            "Objet : ${selectedReason.subject}",
             color = ContactMuted,
             fontSize = 10.5.sp,
             lineHeight = 14.sp,
@@ -206,11 +209,13 @@ fun ContactScreen(onBack: () -> Unit) {
         OutlinedTextField(
             value = message,
             onValueChange = { newValue ->
-                if (newValue.length <= MAX_CONTACT_MESSAGE_CHARS) {
+                if (!sending && newValue.length <= MAX_CONTACT_MESSAGE_CHARS) {
                     message = newValue
                     sendError = null
+                    sendSuccess = null
                 }
             },
+            enabled = !sending,
             modifier = Modifier.fillMaxWidth(),
             placeholder = {
                 Text(
@@ -232,49 +237,53 @@ fun ContactScreen(onBack: () -> Unit) {
             colors = TextFieldDefaults.colors(
                 focusedTextColor = ContactText,
                 unfocusedTextColor = ContactText,
+                disabledTextColor = ContactMuted,
                 focusedContainerColor = Color(0xFF081329),
                 unfocusedContainerColor = Color(0xFF081329),
+                disabledContainerColor = Color(0xFF081329),
                 focusedIndicatorColor = ContactCyan,
                 unfocusedIndicatorColor = ContactBorder,
+                disabledIndicatorColor = ContactBorder,
                 cursorColor = ContactCyan
             )
         )
 
-        if (sendError != null) {
-            Text(
-                sendError.orEmpty(),
-                color = ContactOrange,
-                fontSize = 11.sp,
-                lineHeight = 15.sp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(ContactOrange.copy(alpha = .08f), RoundedCornerShape(12.dp))
-                    .border(1.dp, ContactOrange.copy(alpha = .35f), RoundedCornerShape(12.dp))
-                    .padding(11.dp)
+        sendError?.let { error ->
+            ContactStatusMessage(
+                text = error,
+                accent = ContactOrange
+            )
+        }
+
+        sendSuccess?.let { success ->
+            ContactStatusMessage(
+                text = success,
+                accent = ContactGreen
             )
         }
 
         Button(
             enabled = canSend,
             onClick = {
-                val body = buildString {
-                    append(message.trim())
-                    append("\n\n---\n")
-                    append("Envoyé depuis CyberQuiz ")
-                    append(BuildConfig.VERSION_NAME)
-                    append(" sur Android")
-                }
-                val mailUri = Uri.parse("mailto:$CONTACT_EMAIL")
-                    .buildUpon()
-                    .appendQueryParameter("subject", selectedReason.subject)
-                    .appendQueryParameter("body", body)
-                    .build()
-                val intent = Intent(Intent.ACTION_SENDTO, mailUri)
+                if (sending) return@Button
+                sending = true
+                sendError = null
+                sendSuccess = null
+                val pendingMessage = message.trim()
+                val pendingReason = selectedReason.code
 
-                try {
-                    context.startActivity(intent)
-                } catch (_: ActivityNotFoundException) {
-                    sendError = "Aucune application de messagerie compatible n'est installée. Tu peux écrire à $CONTACT_EMAIL."
+                scope.launch {
+                    val result = CyberQuizContactClient.send(pendingReason, pendingMessage)
+                    sending = false
+                    result.fold(
+                        onSuccess = {
+                            message = ""
+                            sendSuccess = "Message envoyé. Merci, nous l'avons bien reçu."
+                        },
+                        onFailure = { error ->
+                            sendError = error.message ?: "Le message n'a pas pu être envoyé. Réessaie plus tard."
+                        }
+                    )
                 }
             },
             modifier = Modifier
@@ -289,7 +298,7 @@ fun ContactScreen(onBack: () -> Unit) {
             )
         ) {
             Text(
-                "ENVOYER",
+                if (sending) "ENVOI…" else "ENVOYER",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Black,
                 letterSpacing = 1.3.sp
@@ -306,6 +315,21 @@ fun ContactScreen(onBack: () -> Unit) {
 
         Spacer(Modifier.height(4.dp))
     }
+}
+
+@Composable
+private fun ContactStatusMessage(text: String, accent: Color) {
+    Text(
+        text,
+        color = accent,
+        fontSize = 11.sp,
+        lineHeight = 15.sp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(accent.copy(alpha = .08f), RoundedCornerShape(12.dp))
+            .border(1.dp, accent.copy(alpha = .35f), RoundedCornerShape(12.dp))
+            .padding(11.dp)
+    )
 }
 
 @Composable

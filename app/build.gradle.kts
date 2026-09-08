@@ -7,10 +7,17 @@ plugins {
 val cyberVersionCode = providers.gradleProperty("cyberVersionCode").orElse("1").get().toInt()
 val cyberVersionName = providers.gradleProperty("cyberVersionName").orElse("1.0").get()
 val roomSchemaLocation = providers.gradleProperty("roomSchemaLocation").orElse("$projectDir/schemas").get()
+val cyberContactApiUrl = providers.gradleProperty("cyberContactApiUrl")
+    .orElse(providers.environmentVariable("CYBERQUIZ_CONTACT_API_URL"))
+    .orElse("https://cyberquiz-api.onrender.com/api/contact")
+    .get()
 val updateKeystorePath = System.getenv("CYBERQUIZ_KEYSTORE_PATH")
 val updateKeystorePassword = System.getenv("CYBERQUIZ_KEYSTORE_PASSWORD")
 val updateKeyAlias = System.getenv("CYBERQUIZ_KEY_ALIAS")
 val updateKeyPassword = System.getenv("CYBERQUIZ_KEY_PASSWORD")
+
+fun quotedBuildConfigValue(value: String): String =
+    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 android {
     // Keep the Kotlin/Android namespace stable to avoid an unnecessary source-code move.
@@ -25,6 +32,7 @@ android {
         versionCode = cyberVersionCode
         versionName = cyberVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "CONTACT_API_URL", quotedBuildConfigValue(cyberContactApiUrl))
     }
 
     val updateSigningConfig = if (
