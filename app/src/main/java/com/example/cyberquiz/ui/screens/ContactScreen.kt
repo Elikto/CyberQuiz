@@ -31,21 +31,19 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cyberquiz.contact.CyberQuizContactClient
+import com.example.cyberquiz.contact.CyberQuizContactQueue
 import com.example.cyberquiz.ui.theme.CyberBackground
-import kotlinx.coroutines.launch
 
 private const val CONTACT_EMAIL = "elikto@proton.me"
 private const val MAX_CONTACT_MESSAGE_CHARS = 3000
@@ -76,15 +74,14 @@ private val contactReasons = listOf(
 
 @Composable
 fun ContactScreen(onBack: () -> Unit) {
-    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var selectedReasonIndex by rememberSaveable { mutableStateOf(0) }
     var reasonMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var message by rememberSaveable { mutableStateOf("") }
     var sendError by rememberSaveable { mutableStateOf<String?>(null) }
     var sendSuccess by rememberSaveable { mutableStateOf<String?>(null) }
-    var sending by remember { mutableStateOf(false) }
     val selectedReason = contactReasons[selectedReasonIndex]
-    val canSend = message.isNotBlank() && !sending
+    val canSend = message.isNotBlank()
 
     BackHandler(onBack = onBack)
 
@@ -129,7 +126,7 @@ fun ContactScreen(onBack: () -> Unit) {
                 fontWeight = FontWeight.Black
             )
             Text(
-                "Choisis le motif puis décris ta demande. Le message est envoyé directement depuis l'application, sans ouvrir ta messagerie.",
+                "Choisis le motif puis décris ta demande. CyberQuiz prend immédiatement le message en charge puis l'envoie en arrière-plan, même si le serveur doit se réveiller.",
                 color = ContactMuted,
                 fontSize = 12.sp,
                 lineHeight = 17.sp
@@ -144,7 +141,7 @@ fun ContactScreen(onBack: () -> Unit) {
                     .fillMaxWidth()
                     .background(Color(0xFF081329), RoundedCornerShape(18.dp))
                     .border(1.dp, ContactBorder, RoundedCornerShape(18.dp))
-                    .clickable(enabled = !sending) { reasonMenuExpanded = true }
+                    .clickable { reasonMenuExpanded = true }
                     .padding(horizontal = 15.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -209,13 +206,12 @@ fun ContactScreen(onBack: () -> Unit) {
         OutlinedTextField(
             value = message,
             onValueChange = { newValue ->
-                if (!sending && newValue.length <= MAX_CONTACT_MESSAGE_CHARS) {
+                if (newValue.length <= MAX_CONTACT_MESSAGE_CHARS) {
                     message = newValue
                     sendError = null
                     sendSuccess = null
                 }
             },
-            enabled = !sending,
             modifier = Modifier.fillMaxWidth(),
             placeholder = {
                 Text(
@@ -237,13 +233,10 @@ fun ContactScreen(onBack: () -> Unit) {
             colors = TextFieldDefaults.colors(
                 focusedTextColor = ContactText,
                 unfocusedTextColor = ContactText,
-                disabledTextColor = ContactMuted,
                 focusedContainerColor = Color(0xFF081329),
                 unfocusedContainerColor = Color(0xFF081329),
-                disabledContainerColor = Color(0xFF081329),
                 focusedIndicatorColor = ContactCyan,
                 unfocusedIndicatorColor = ContactBorder,
-                disabledIndicatorColor = ContactBorder,
                 cursorColor = ContactCyan
             )
         )
@@ -265,26 +258,24 @@ fun ContactScreen(onBack: () -> Unit) {
         Button(
             enabled = canSend,
             onClick = {
-                if (sending) return@Button
-                sending = true
                 sendError = null
                 sendSuccess = null
                 val pendingMessage = message.trim()
                 val pendingReason = selectedReason.code
 
-                scope.launch {
-                    val result = CyberQuizContactClient.send(pendingReason, pendingMessage)
-                    sending = false
-                    result.fold(
-                        onSuccess = {
-                            message = ""
-                            sendSuccess = "Message envoyé. Merci, nous l'avons bien reçu."
-                        },
-                        onFailure = { error ->
-                            sendError = error.message ?: "Le message n'a pas pu être envoyé. Réessaie plus tard."
-                        }
-                    )
-                }
+                CyberQuizContactQueue.enqueue(
+                    context = context,
+                    reason = pendingReason,
+                    message = pendingMessage
+                ).fold(
+                    onSuccess = {
+                        message = ""
+                        sendSuccess = "Message pris en charge. CyberQuiz l'envoie en arrière-plan et réessaiera automatiquement si nécessaire."
+                    },
+                    onFailure = { error ->
+                        sendError = error.message ?: "Le message n'a pas pu être préparé pour l'envoi."
+                    }
+                )
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -298,7 +289,7 @@ fun ContactScreen(onBack: () -> Unit) {
             )
         ) {
             Text(
-                if (sending) "ENVOI…" else "ENVOYER",
+                "ENVOYER",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Black,
                 letterSpacing = 1.3.sp
