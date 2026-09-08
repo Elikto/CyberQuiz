@@ -17,6 +17,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -25,6 +26,8 @@ import com.example.cyberquiz.MainActivity
 import com.example.cyberquiz.R
 import java.util.concurrent.TimeUnit
 
+internal const val UPDATE_CHECK_INTERVAL_MINUTES = 15L
+
 internal fun shouldNotifyUpdate(
     currentVersionCode: Int,
     remoteVersionCode: Int,
@@ -32,7 +35,7 @@ internal fun shouldNotifyUpdate(
 ): Boolean = remoteVersionCode > currentVersionCode && remoteVersionCode > lastNotifiedVersionCode
 
 internal object CyberQuizUpdateNotificationManager {
-    private const val CHANNEL_ID = "cyberquiz_updates"
+    private const val CHANNEL_ID = "cyberquiz_updates_priority"
     private const val CHANNEL_NAME = "Mises à jour CyberQuiz"
     private const val PREFERENCES_NAME = "cyberquiz_update_notifications"
     private const val KEY_LAST_NOTIFIED_VERSION_CODE = "last_notified_version_code"
@@ -42,10 +45,11 @@ internal object CyberQuizUpdateNotificationManager {
         val channel = NotificationChannel(
             CHANNEL_ID,
             CHANNEL_NAME,
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "Alerte lorsqu'une nouvelle version de CyberQuiz est disponible."
+            description = "Alerte dès qu'une nouvelle version de CyberQuiz est disponible."
             setShowBadge(true)
+            enableVibration(true)
         }
 
         context.getSystemService(NotificationManager::class.java)
@@ -87,17 +91,18 @@ internal object CyberQuizUpdateNotificationManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val message = "Version ${update.versionName} disponible. Appuie pour ouvrir CyberQuiz."
+        val message = "La version ${update.versionName} est prête. Appuie pour ouvrir CyberQuiz et l'installer."
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_update_notification)
-            .setContentTitle("Mise à jour CyberQuiz disponible")
+            .setContentTitle("Nouvelle mise à jour CyberQuiz")
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
 
         val posted = runCatching {
@@ -134,11 +139,12 @@ internal object CyberQuizUpdateNotificationScheduler {
 
         val immediateCheck = OneTimeWorkRequestBuilder<CyberQuizUpdateCheckWorker>()
             .setConstraints(constraints)
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .build()
 
         val periodicCheck = PeriodicWorkRequestBuilder<CyberQuizUpdateCheckWorker>(
-            1,
-            TimeUnit.HOURS
+            UPDATE_CHECK_INTERVAL_MINUTES,
+            TimeUnit.MINUTES
         )
             .setConstraints(constraints)
             .build()
@@ -151,7 +157,7 @@ internal object CyberQuizUpdateNotificationScheduler {
         )
         workManager.enqueueUniquePeriodicWork(
             PERIODIC_WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             periodicCheck
         )
     }
