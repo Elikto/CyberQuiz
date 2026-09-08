@@ -1,8 +1,10 @@
+import hashlib
 import json
 import logging
 import os
 import threading
 import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from secrets import compare_digest
@@ -10,13 +12,12 @@ from typing import Literal
 from uuid import uuid4
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, Request
-from openai import OpenAI
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 load_dotenv()
 logger = logging.getLogger("cyberquiz.backend")
-app = FastAPI(title="CyberQuiz AI Backend", version="1.2.0")
+app = FastAPI(title="CyberQuiz AI Backend", version="1.3.0")
 
 CONTACT_RATE_LIMIT = 5
 CONTACT_RATE_WINDOW_SECONDS = 60 * 60
@@ -65,6 +66,7 @@ class ContactRequest(BaseModel):
     message: str = Field(min_length=1, max_length=3000)
     appVersion: str = Field(default="inconnue", max_length=80)
     platform: str = Field(default="Android", max_length=80)
+    submissionId: str | None = Field(default=None, min_length=8, max_length=80)
 
     @field_validator("message")
     @classmethod
@@ -158,10 +160,10 @@ def _resend_post(url: str, payload: dict[str, object], api_key: str) -> dict[str
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "CyberQuiz-Backend/1.2",
+            "User-Agent": "CyberQuiz-Backend/1.3",
         },
     )
-    with urllib.request.urlopen(request, timeout=10) as response:
+    with urllib.request.urlopen(request, timeout=8) as response:
         if response.status < 200 or response.status >= 300:
             raise RuntimeError(f"Resend returned HTTP {response.status}")
         raw = response.read()
@@ -170,12 +172,18 @@ def _resend_post(url: str, payload: dict[str, object], api_key: str) -> dict[str
         return json.loads(raw.decode("utf-8"))
 
 
+def _submission_token(req: ContactRequest) -> str:
+    if not req.submissionId:
+        return uuid4().hex
+    return hashlib.sha256(req.submissionId.encode("utf-8")).hexdigest()[:32]
+
+
 def _store_contact_submission(req: ContactRequest, config: dict[str, str]) -> str:
-    submission_id = uuid4().hex
+    submission_token = _submission_token(req)
     message_part_1 = req.message[:CONTACT_MESSAGE_PART_SIZE]
     message_part_2 = req.message[CONTACT_MESSAGE_PART_SIZE:]
     payload: dict[str, object] = {
-        "email": f"cyberquiz-contact-{submission_id}@example.com",
+        "email": f"cyberquiz-contact-{submission_token}@example.com",
         "unsubscribed": True,
         "properties": {
             "cq_reason": CONTACT_LABELS[req.reason],
@@ -187,7 +195,15 @@ def _store_contact_submission(req: ContactRequest, config: dict[str, str]) -> st
         },
         "segments": [{"id": config["inbox_segment_id"]}],
     }
-    result = _resend_post(RESEND_CONTACTS_URL, payload, config["api_key"])
+    try:
+        result = _resend_post(RESEND_CONTACTS_URL, payload, config["api_key"])
+    except urllib.error.HTTPError as exc:
+        # A retry can arrive after the first request was stored but its HTTP response was lost.
+        # The deterministic contact email makes a 409 equivalent to successful persistence.
+        if exc.code == 409 and req.submissionId:
+            return f"existing:{submission_token}"
+        raise
+
     contact_id = str(result.get("id", "")).strip()
     if not contact_id:
         raise RuntimeError("Resend did not return a contact id")
@@ -219,13 +235,25 @@ def _send_contact_email(req: ContactRequest, config: dict[str, str]) -> None:
     )
 
 
+def _send_contact_email_best_effort(req: ContactRequest, config: dict[str, str]) -> None:
+    try:
+        _send_contact_email(req, config)
+    except Exception:
+        # Persistence is the source of truth; notification must never delay/fail the request.
+        logger.warning("Contact email notification failed after message persistence", exc_info=True)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 
 @app.post("/api/contact", response_model=ContactResponse)
-def contact(req: ContactRequest, request: Request):
+def contact(
+    req: ContactRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
     config = _contact_configuration()
     client_id = request.client.host if request.client else "unknown"
     _check_contact_rate_limit(client_id)
@@ -236,11 +264,8 @@ def contact(req: ContactRequest, request: Request):
         logger.exception("Contact message persistence failed")
         raise HTTPException(502, "Le message n'a pas pu être enregistré. Réessaie plus tard.") from None
 
-    try:
-        _send_contact_email(req, config)
-    except Exception:
-        # The durable inbox entry is the source of truth. Email is a best-effort notification only.
-        logger.warning("Contact email notification failed after message persistence", exc_info=True)
+    if config.get("from_address") and config.get("to_address"):
+        background_tasks.add_task(_send_contact_email_best_effort, req, config)
 
     return ContactResponse(sent=True)
 
@@ -256,6 +281,9 @@ def generate(
     if not key:
         logger.error("Question generation requested without server API credentials")
         raise HTTPException(503, "Service de génération indisponible")
+
+    # Keep the contact API cold start light: OpenAI is imported only for generation requests.
+    from openai import OpenAI
 
     client = OpenAI(api_key=key, timeout=30.0)
     prompt = f"""Génère {req.count} question(s) de quiz de cybersécurité en français.\nCatégorie: {req.category}\nDifficulté: {req.difficulty}\nChaque question doit avoir exactement 4 réponses et une seule correcte.\nRetourne uniquement un JSON valide sous la forme {{\"questions\":[{{\"category\":...,\"difficulty\":...,\"question\":...,\"answers\":[...4...],\"correctIndex\":0-3,\"explanation\":...}}]}}.\nLes questions doivent être techniquement exactes et pédagogiques."""
