@@ -1,4 +1,3 @@
-import base64
 import hashlib
 import json
 import logging
@@ -6,7 +5,6 @@ import os
 import threading
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from secrets import compare_digest
@@ -19,20 +17,20 @@ from pydantic import BaseModel, Field, field_validator
 
 load_dotenv()
 logger = logging.getLogger("cyberquiz.backend")
-app = FastAPI(title="CyberQuiz AI Backend", version="1.4.0")
+app = FastAPI(title="CyberQuiz AI Backend", version="1.5.0")
 
 CONTACT_RATE_LIMIT = 5
 CONTACT_RATE_WINDOW_SECONDS = 60 * 60
 CONTACT_MESSAGE_PART_SIZE = 1500
-URGENT_SMS_RATE_LIMIT = 10
-URGENT_SMS_RATE_WINDOW_SECONDS = 60 * 60
-TWILIO_SMS_BODY_MAX_CHARS = 1600
+URGENT_TELEGRAM_RATE_LIMIT = 10
+URGENT_TELEGRAM_RATE_WINDOW_SECONDS = 60 * 60
+TELEGRAM_MESSAGE_MAX_CHARS = 4096
 RESEND_EMAILS_URL = "https://api.resend.com/emails"
 RESEND_CONTACTS_URL = "https://api.resend.com/contacts"
 _contact_attempts: dict[str, list[float]] = {}
 _contact_rate_lock = threading.Lock()
-_urgent_sms_attempts: list[float] = []
-_urgent_sms_rate_lock = threading.Lock()
+_urgent_telegram_attempts: list[float] = []
+_urgent_telegram_rate_lock = threading.Lock()
 
 CONTACT_SUBJECTS: dict[str, str] = {
     "bug": "[CyberQuiz] Signalement de bug",
@@ -120,8 +118,8 @@ def _contact_enabled() -> bool:
     }
 
 
-def _urgent_sms_enabled() -> bool:
-    return os.getenv("CYBERQUIZ_URGENT_SMS_ENABLED", "false").strip().lower() in {
+def _urgent_telegram_enabled() -> bool:
+    return os.getenv("CYBERQUIZ_URGENT_TELEGRAM_ENABLED", "false").strip().lower() in {
         "1",
         "true",
         "yes",
@@ -137,11 +135,9 @@ def _contact_configuration() -> dict[str, str]:
     inbox_segment_id = os.getenv("CYBERQUIZ_CONTACT_INBOX_SEGMENT_ID", "").strip()
     to_address = os.getenv("CYBERQUIZ_CONTACT_TO", "").strip()
     from_address = os.getenv("CYBERQUIZ_CONTACT_FROM", "").strip()
-    sms_account_sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
-    sms_auth_token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
-    sms_from_number = os.getenv("TWILIO_FROM_NUMBER", "").strip()
-    sms_to_number = os.getenv("CYBERQUIZ_URGENT_SMS_TO", "").strip()
-    sms_enabled = _urgent_sms_enabled()
+    telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    telegram_chat_id = os.getenv("CYBERQUIZ_URGENT_TELEGRAM_CHAT_ID", "").strip()
+    telegram_enabled = _urgent_telegram_enabled()
 
     if not api_key or not inbox_segment_id:
         logger.error("Contact service enabled without Resend inbox configuration")
@@ -152,26 +148,22 @@ def _contact_configuration() -> dict[str, str]:
         to_address = ""
         from_address = ""
 
-    if sms_enabled and not all(
-        [sms_account_sid, sms_auth_token, sms_from_number, sms_to_number]
-    ):
-        logger.warning("Urgent SMS configuration is incomplete; SMS notifications disabled")
-        sms_enabled = False
-        sms_account_sid = ""
-        sms_auth_token = ""
-        sms_from_number = ""
-        sms_to_number = ""
+    if telegram_enabled and not all([telegram_bot_token, telegram_chat_id]):
+        logger.warning(
+            "Urgent Telegram configuration is incomplete; Telegram notifications disabled"
+        )
+        telegram_enabled = False
+        telegram_bot_token = ""
+        telegram_chat_id = ""
 
     return {
         "api_key": api_key,
         "inbox_segment_id": inbox_segment_id,
         "to_address": to_address,
         "from_address": from_address,
-        "sms_enabled": "true" if sms_enabled else "",
-        "sms_account_sid": sms_account_sid,
-        "sms_auth_token": sms_auth_token,
-        "sms_from_number": sms_from_number,
-        "sms_to_number": sms_to_number,
+        "telegram_enabled": "true" if telegram_enabled else "",
+        "telegram_bot_token": telegram_bot_token,
+        "telegram_chat_id": telegram_chat_id,
     }
 
 
@@ -188,17 +180,17 @@ def _check_contact_rate_limit(client_id: str, now: float | None = None) -> None:
         _contact_attempts[client_id] = recent
 
 
-def _allow_urgent_sms_notification(now: float | None = None) -> bool:
+def _allow_urgent_telegram_notification(now: float | None = None) -> bool:
     timestamp = time.monotonic() if now is None else now
-    cutoff = timestamp - URGENT_SMS_RATE_WINDOW_SECONDS
+    cutoff = timestamp - URGENT_TELEGRAM_RATE_WINDOW_SECONDS
 
-    with _urgent_sms_rate_lock:
-        recent = [attempt for attempt in _urgent_sms_attempts if attempt > cutoff]
-        if len(recent) >= URGENT_SMS_RATE_LIMIT:
-            _urgent_sms_attempts[:] = recent
+    with _urgent_telegram_rate_lock:
+        recent = [attempt for attempt in _urgent_telegram_attempts if attempt > cutoff]
+        if len(recent) >= URGENT_TELEGRAM_RATE_LIMIT:
+            _urgent_telegram_attempts[:] = recent
             return False
         recent.append(timestamp)
-        _urgent_sms_attempts[:] = recent
+        _urgent_telegram_attempts[:] = recent
         return True
 
 
@@ -211,7 +203,7 @@ def _resend_post(url: str, payload: dict[str, object], api_key: str) -> dict[str
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "CyberQuiz-Backend/1.4",
+            "User-Agent": "CyberQuiz-Backend/1.5",
         },
     )
     with urllib.request.urlopen(request, timeout=8) as response:
@@ -223,31 +215,33 @@ def _resend_post(url: str, payload: dict[str, object], api_key: str) -> dict[str
         return json.loads(raw.decode("utf-8"))
 
 
-def _twilio_post(
-    account_sid: str,
-    auth_token: str,
-    form: dict[str, str],
-) -> dict[str, object]:
-    url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
-    credentials = base64.b64encode(f"{account_sid}:{auth_token}".encode("utf-8")).decode("ascii")
+def _telegram_post(bot_token: str, payload: dict[str, object]) -> dict[str, object]:
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     request = urllib.request.Request(
         url,
-        data=urllib.parse.urlencode(form).encode("utf-8"),
+        data=json.dumps(payload).encode("utf-8"),
         method="POST",
         headers={
-            "Authorization": f"Basic {credentials}",
-            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "CyberQuiz-Backend/1.4",
+            "User-Agent": "CyberQuiz-Backend/1.5",
         },
     )
-    with urllib.request.urlopen(request, timeout=8) as response:
-        if response.status < 200 or response.status >= 300:
-            raise RuntimeError(f"Twilio returned HTTP {response.status}")
-        raw = response.read()
-        if not raw:
-            return {}
-        return json.loads(raw.decode("utf-8"))
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            if response.status < 200 or response.status >= 300:
+                raise RuntimeError(f"Telegram returned HTTP {response.status}")
+            raw = response.read()
+    except urllib.error.HTTPError as exc:
+        # Do not bubble the request URL because it contains the bot token.
+        raise RuntimeError(f"Telegram returned HTTP {exc.code}") from None
+
+    if not raw:
+        return {}
+    result = json.loads(raw.decode("utf-8"))
+    if result.get("ok") is not True:
+        raise RuntimeError("Telegram rejected the message")
+    return result
 
 
 def _contact_subject(req: ContactRequest) -> str:
@@ -255,10 +249,10 @@ def _contact_subject(req: ContactRequest) -> str:
     return f"[URGENT] {subject}" if req.urgent else subject
 
 
-def _urgent_sms_text(req: ContactRequest) -> str:
+def _urgent_telegram_text(req: ContactRequest) -> str:
     prefix = "\n".join(
         [
-            "URGENT CyberQuiz",
+            "🚨 URGENT — CyberQuiz",
             f"Objet : {_contact_subject(req)}",
             f"Motif : {CONTACT_LABELS[req.reason]}",
             f"Version : {req.appVersion}",
@@ -266,13 +260,13 @@ def _urgent_sms_text(req: ContactRequest) -> str:
             "",
         ]
     )
-    suffix = "... [message tronque]"
-    available = TWILIO_SMS_BODY_MAX_CHARS - len(prefix)
+    suffix = "... [message tronqué]"
+    available = TELEGRAM_MESSAGE_MAX_CHARS - len(prefix)
     message = req.message
     if len(message) > available:
         keep = max(0, available - len(suffix))
         message = message[:keep] + suffix
-    return (prefix + message)[:TWILIO_SMS_BODY_MAX_CHARS]
+    return (prefix + message)[:TELEGRAM_MESSAGE_MAX_CHARS]
 
 
 def _submission_token(req: ContactRequest) -> str:
@@ -340,26 +334,25 @@ def _send_contact_email(req: ContactRequest, config: dict[str, str]) -> None:
     )
 
 
-def _send_contact_sms(req: ContactRequest, config: dict[str, str]) -> None:
-    if not req.urgent or not config.get("sms_enabled"):
+def _send_contact_telegram(req: ContactRequest, config: dict[str, str]) -> None:
+    if not req.urgent or not config.get("telegram_enabled"):
         return
 
-    _twilio_post(
-        config["sms_account_sid"],
-        config["sms_auth_token"],
+    _telegram_post(
+        config["telegram_bot_token"],
         {
-            "To": config["sms_to_number"],
-            "From": config["sms_from_number"],
-            "Body": _urgent_sms_text(req),
+            "chat_id": config["telegram_chat_id"],
+            "text": _urgent_telegram_text(req),
         },
     )
 
 
-def _send_contact_sms_best_effort(req: ContactRequest, config: dict[str, str]) -> None:
+def _send_contact_telegram_best_effort(req: ContactRequest, config: dict[str, str]) -> None:
     try:
-        _send_contact_sms(req, config)
+        _send_contact_telegram(req, config)
     except Exception:
-        logger.warning("Urgent SMS notification failed after message persistence", exc_info=True)
+        # Avoid logging exception details because Telegram request URLs contain the bot token.
+        logger.warning("Urgent Telegram notification failed after message persistence")
 
 
 def _send_contact_email_best_effort(req: ContactRequest, config: dict[str, str]) -> None:
@@ -394,11 +387,13 @@ def contact(
     if config.get("from_address") and config.get("to_address"):
         background_tasks.add_task(_send_contact_email_best_effort, req, config)
 
-    if req.urgent and config.get("sms_enabled"):
-        if _allow_urgent_sms_notification():
-            background_tasks.add_task(_send_contact_sms_best_effort, req, config)
+    if req.urgent and config.get("telegram_enabled"):
+        if _allow_urgent_telegram_notification():
+            background_tasks.add_task(_send_contact_telegram_best_effort, req, config)
         else:
-            logger.warning("Urgent SMS notification skipped because the hourly safety cap was reached")
+            logger.warning(
+                "Urgent Telegram notification skipped because the hourly safety cap was reached"
+            )
 
     return ContactResponse(sent=True)
 
@@ -419,7 +414,12 @@ def generate(
     from openai import OpenAI
 
     client = OpenAI(api_key=key, timeout=30.0)
-    prompt = f"""Génère {req.count} question(s) de quiz de cybersécurité en français.\nCatégorie: {req.category}\nDifficulté: {req.difficulty}\nChaque question doit avoir exactement 4 réponses et une seule correcte.\nRetourne uniquement un JSON valide sous la forme {{\"questions\":[{{\"category\":...,\"difficulty\":...,\"question\":...,\"answers\":[...4...],\"correctIndex\":0-3,\"explanation\":...}}]}}.\nLes questions doivent être techniquement exactes et pédagogiques."""
+    prompt = f"""Génère {req.count} question(s) de quiz de cybersécurité en français.
+Catégorie: {req.category}
+Difficulté: {req.difficulty}
+Chaque question doit avoir exactement 4 réponses et une seule correcte.
+Retourne uniquement un JSON valide sous la forme {{"questions":[{{"category":...,"difficulty":...,"question":...,"answers":[...4...],"correctIndex":0-3,"explanation":...}}]}}.
+Les questions doivent être techniquement exactes et pédagogiques."""
 
     try:
         response = client.responses.create(

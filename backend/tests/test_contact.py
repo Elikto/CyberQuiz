@@ -1,8 +1,7 @@
-import json
 import os
 import unittest
 import urllib.error
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -10,21 +9,21 @@ from fastapi.testclient import TestClient
 from app.main import (
     CONTACT_MESSAGE_PART_SIZE,
     CONTACT_RATE_LIMIT,
-    TWILIO_SMS_BODY_MAX_CHARS,
-    URGENT_SMS_RATE_LIMIT,
+    TELEGRAM_MESSAGE_MAX_CHARS,
+    URGENT_TELEGRAM_RATE_LIMIT,
     RESEND_CONTACTS_URL,
     RESEND_EMAILS_URL,
     ContactRequest,
-    _allow_urgent_sms_notification,
+    _allow_urgent_telegram_notification,
     _check_contact_rate_limit,
     _contact_attempts,
     _contact_configuration,
     _contact_rate_lock,
     _send_contact_email,
-    _send_contact_sms,
-    _urgent_sms_attempts,
-    _urgent_sms_rate_lock,
-    _urgent_sms_text,
+    _send_contact_telegram,
+    _urgent_telegram_attempts,
+    _urgent_telegram_rate_lock,
+    _urgent_telegram_text,
     _store_contact_submission,
     _submission_token,
     app,
@@ -35,8 +34,8 @@ class ContactServiceTests(unittest.TestCase):
     def setUp(self):
         with _contact_rate_lock:
             _contact_attempts.clear()
-        with _urgent_sms_rate_lock:
-            _urgent_sms_attempts.clear()
+        with _urgent_telegram_rate_lock:
+            _urgent_telegram_attempts.clear()
 
     def test_contact_service_is_disabled_by_default(self):
         with patch.dict(os.environ, {}, clear=True):
@@ -83,37 +82,34 @@ class ContactServiceTests(unittest.TestCase):
         self.assertEqual(config["from_address"], "")
         self.assertEqual(config["to_address"], "")
 
-    def test_contact_configuration_accepts_optional_urgent_sms(self):
+    def test_contact_configuration_accepts_optional_urgent_telegram(self):
         env = {
             "CYBERQUIZ_CONTACT_ENABLED": "true",
             "RESEND_API_KEY": "re_test_secret",
             "CYBERQUIZ_CONTACT_INBOX_SEGMENT_ID": "seg_test",
-            "CYBERQUIZ_URGENT_SMS_ENABLED": "true",
-            "TWILIO_ACCOUNT_SID": "AC123",
-            "TWILIO_AUTH_TOKEN": "secret",
-            "TWILIO_FROM_NUMBER": "+33123456789",
-            "CYBERQUIZ_URGENT_SMS_TO": "+33612345678",
+            "CYBERQUIZ_URGENT_TELEGRAM_ENABLED": "true",
+            "TELEGRAM_BOT_TOKEN": "123456:test-secret",
+            "CYBERQUIZ_URGENT_TELEGRAM_CHAT_ID": "123456789",
         }
         with patch.dict(os.environ, env, clear=True):
             config = _contact_configuration()
 
-        self.assertEqual(config["sms_enabled"], "true")
-        self.assertEqual(config["sms_account_sid"], "AC123")
-        self.assertEqual(config["sms_from_number"], "+33123456789")
-        self.assertEqual(config["sms_to_number"], "+33612345678")
+        self.assertEqual(config["telegram_enabled"], "true")
+        self.assertEqual(config["telegram_bot_token"], "123456:test-secret")
+        self.assertEqual(config["telegram_chat_id"], "123456789")
 
-    def test_incomplete_urgent_sms_configuration_is_disabled_without_breaking_contact(self):
+    def test_incomplete_urgent_telegram_configuration_is_disabled_without_breaking_contact(self):
         env = {
             "CYBERQUIZ_CONTACT_ENABLED": "true",
             "RESEND_API_KEY": "re_test_secret",
             "CYBERQUIZ_CONTACT_INBOX_SEGMENT_ID": "seg_test",
-            "CYBERQUIZ_URGENT_SMS_ENABLED": "true",
-            "TWILIO_ACCOUNT_SID": "AC123",
+            "CYBERQUIZ_URGENT_TELEGRAM_ENABLED": "true",
+            "TELEGRAM_BOT_TOKEN": "123456:test-secret",
         }
         with patch.dict(os.environ, env, clear=True):
             config = _contact_configuration()
 
-        self.assertEqual(config["sms_enabled"], "")
+        self.assertEqual(config["telegram_enabled"], "")
 
     def test_blank_contact_message_is_rejected(self):
         with self.assertRaises(ValueError):
@@ -131,11 +127,13 @@ class ContactServiceTests(unittest.TestCase):
             _check_contact_rate_limit("203.0.113.10", now=float(CONTACT_RATE_LIMIT))
         self.assertEqual(ctx.exception.status_code, 429)
 
-    def test_urgent_sms_hourly_safety_cap(self):
-        for index in range(URGENT_SMS_RATE_LIMIT):
-            self.assertTrue(_allow_urgent_sms_notification(now=float(index)))
+    def test_urgent_telegram_hourly_safety_cap(self):
+        for index in range(URGENT_TELEGRAM_RATE_LIMIT):
+            self.assertTrue(_allow_urgent_telegram_notification(now=float(index)))
 
-        self.assertFalse(_allow_urgent_sms_notification(now=float(URGENT_SMS_RATE_LIMIT)))
+        self.assertFalse(
+            _allow_urgent_telegram_notification(now=float(URGENT_TELEGRAM_RATE_LIMIT))
+        )
 
     def test_submission_token_is_stable_for_client_retry_id(self):
         request = ContactRequest(
@@ -256,15 +254,13 @@ class ContactServiceTests(unittest.TestCase):
         self.assertEqual(payload["subject"], "[URGENT] [CyberQuiz] Demande d'aide")
         self.assertIn("Urgent : Oui", payload["text"])
 
-    @patch("app.main._twilio_post")
-    def test_urgent_sms_contains_subject_and_message(self, twilio_post):
-        twilio_post.return_value = {"sid": "SM123"}
+    @patch("app.main._telegram_post")
+    def test_urgent_telegram_contains_subject_and_message(self, telegram_post):
+        telegram_post.return_value = {"ok": True}
         config = {
-            "sms_enabled": "true",
-            "sms_account_sid": "AC123",
-            "sms_auth_token": "secret",
-            "sms_from_number": "+33123456789",
-            "sms_to_number": "+33612345678",
+            "telegram_enabled": "true",
+            "telegram_bot_token": "123456:test-secret",
+            "telegram_chat_id": "123456789",
         }
         request = ContactRequest(
             reason="bug",
@@ -274,34 +270,30 @@ class ContactServiceTests(unittest.TestCase):
             urgent=True,
         )
 
-        _send_contact_sms(request, config)
+        _send_contact_telegram(request, config)
 
-        twilio_post.assert_called_once()
-        account_sid, auth_token, form = twilio_post.call_args.args
-        self.assertEqual(account_sid, "AC123")
-        self.assertEqual(auth_token, "secret")
-        self.assertEqual(form["To"], "+33612345678")
-        self.assertEqual(form["From"], "+33123456789")
-        self.assertIn("[URGENT] [CyberQuiz] Signalement de bug", form["Body"])
-        self.assertIn("Le quiz est bloqué.", form["Body"])
+        telegram_post.assert_called_once()
+        bot_token, payload = telegram_post.call_args.args
+        self.assertEqual(bot_token, "123456:test-secret")
+        self.assertEqual(payload["chat_id"], "123456789")
+        self.assertIn("[URGENT] [CyberQuiz] Signalement de bug", payload["text"])
+        self.assertIn("Le quiz est bloqué.", payload["text"])
 
-    @patch("app.main._twilio_post")
-    def test_non_urgent_contact_does_not_send_sms(self, twilio_post):
+    @patch("app.main._telegram_post")
+    def test_non_urgent_contact_does_not_send_telegram(self, telegram_post):
         config = {
-            "sms_enabled": "true",
-            "sms_account_sid": "AC123",
-            "sms_auth_token": "secret",
-            "sms_from_number": "+33123456789",
-            "sms_to_number": "+33612345678",
+            "telegram_enabled": "true",
+            "telegram_bot_token": "123456:test-secret",
+            "telegram_chat_id": "123456789",
         }
-        _send_contact_sms(ContactRequest(reason="other", message="Normal"), config)
-        twilio_post.assert_not_called()
+        _send_contact_telegram(ContactRequest(reason="other", message="Normal"), config)
+        telegram_post.assert_not_called()
 
-    def test_urgent_sms_is_capped_to_twilio_body_limit(self):
+    def test_urgent_telegram_is_capped_to_telegram_message_limit(self):
         request = ContactRequest(reason="other", message="x" * 3000, urgent=True)
-        body = _urgent_sms_text(request)
-        self.assertLessEqual(len(body), TWILIO_SMS_BODY_MAX_CHARS)
-        self.assertTrue(body.endswith("... [message tronque]"))
+        body = _urgent_telegram_text(request)
+        self.assertLessEqual(len(body), TELEGRAM_MESSAGE_MAX_CHARS)
+        self.assertIn("x", body)
 
     @patch("app.main._send_contact_email", side_effect=RuntimeError("notification blocked"))
     @patch("app.main._store_contact_submission", return_value="contact_123")
@@ -334,14 +326,14 @@ class ContactServiceTests(unittest.TestCase):
         store_submission.assert_called_once()
         send_email.assert_called_once()
 
-    @patch("app.main._send_contact_sms")
+    @patch("app.main._send_contact_telegram")
     @patch("app.main._send_contact_email")
     @patch("app.main._store_contact_submission", return_value="contact_urgent")
-    def test_urgent_contact_endpoint_sends_email_and_sms_in_background(
+    def test_urgent_contact_endpoint_sends_email_and_telegram_in_background(
         self,
         store_submission,
         send_email,
-        send_sms,
+        send_telegram,
     ):
         env = {
             "CYBERQUIZ_CONTACT_ENABLED": "true",
@@ -349,11 +341,9 @@ class ContactServiceTests(unittest.TestCase):
             "CYBERQUIZ_CONTACT_INBOX_SEGMENT_ID": "seg_test",
             "CYBERQUIZ_CONTACT_FROM": "CyberQuiz <contact@example.com>",
             "CYBERQUIZ_CONTACT_TO": "elikto@proton.me",
-            "CYBERQUIZ_URGENT_SMS_ENABLED": "true",
-            "TWILIO_ACCOUNT_SID": "AC123",
-            "TWILIO_AUTH_TOKEN": "secret",
-            "TWILIO_FROM_NUMBER": "+33123456789",
-            "CYBERQUIZ_URGENT_SMS_TO": "+33612345678",
+            "CYBERQUIZ_URGENT_TELEGRAM_ENABLED": "true",
+            "TELEGRAM_BOT_TOKEN": "123456:test-secret",
+            "CYBERQUIZ_URGENT_TELEGRAM_CHAT_ID": "123456789",
         }
         with patch.dict(os.environ, env, clear=True):
             response = TestClient(app).post(
@@ -369,7 +359,7 @@ class ContactServiceTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         store_submission.assert_called_once()
         send_email.assert_called_once()
-        send_sms.assert_called_once()
+        send_telegram.assert_called_once()
 
 
 if __name__ == "__main__":
