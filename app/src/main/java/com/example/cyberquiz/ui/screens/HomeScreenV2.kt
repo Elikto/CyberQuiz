@@ -63,6 +63,9 @@ fun HomeScreenV2(
             TopButton(TopIcon.PROFILE, onProfile)
         }
 
+        Spacer(Modifier.height(8.dp))
+        CompactLevelProgress(p.level, title, xp, progress)
+
         Spacer(Modifier.height(4.dp))
         HeroLogo()
 
@@ -76,9 +79,6 @@ fun HomeScreenV2(
         Box(Modifier.background(Color(0xFF0D1730), RoundedCornerShape(50.dp)).border(1.dp, CyberBlue.copy(.55f), RoundedCornerShape(50.dp)).padding(horizontal = 13.dp, vertical = 6.dp)) {
             Text("QUIZ : ${selectedQuizType.label.uppercase()}", color = Color(0xFFBFD7FF), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
         }
-
-        Spacer(Modifier.height(16.dp))
-        LevelCard(p.level, title, xp, progress)
 
         Spacer(Modifier.height(14.dp))
         Text("« La cybersécurité d'aujourd'hui\nconstruit un meilleur demain »", color = Color(0xFFC9D0F3), textAlign = TextAlign.Center, fontSize = 15.sp, lineHeight = 22.sp)
@@ -164,6 +164,58 @@ private fun TopButton(icon: TopIcon, onClick: () -> Unit, showBadge: Boolean = f
 }
 
 @Composable
+private fun CompactLevelProgress(level: Int, title: String, xp: Int, progress: Float) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "NIV. $level",
+                color = Color(0xFF21E3FF),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = .7.sp
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                title,
+                color = Color(0xFFE8ECFF),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                "$xp / 100 XP",
+                color = Color(0xFFAEB9EA),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(5.dp)
+                .background(Color(0xFF20365E), RoundedCornerShape(50.dp))
+        ) {
+            if (progress > 0f) {
+                Box(
+                    Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(progress)
+                        .background(
+                            Brush.horizontalGradient(listOf(Color(0xFF7B34FF), Color(0xFFD54EFF), Color(0xFF21E3FF))),
+                            RoundedCornerShape(50.dp)
+                        )
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun HeroLogo() {
     Box(Modifier.fillMaxWidth().height(188.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
@@ -205,54 +257,6 @@ private fun HeroLogo() {
             drawRoundRect(Brush.verticalGradient(listOf(Color(0xFFBB63FF), Color(0xFF408DFF))), Offset(cx - 30, lockTop + 26), Size(60f, 52f), CornerRadius(13f, 13f))
             drawCircle(Color(0xFF08162F), 8.5f, Offset(cx, lockTop + 50)); drawLine(Color(0xFF08162F), Offset(cx, lockTop + 57), Offset(cx, lockTop + 68), 5f, StrokeCap.Round)
         }
-    }
-}
-
-@Composable
-private fun LevelCard(level: Int, title: String, xp: Int, progress: Float) {
-    Column(
-        Modifier.fillMaxWidth()
-            .background(Brush.horizontalGradient(listOf(Color(0xFF0B1430), Color(0xFF07152E), Color(0xFF061024))), RoundedCornerShape(22.dp))
-            .border(1.35.dp, Color(0xFF2AAEFF), RoundedCornerShape(22.dp))
-            .padding(horizontal = 14.dp, vertical = 13.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            LevelBadge(level); Spacer(Modifier.width(13.dp))
-            Column(Modifier.weight(1f)) {
-                Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text("$xp / 100 XP", color = Color(0xFF21E3FF), fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            }
-            Spacer(Modifier.width(8.dp)); MiniBars()
-        }
-        Spacer(Modifier.height(11.dp)); UnifiedBar(progress)
-    }
-}
-
-@Composable
-private fun UnifiedBar(progress: Float) {
-    Box(Modifier.fillMaxWidth().height(10.dp).background(Color(0xFF20365E), RoundedCornerShape(50.dp))) {
-        if (progress > 0f) Box(Modifier.fillMaxHeight().fillMaxWidth(progress).background(Brush.horizontalGradient(listOf(Color(0xFF7B34FF), Color(0xFFD54EFF))), RoundedCornerShape(50.dp)))
-    }
-}
-
-@Composable
-private fun LevelBadge(level: Int) {
-    Box(Modifier.size(78.dp), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize()) {
-            val w = size.width; val h = size.height
-            val p = Path().apply { moveTo(w*.5f,h*.06f); lineTo(w*.84f,h*.26f); lineTo(w*.84f,h*.74f); lineTo(w*.5f,h*.94f); lineTo(w*.16f,h*.74f); lineTo(w*.16f,h*.26f); close() }
-            drawPath(p, Brush.linearGradient(listOf(Color(0xFFE163FF), Color(0xFF00CFFF))), style = Stroke(5f))
-        }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) { Text("NIV.", color = Color(0xFFE8ECFF), fontSize = 9.sp); Text(level.toString(), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black) }
-    }
-}
-
-@Composable
-private fun MiniBars() {
-    Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.Bottom, modifier = Modifier.height(34.dp)) {
-        Box(Modifier.width(6.dp).height(13.dp).background(Color(0xFF52C8FF), RoundedCornerShape(3.dp)))
-        Box(Modifier.width(6.dp).height(20.dp).background(Color(0xFF52C8FF), RoundedCornerShape(3.dp)))
-        Box(Modifier.width(6.dp).height(28.dp).background(Color(0xFF52C8FF), RoundedCornerShape(3.dp)))
     }
 }
 

@@ -36,11 +36,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cyberquiz.model.CATEGORY_MINI_QUIZ_SIZE
 import com.example.cyberquiz.model.Category
-import com.example.cyberquiz.model.categoryMiniQuizAttempts
+import com.example.cyberquiz.model.categoryQuizAttempts
 import com.example.cyberquiz.viewmodel.QuizViewModel
 
 private val MiniCatPurple = Color(0xFFD652FF)
@@ -51,17 +51,19 @@ private val MiniCatOrange = Color(0xFFFFB84A)
 private val MiniCatText = Color(0xFFF5F7FF)
 private val MiniCatMuted = Color(0xFF9FAED3)
 private val MiniCatPanel = Color(0xFF081226)
+private val MiniCatBorder = Color(0xFF284B7A)
 
 @Composable
 fun CyberMiniQuizCategoriesScreen(
     vm: QuizViewModel,
     onBack: () -> Unit,
-    onCategoryQuiz: (String) -> Unit,
+    onCategoryQuiz: (String, Int) -> Unit,
     onAdaptiveQuiz: () -> Unit
 ) {
     val history by vm.quizHistory.collectAsState()
     val activeSessions by vm.activeSessions.collectAsState()
     var blockedCategory by remember { mutableStateOf<String?>(null) }
+    var selectedCategory by remember { mutableStateOf<Category?>(null) }
     val hasFreeSlot = activeSessions.size < QuizViewModel.MAX_ACTIVE_SESSIONS
 
     Column(
@@ -87,11 +89,17 @@ fun CyberMiniQuizCategoriesScreen(
                 .border(1.dp, MiniCatPurple.copy(alpha = .65f), RoundedCornerShape(20.dp))
                 .padding(15.dp)
         ) {
-            Text("MINI-QUIZ PAR CATÉGORIE", color = MiniCatPurple, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.4.sp)
-            Spacer(Modifier.height(4.dp))
-            Text("5 questions à chaque fois", color = MiniCatText, fontSize = 20.sp, fontWeight = FontWeight.Black)
             Text(
-                "Relance une même catégorie autant de fois que tu veux. Chaque série de 5 questions est conservée séparément et apparaît dans tes statistiques.",
+                "QUIZ PAR CATÉGORIE",
+                color = MiniCatPurple,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.4.sp
+            )
+            Spacer(Modifier.height(4.dp))
+            Text("Choisis ton domaine", color = MiniCatText, fontSize = 20.sp, fontWeight = FontWeight.Black)
+            Text(
+                "Sélectionne une catégorie, puis choisis le nombre de questions que tu veux jouer.",
                 color = MiniCatMuted,
                 fontSize = 11.sp,
                 lineHeight = 16.sp
@@ -109,14 +117,18 @@ fun CyberMiniQuizCategoriesScreen(
         ) {
             items(Category.entries) { category ->
                 val attempts = remember(history, category.label) {
-                    categoryMiniQuizAttempts(history, category.label)
+                    categoryQuizAttempts(history, category.label)
                 }
                 MiniCategoryCard(
                     category = category,
                     attemptCount = attempts.size,
                     lastPercent = attempts.lastOrNull()?.percent,
                     onClick = {
-                        if (hasFreeSlot) onCategoryQuiz(category.label) else blockedCategory = category.label
+                        if (hasFreeSlot) {
+                            selectedCategory = category
+                        } else {
+                            blockedCategory = category.label
+                        }
                     }
                 )
             }
@@ -145,6 +157,79 @@ fun CyberMiniQuizCategoriesScreen(
         }
     }
 
+    selectedCategory?.let { category ->
+        AlertDialog(
+            onDismissRequest = { selectedCategory = null },
+            containerColor = Color(0xFF0B1429),
+            title = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        miniCategorySymbol(category),
+                        color = miniCategoryAccent(category),
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    Text(category.label, color = MiniCatText, fontWeight = FontWeight.Black)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "Combien de questions veux-tu pour ce quiz ?",
+                        color = MiniCatMuted,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp
+                    )
+                    QUIZ_QUESTION_COUNT_OPTIONS.chunked(3).forEach { rowOptions ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp)
+                        ) {
+                            rowOptions.forEach { count ->
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(42.dp)
+                                        .background(
+                                            miniCategoryAccent(category).copy(alpha = .11f),
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            miniCategoryAccent(category).copy(alpha = .55f),
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                        .clickable {
+                                            selectedCategory = null
+                                            onCategoryQuiz(category.label, count)
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        quizQuestionCountLabel(count),
+                                        color = MiniCatText,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Black,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                            repeat(3 - rowOptions.size) {
+                                Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { selectedCategory = null }) {
+                    Text("ANNULER", color = MiniCatMuted, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
     blockedCategory?.let { category ->
         AlertDialog(
             onDismissRequest = { blockedCategory = null },
@@ -152,7 +237,7 @@ fun CyberMiniQuizCategoriesScreen(
             title = { Text("Limite de quiz en cours", color = MiniCatText, fontWeight = FontWeight.Black) },
             text = {
                 Text(
-                    "Tu as déjà ${QuizViewModel.MAX_ACTIVE_SESSIONS} quiz enregistrés. Reprends ou arrête une session avant de lancer un nouveau mini-quiz $category.",
+                    "Tu as déjà ${QuizViewModel.MAX_ACTIVE_SESSIONS} quiz enregistrés. Reprends ou arrête une session avant de lancer un nouveau quiz $category.",
                     color = MiniCatMuted
                 )
             },
@@ -181,7 +266,7 @@ private fun MiniCategoryHeader(onBack: () -> Unit) {
         Spacer(Modifier.width(11.dp))
         Column {
             Text("Catégories", color = MiniCatText, fontSize = 22.sp, fontWeight = FontWeight.Black)
-            Text("CYBERSÉCURITÉ · $CATEGORY_MINI_QUIZ_SIZE QUESTIONS", color = MiniCatMuted, fontSize = 8.sp, letterSpacing = 1.2.sp)
+            Text("CYBERSÉCURITÉ", color = MiniCatMuted, fontSize = 8.sp, letterSpacing = 1.2.sp)
         }
     }
 }
@@ -193,12 +278,7 @@ private fun MiniCategoryCard(
     lastPercent: Int?,
     onClick: () -> Unit
 ) {
-    val accent = when (category.ordinal % 4) {
-        0 -> MiniCatPurple
-        1 -> MiniCatBlue
-        2 -> MiniCatCyan
-        else -> Color(0xFF8B7CFF)
-    }
+    val accent = miniCategoryAccent(category)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -213,20 +293,62 @@ private fun MiniCategoryCard(
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("5 Q", color = accent, fontSize = 10.sp, fontWeight = FontWeight.Black)
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(accent.copy(alpha = .13f), RoundedCornerShape(10.dp))
+                    .border(1.dp, accent.copy(alpha = .32f), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    miniCategorySymbol(category),
+                    color = accent,
+                    fontSize = if (category == Category.AD) 11.sp else 16.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
             Spacer(Modifier.weight(1f))
             Text("›", color = accent, fontSize = 22.sp)
         }
         Text(category.label, color = MiniCatText, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Black)
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                if (attemptCount == 0) "Aucun mini-quiz" else "$attemptCount quiz terminé${if (attemptCount > 1) "s" else ""}",
+                if (attemptCount == 0) "Aucun quiz terminé" else "$attemptCount quiz terminé${if (attemptCount > 1) "s" else ""}",
                 color = MiniCatMuted,
                 fontSize = 8.sp
             )
             if (lastPercent != null) {
-                Text("Dernier : $lastPercent%", color = if (lastPercent >= 80) MiniCatGreen else MiniCatOrange, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "Dernier : $lastPercent%",
+                    color = if (lastPercent >= 80) MiniCatGreen else MiniCatOrange,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
+}
+
+private fun miniCategoryAccent(category: Category): Color = when (category.ordinal % 4) {
+    0 -> MiniCatPurple
+    1 -> MiniCatBlue
+    2 -> MiniCatCyan
+    else -> MiniCatGreen
+}
+
+private fun miniCategorySymbol(category: Category): String = when (category) {
+    Category.RESEAUX -> "⌁"
+    Category.LINUX -> ">_"
+    Category.WINDOWS -> "▦"
+    Category.CRYPTO -> "◇"
+    Category.WEB -> "◎"
+    Category.MALWARE -> "!"
+    Category.SOCIAL -> "◌"
+    Category.OSINT -> "⌖"
+    Category.FORENSICS -> "⌕"
+    Category.PENTEST -> "⚡"
+    Category.AD -> "AD"
+    Category.CLOUD -> "☁"
+    Category.MOBILE -> "▯"
+    Category.SYSTEM -> "⚙"
 }
