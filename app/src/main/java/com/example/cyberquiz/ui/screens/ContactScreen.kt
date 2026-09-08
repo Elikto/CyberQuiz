@@ -1,6 +1,9 @@
 package com.example.cyberquiz.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,8 +34,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -66,8 +71,8 @@ private data class ContactReason(
 )
 
 private val contactReasons = listOf(
-    ContactReason("bug", "Signaler un bug", "[CyberQuiz] Signalement de bug"),
     ContactReason("improvement", "Proposer une amélioration", "[CyberQuiz] Proposition d'amélioration"),
+    ContactReason("bug", "Signaler un bug", "[CyberQuiz] Signalement de bug"),
     ContactReason("update", "Problème de mise à jour", "[CyberQuiz] Problème de mise à jour"),
     ContactReason("content", "Question sur un quiz / contenu", "[CyberQuiz] Question sur un quiz ou contenu"),
     ContactReason("support", "Aide / support", "[CyberQuiz] Demande d'aide"),
@@ -82,9 +87,18 @@ fun ContactScreen(onBack: () -> Unit) {
     var message by rememberSaveable { mutableStateOf("") }
     var urgent by rememberSaveable { mutableStateOf(false) }
     var sendError by rememberSaveable { mutableStateOf<String?>(null) }
-    var sendSuccess by rememberSaveable { mutableStateOf<String?>(null) }
+    var showSentConfirmation by rememberSaveable { mutableStateOf(false) }
     val selectedReason = contactReasons[selectedReasonIndex]
     val canSend = message.isNotBlank()
+
+    if (showSentConfirmation) {
+        BackHandler { showSentConfirmation = false }
+        ContactSentConfirmation(
+            onBack = onBack,
+            onAnotherMessage = { showSentConfirmation = false }
+        )
+        return
+    }
 
     BackHandler(onBack = onBack)
 
@@ -103,38 +117,6 @@ fun ContactScreen(onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         ContactHeader(onBack)
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.horizontalGradient(listOf(Color(0xFF17143D), Color(0xFF07172F))),
-                    RoundedCornerShape(22.dp)
-                )
-                .border(1.2.dp, Color(0xFF416EC2), RoundedCornerShape(22.dp))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp)
-        ) {
-            Text(
-                "UNE QUESTION ? UN PROBLÈME ?",
-                color = ContactCyan,
-                fontSize = 10.sp,
-                letterSpacing = 1.5.sp,
-                fontWeight = FontWeight.Black
-            )
-            Text(
-                "Écris-nous directement depuis CyberQuiz.",
-                color = ContactText,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Black
-            )
-            Text(
-                "Choisis le motif puis décris ta demande. CyberQuiz prend immédiatement le message en charge puis l'envoie en arrière-plan, même si le serveur doit se réveiller.",
-                color = ContactMuted,
-                fontSize = 12.sp,
-                lineHeight = 17.sp
-            )
-        }
 
         ContactSectionLabel("OBJET")
 
@@ -189,7 +171,6 @@ fun ContactScreen(onBack: () -> Unit) {
                             selectedReasonIndex = index
                             reasonMenuExpanded = false
                             sendError = null
-                            sendSuccess = null
                         }
                     )
                 }
@@ -212,7 +193,6 @@ fun ContactScreen(onBack: () -> Unit) {
                 if (newValue.length <= MAX_CONTACT_MESSAGE_CHARS) {
                     message = newValue
                     sendError = null
-                    sendSuccess = null
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -261,7 +241,6 @@ fun ContactScreen(onBack: () -> Unit) {
                 .clickable {
                     urgent = !urgent
                     sendError = null
-                    sendSuccess = null
                 }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -271,7 +250,6 @@ fun ContactScreen(onBack: () -> Unit) {
                 onCheckedChange = {
                     urgent = it
                     sendError = null
-                    sendSuccess = null
                 },
                 colors = CheckboxDefaults.colors(
                     checkedColor = ContactOrange,
@@ -288,7 +266,7 @@ fun ContactScreen(onBack: () -> Unit) {
                     fontWeight = FontWeight.Black
                 )
                 Text(
-                    "Si cette case est cochée, CyberQuiz enverra aussi une alerte Telegram en plus du mail.",
+                    "Si vous cochez cette case, votre demande passera en priorité.",
                     color = ContactMuted,
                     fontSize = 10.5.sp,
                     lineHeight = 14.sp
@@ -303,18 +281,10 @@ fun ContactScreen(onBack: () -> Unit) {
             )
         }
 
-        sendSuccess?.let { success ->
-            ContactStatusMessage(
-                text = success,
-                accent = ContactGreen
-            )
-        }
-
         Button(
             enabled = canSend,
             onClick = {
                 sendError = null
-                sendSuccess = null
                 val pendingMessage = message.trim()
                 val pendingReason = selectedReason.code
 
@@ -327,7 +297,7 @@ fun ContactScreen(onBack: () -> Unit) {
                     onSuccess = {
                         message = ""
                         urgent = false
-                        sendSuccess = "Message pris en charge. CyberQuiz l'envoie en arrière-plan et réessaiera automatiquement si nécessaire."
+                        showSentConfirmation = true
                     },
                     onFailure = { error ->
                         sendError = error.message ?: "Le message n'a pas pu être préparé pour l'envoi."
@@ -362,6 +332,102 @@ fun ContactScreen(onBack: () -> Unit) {
         )
 
         Spacer(Modifier.height(4.dp))
+    }
+}
+
+@Composable
+private fun ContactSentConfirmation(
+    onBack: () -> Unit,
+    onAnotherMessage: () -> Unit
+) {
+    var animateIn by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { animateIn = true }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF020610), Color(0xFF071022), CyberBackground, Color(0xFF030712))
+                )
+            )
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(22.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        AnimatedVisibility(
+            visible = animateIn,
+            enter = fadeIn() + scaleIn(initialScale = .88f)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(listOf(Color(0xFF0C1B32), Color(0xFF071329))),
+                        RoundedCornerShape(26.dp)
+                    )
+                    .border(1.4.dp, ContactGreen.copy(alpha = .65f), RoundedCornerShape(26.dp))
+                    .padding(22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(13.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .background(ContactGreen.copy(alpha = .13f), CircleShape)
+                        .border(1.5.dp, ContactGreen, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("✓", color = ContactGreen, fontSize = 38.sp, fontWeight = FontWeight.Black)
+                }
+
+                Text(
+                    "Message envoyé",
+                    color = ContactText,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    "Merci pour votre message. Votre demande a bien été prise en charge.",
+                    color = ContactMuted,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(Modifier.height(2.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    Button(
+                        onClick = onBack,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(15.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF14233D),
+                            contentColor = ContactText
+                        )
+                    ) {
+                        Text("RETOUR", fontSize = 10.sp, fontWeight = FontWeight.Black)
+                    }
+                    Button(
+                        onClick = onAnotherMessage,
+                        modifier = Modifier.weight(1.4f).height(48.dp),
+                        shape = RoundedCornerShape(15.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ContactPurple,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text("ÉCRIRE UN AUTRE MESSAGE", fontSize = 9.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
+                    }
+                }
+            }
+        }
     }
 }
 
