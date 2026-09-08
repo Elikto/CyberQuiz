@@ -46,21 +46,22 @@ fun ProfileScreenV5(
         quizCount = history.size
     )
     var showCosmetics by rememberSaveable { mutableStateOf(false) }
-    var showRewards by rememberSaveable { mutableStateOf(false) }
+    var showShop by rememberSaveable { mutableStateOf(false) }
 
     when {
         showCosmetics -> {
             EngagementStore.sync(context, metrics)
             CosmeticsScreen(
                 playerLevel = progress.level,
+                metrics = metrics,
                 onBack = { showCosmetics = false }
             )
         }
 
-        showRewards -> {
-            EngagementScreen(
+        showShop -> {
+            CosmeticShopScreen(
                 metrics = metrics,
-                onBack = { showRewards = false }
+                onBack = { showShop = false }
             )
         }
 
@@ -81,7 +82,7 @@ fun ProfileScreenV5(
                         .padding(top = 14.dp, end = 18.dp)
                         .background(Color(0xFF20153B), RoundedCornerShape(50.dp))
                         .border(1.dp, Color(0xFFFFB84A).copy(alpha = .65f), RoundedCornerShape(50.dp))
-                        .clickable { showRewards = true }
+                        .clickable { showShop = true }
                         .padding(horizontal = 11.dp, vertical = 7.dp),
                     contentAlignment = Alignment.Center
                 ) {
