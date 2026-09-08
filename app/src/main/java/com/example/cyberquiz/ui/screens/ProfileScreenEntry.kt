@@ -1,6 +1,7 @@
 package com.example.cyberquiz.ui.screens
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -15,7 +16,7 @@ fun ProfileScreenV5(
     onBack: () -> Unit
 ) {
     val vm: QuizViewModel = viewModel()
-    val progress by vm.progress.collectAsStateWithLifecycleCompat()
+    val progress by vm.progress.collectAsState()
     var showCosmetics by rememberSaveable { mutableStateOf(false) }
 
     if (showCosmetics) {
@@ -32,7 +33,3 @@ fun ProfileScreenV5(
         )
     }
 }
-
-@Composable
-private fun <T> kotlinx.coroutines.flow.StateFlow<T>.collectAsStateWithLifecycleCompat() =
-    androidx.compose.runtime.collectAsState()
