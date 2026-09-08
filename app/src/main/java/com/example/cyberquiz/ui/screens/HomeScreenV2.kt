@@ -4,34 +4,14 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -52,7 +32,6 @@ import com.example.cyberquiz.model.EngagementMetrics
 import com.example.cyberquiz.ui.theme.CyberBackground
 import com.example.cyberquiz.update.CyberQuizUpdateManager
 import com.example.cyberquiz.viewmodel.QuizViewModel
-import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -72,7 +51,6 @@ fun HomeScreenV2(
     val reviewItems by vm.reviewItems.collectAsState()
     val history by vm.quizHistory.collectAsState()
     val context = LocalContext.current
-
     val metrics = EngagementMetrics(
         answered = p.answered,
         correct = p.correct,
@@ -86,7 +64,6 @@ fun HomeScreenV2(
     var selectedAvatar by remember { mutableStateOf(storedPlayerAvatar(context)) }
     var selectedBanner by remember { mutableStateOf(storedPlayerBanner(context)) }
     var selectedFrame by remember { mutableStateOf(storedPlayerFrame(context)) }
-    var coins by remember { mutableIntStateOf(engagement.coins) }
     var showPicker by rememberSaveable { mutableStateOf(false) }
     var showShop by rememberSaveable { mutableStateOf(false) }
     var updateAvailable by remember { mutableStateOf(false) }
@@ -95,19 +72,12 @@ fun HomeScreenV2(
     val xpIntoLevel = p.xp % 100
     val levelProgress = (xpIntoLevel / 100f).coerceIn(0f, 1f)
     val accuracy = if (p.answered == 0) 0 else p.correct * 100 / p.answered
-    val title = when {
-        p.level >= 15 -> "Architecte Sécurité"
-        p.level >= 10 -> "Hacker Éthique"
-        p.level >= 5 -> "Analyste SOC"
-        else -> "Débutant Cyber"
-    }
 
-    fun reloadCosmeticsAndRewards() {
+    fun reload() {
         selectedAvatar = storedPlayerAvatar(context)
         selectedBanner = storedPlayerBanner(context)
         selectedFrame = storedPlayerFrame(context)
         engagement = EngagementStore.sync(context, metrics)
-        coins = engagement.coins
     }
 
     LaunchedEffect(Unit) {
@@ -115,11 +85,11 @@ fun HomeScreenV2(
     }
 
     if (showShop) {
-        EngagementScreen(
+        CosmeticShopScreen(
             metrics = metrics,
             onBack = {
                 showShop = false
-                reloadCosmeticsAndRewards()
+                reload()
             }
         )
         return
@@ -136,63 +106,45 @@ fun HomeScreenV2(
             .verticalScroll(rememberScrollState())
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(horizontal = 18.dp, vertical = 10.dp),
+            .padding(horizontal = 18.dp, vertical = 9.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            HomeTopButton(HomeTopIcon.SETTINGS, onSettings, showBadge = updateAvailable)
+            HomeTopButton(HomeTopIcon.SETTINGS, onSettings, updateAvailable)
             HomeTopButton(HomeTopIcon.PROFILE, onProfile)
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
         HomePlayerHeader(
             level = p.level,
-            title = title,
-            xpIntoLevel = xpIntoLevel,
             progress = levelProgress,
-            coins = coins,
+            coins = engagement.coins,
             avatar = selectedAvatar,
             banner = selectedBanner,
             frame = selectedFrame,
-            onAvatarClick = { showPicker = true },
-            onCoinsClick = { showShop = true }
+            onCoinsClick = { showShop = true },
+            onAvatarClick = { showPicker = true }
         )
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(5.dp))
         HomeHeroLogo()
 
         Row(verticalAlignment = Alignment.Bottom) {
-            Text("Cyber", color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.Black)
-            Text("Quiz", color = Color(0xFFE04FFF), fontSize = 40.sp, fontWeight = FontWeight.Black)
+            Text("Cyber", color = Color.White, fontSize = 31.sp, fontWeight = FontWeight.Black)
+            Text("Quiz", color = Color(0xFFE04FFF), fontSize = 31.sp, fontWeight = FontWeight.Black)
         }
         Text(
             "APPRENDS  ·  JOUE  ·  SÉCURISE",
             color = Color(0xFFAEB9EA),
-            fontSize = 10.sp,
-            letterSpacing = 2.sp
+            fontSize = 8.5.sp,
+            letterSpacing = 1.65.sp
         )
 
-        Spacer(Modifier.height(8.dp))
-        Box(
-            Modifier
-                .background(Color(0xFF0D1730), RoundedCornerShape(50.dp))
-                .border(1.dp, Color(0xFF18BFFF).copy(alpha = .55f), RoundedCornerShape(50.dp))
-                .padding(horizontal = 13.dp, vertical = 6.dp)
-        ) {
-            Text(
-                "QUIZ : ${selectedQuizType.label.uppercase()}",
-                color = Color(0xFFBFD7FF),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.2.sp
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(17.dp))
         HomeMenuCard("Commencer", "Lancer un nouveau quiz", Color(0xFFD652FF), onQuiz)
         Spacer(Modifier.height(9.dp))
         HomeMenuCard("Statistiques", "Suis ta progression", Color(0xFF18BFFF), onStats)
@@ -214,27 +166,23 @@ fun HomeScreenV2(
         )
 
         Spacer(Modifier.height(14.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             HomeStatCard("🔥", p.streak.toString(), "Série", Modifier.weight(1f), Color(0xFFFFA61A))
             HomeStatCard("★", p.xp.toString(), "XP", Modifier.weight(1f), Color(0xFFD64CFF))
             HomeStatCard("▥", p.level.toString(), "Niveau", Modifier.weight(1f), Color(0xFF1AC3FF))
             HomeStatCard("🏆", "$accuracy%", "Réussite", Modifier.weight(1f), Color(0xFFFFCC33))
         }
-
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
         HomeDigitalPlanet()
     }
 
     if (showPicker) {
         PlayerAvatarPickerDialog(
             playerLevel = p.level,
-            onSelectionChanged = { reloadCosmeticsAndRewards() },
+            onSelectionChanged = { reload() },
             onDismiss = {
                 showPicker = false
-                reloadCosmeticsAndRewards()
+                reload()
             }
         )
     }
@@ -243,105 +191,62 @@ fun HomeScreenV2(
 @Composable
 private fun HomePlayerHeader(
     level: Int,
-    title: String,
-    xpIntoLevel: Int,
     progress: Float,
     coins: Int,
     avatar: PlayerAvatarStyle,
     banner: PlayerBannerStyle,
     frame: PlayerFrameStyle,
-    onAvatarClick: () -> Unit,
-    onCoinsClick: () -> Unit
+    onCoinsClick: () -> Unit,
+    onAvatarClick: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier.width(192.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp)
+        Text(
+            "NIV. $level",
+            color = Color(0xFF43E8FF),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Black
+        )
+        Spacer(Modifier.width(7.dp))
+        Box(
+            Modifier
+                .width(100.dp)
+                .height(5.dp)
+                .background(Color(0xFF142039), RoundedCornerShape(50.dp))
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            if (progress > 0f) {
                 Box(
-                    modifier = Modifier
-                        .background(Color(0xFF0D2038), RoundedCornerShape(50.dp))
-                        .border(1.dp, Color(0xFF25DFFF).copy(alpha = .65f), RoundedCornerShape(50.dp))
-                        .padding(horizontal = 9.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        "NIV. $level",
-                        color = Color(0xFF2DE8FF),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                }
-                Spacer(Modifier.width(7.dp))
-                Text(
-                    title,
-                    color = Color(0xFFF1F4FF),
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1
+                    Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(progress)
+                        .background(
+                            Brush.horizontalGradient(listOf(Color(0xFF8254FF), Color(0xFF29DFFF))),
+                            RoundedCornerShape(50.dp)
+                        )
                 )
             }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .width(132.dp)
-                        .height(13.dp)
-                        .background(Color(0xFF071323), RoundedCornerShape(50.dp))
-                        .border(1.dp, Color(0xFF3F69A2), RoundedCornerShape(50.dp))
-                        .padding(2.dp)
-                ) {
-                    if (progress > 0f) {
-                        Box(
-                            Modifier
-                                .fillMaxHeight()
-                                .fillMaxWidth(progress)
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(Color(0xFF6A34FF), Color(0xFFD54EFF), Color(0xFF27DFFF))
-                                    ),
-                                    RoundedCornerShape(50.dp)
-                                )
-                        )
-                    }
-                }
-                Spacer(Modifier.width(7.dp))
-                Box(
-                    modifier = Modifier
-                        .background(Color(0xFF21163A), RoundedCornerShape(50.dp))
-                        .border(1.dp, Color(0xFFFFB84A).copy(alpha = .75f), RoundedCornerShape(50.dp))
-                        .clickable(onClick = onCoinsClick)
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        "◈ $coins",
-                        color = Color(0xFFFFC86A),
-                        fontSize = 8.5.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                }
-            }
-
-            Text(
-                "$xpIntoLevel / 100 XP",
-                color = Color(0xFF8EA3CA),
-                fontSize = 7.5.sp,
-                fontWeight = FontWeight.Bold
-            )
         }
 
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.weight(1f))
+        Box(
+            Modifier
+                .background(Color(0xFF21163A), RoundedCornerShape(50.dp))
+                .border(1.dp, Color(0xFFFFB84A).copy(alpha = .55f), RoundedCornerShape(50.dp))
+                .clickable(onClick = onCoinsClick)
+                .padding(horizontal = 9.dp, vertical = 5.dp)
+        ) {
+            Text("◈ $coins", color = Color(0xFFFFC86A), fontSize = 9.sp, fontWeight = FontWeight.Black)
+        }
+        Spacer(Modifier.width(7.dp))
         CyberAvatarView(
             style = avatar,
             banner = banner,
             frame = frame,
             onClick = onAvatarClick,
-            size = 64.dp,
-            showEditBadge = true
+            size = 51.dp,
+            showEditBadge = false
         )
     }
 }
@@ -351,54 +256,33 @@ private enum class HomeTopIcon { SETTINGS, PROFILE }
 @Composable
 private fun HomeTopButton(icon: HomeTopIcon, onClick: () -> Unit, showBadge: Boolean = false) {
     Box(
-        modifier = Modifier
-            .size(44.dp)
+        Modifier
+            .size(40.dp)
             .background(Brush.radialGradient(listOf(Color(0xFF172A57), Color(0xFF081123))), CircleShape)
-            .border(1.3.dp, Color(0xFF7898F2), CircleShape)
+            .border(1.1.dp, Color(0xFF7898F2), CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(Modifier.size(25.dp)) {
+        Canvas(Modifier.size(23.dp)) {
             when (icon) {
                 HomeTopIcon.SETTINGS -> {
-                    val c = Offset(size.width / 2, size.height / 2)
+                    val c = center
                     repeat(8) { i ->
                         val a = Math.toRadians(i * 45.0)
-                        val x = cos(a).toFloat()
-                        val y = sin(a).toFloat()
-                        drawLine(
-                            Color(0xFFE0E7FF),
-                            Offset(c.x + x * size.minDimension * .39f, c.y + y * size.minDimension * .39f),
-                            Offset(c.x + x * size.minDimension * .48f, c.y + y * size.minDimension * .48f),
-                            3f,
-                            StrokeCap.Round
-                        )
+                        val x = cos(a).toFloat(); val y = sin(a).toFloat()
+                        drawLine(Color(0xFFE0E7FF), Offset(c.x+x*8f,c.y+y*8f), Offset(c.x+x*10f,c.y+y*10f), 2.5f, StrokeCap.Round)
                     }
-                    drawCircle(Color(0xFFE0E7FF), size.minDimension * .30f, c, style = Stroke(3f))
-                    drawCircle(Color(0xFF081123), size.minDimension * .11f, c)
+                    drawCircle(Color(0xFFE0E7FF), 6.2f, c, style = Stroke(2.4f))
+                    drawCircle(Color(0xFF081123), 2.3f, c)
                 }
                 HomeTopIcon.PROFILE -> {
-                    drawCircle(Color(0xFFE0E7FF), size.minDimension * .17f, Offset(size.width / 2, size.height * .31f), style = Stroke(3f))
-                    drawArc(
-                        Color(0xFFE0E7FF),
-                        198f,
-                        144f,
-                        false,
-                        Offset(size.width * .17f, size.height * .46f),
-                        Size(size.width * .66f, size.height * .48f),
-                        style = Stroke(3f, cap = StrokeCap.Round)
-                    )
+                    drawCircle(Color(0xFFE0E7FF), 4.1f, Offset(size.width/2,size.height*.31f), style=Stroke(2.5f))
+                    drawArc(Color(0xFFE0E7FF),198f,144f,false,Offset(size.width*.17f,size.height*.46f),Size(size.width*.66f,size.height*.48f),style=Stroke(2.5f,cap=StrokeCap.Round))
                 }
             }
         }
         if (showBadge && icon == HomeTopIcon.SETTINGS) {
-            Box(
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .size(11.dp)
-                    .background(Color(0xFFFF4F6D), CircleShape)
-                    .border(1.5.dp, Color(0xFF081123), CircleShape)
-            )
+            Box(Modifier.align(Alignment.TopEnd).size(10.dp).background(Color(0xFFFF4F6D), CircleShape).border(1.3.dp,Color(0xFF081123),CircleShape))
         }
     }
 }
@@ -406,183 +290,79 @@ private fun HomeTopButton(icon: HomeTopIcon, onClick: () -> Unit, showBadge: Boo
 @Composable
 private fun HomeHeroLogo() {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(180.dp),
+        Modifier.fillMaxWidth().height(126.dp),
         contentAlignment = Alignment.Center
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val cx = w / 2f
-            val cy = h / 2f
-            val cyan = Color(0xFF23DFFF)
-            val purple = Color(0xFFAA47FF)
-
-            drawCircle(
-                Brush.radialGradient(
-                    listOf(purple.copy(alpha = .24f), cyan.copy(alpha = .10f), Color.Transparent),
-                    Offset(cx, cy),
-                    150f
-                ),
-                150f,
-                Offset(cx, cy)
-            )
-
-            repeat(8) { i ->
-                val y = h * (.12f + i * .11f)
-                val start = w * if (i % 2 == 0) .04f else .12f
-                val elbow = w * (.26f + (i % 3) * .025f)
-                val accent = if (i % 2 == 0) cyan else purple
-                val left = Path().apply {
-                    moveTo(start, y)
-                    lineTo(elbow, y)
-                    lineTo(elbow + 16f, cy)
-                    lineTo(cx - 82f, cy)
-                }
-                val right = Path().apply {
-                    moveTo(w - start, y)
-                    lineTo(w - elbow, y)
-                    lineTo(w - elbow - 16f, cy)
-                    lineTo(cx + 82f, cy)
-                }
-                drawPath(left, accent.copy(alpha = .48f), style = Stroke(1.7f, cap = StrokeCap.Round))
-                drawPath(right, accent.copy(alpha = .48f), style = Stroke(1.7f, cap = StrokeCap.Round))
-                drawCircle(accent.copy(alpha = .78f), 2.7f, Offset(start, y))
-                drawCircle(accent.copy(alpha = .78f), 2.7f, Offset(w - start, y))
+            val w=size.width; val h=size.height; val cx=w/2f; val cy=h/2f
+            val cyan=Color(0xFF23DFFF); val purple=Color(0xFFAA47FF)
+            drawCircle(Brush.radialGradient(listOf(purple.copy(alpha=.18f),cyan.copy(alpha=.07f),Color.Transparent),Offset(cx,cy),110f),110f,Offset(cx,cy))
+            repeat(5) { i ->
+                val y=h*(.17f+i*.16f); val accent=if(i%2==0)cyan else purple
+                val left=Path().apply { moveTo(w*.08f,y); lineTo(w*.30f,y); lineTo(w*.36f,cy) }
+                val right=Path().apply { moveTo(w*.92f,y); lineTo(w*.70f,y); lineTo(w*.64f,cy) }
+                drawPath(left,accent.copy(alpha=.38f),style=Stroke(1.4f,cap=StrokeCap.Round))
+                drawPath(right,accent.copy(alpha=.38f),style=Stroke(1.4f,cap=StrokeCap.Round))
+                drawCircle(accent.copy(alpha=.7f),2.4f,Offset(w*.08f,y)); drawCircle(accent.copy(alpha=.7f),2.4f,Offset(w*.92f,y))
             }
-
-            val shield = Path().apply {
-                moveTo(cx, cy - 66f)
-                lineTo(cx + 62f, cy - 40f)
-                lineTo(cx + 55f, cy + 25f)
-                quadraticBezierTo(cx + 36f, cy + 58f, cx, cy + 73f)
-                quadraticBezierTo(cx - 36f, cy + 58f, cx - 55f, cy + 25f)
-                lineTo(cx - 62f, cy - 40f)
-                close()
+            val shield=Path().apply {
+                moveTo(cx,cy-43f); lineTo(cx+45f,cy-26f); lineTo(cx+39f,cy+22f)
+                quadraticBezierTo(cx+26f,cy+48f,cx,cy+58f); quadraticBezierTo(cx-26f,cy+48f,cx-39f,cy+22f)
+                lineTo(cx-45f,cy-26f); close()
             }
-            drawPath(
-                shield,
-                Brush.linearGradient(listOf(Color(0xFFF16EFF), Color(0xFF55E7FF), Color(0xFF347DFF))),
-                style = Stroke(6f, cap = StrokeCap.Round)
-            )
-
-            val shackleTop = cy - 32f
-            drawArc(
-                color = Color(0xFFEE83FF),
-                startAngle = 180f,
-                sweepAngle = 180f,
-                useCenter = false,
-                topLeft = Offset(cx - 21f, shackleTop),
-                size = Size(42f, 44f),
-                style = Stroke(6f, cap = StrokeCap.Round)
-            )
-            drawRoundRect(
-                brush = Brush.verticalGradient(listOf(Color(0xFFC065FF), Color(0xFF3D94FF))),
-                topLeft = Offset(cx - 27f, cy - 8f),
-                size = Size(54f, 48f),
-                cornerRadius = CornerRadius(12f, 12f)
-            )
-            drawCircle(Color(0xFF08162F), 7f, Offset(cx, cy + 14f))
-            drawLine(Color(0xFF08162F), Offset(cx, cy + 20f), Offset(cx, cy + 31f), 4.5f, StrokeCap.Round)
+            drawPath(shield,Brush.linearGradient(listOf(Color(0xFFE75DFF),Color(0xFF45DBFF))),style=Stroke(5f,cap=StrokeCap.Round))
+            drawArc(Color(0xFFEE83FF),180f,180f,false,Offset(cx-17f,cy-27f),Size(34f,36f),style=Stroke(5f,cap=StrokeCap.Round))
+            drawRoundRect(Brush.verticalGradient(listOf(Color(0xFFC065FF),Color(0xFF3D94FF))),Offset(cx-22f,cy-7f),Size(44f,38f),CornerRadius(10f,10f))
+            drawCircle(Color(0xFF08162F),5.5f,Offset(cx,cy+10f)); drawLine(Color(0xFF08162F),Offset(cx,cy+15f),Offset(cx,cy+23f),3.5f,StrokeCap.Round)
         }
     }
 }
 
 @Composable
-private fun HomeMenuCard(
-    title: String,
-    subtitle: String,
-    accent: Color,
-    onClick: () -> Unit
-) {
+private fun HomeMenuCard(title: String, subtitle: String, accent: Color, onClick: () -> Unit) {
     Row(
-        modifier = Modifier
+        Modifier
             .fillMaxWidth()
             .height(72.dp)
-            .background(
-                Brush.horizontalGradient(
-                    listOf(accent.copy(alpha = .18f), Color(0xFF081327), Color(0xFF071021))
-                ),
-                RoundedCornerShape(20.dp)
-            )
-            .border(1.3.dp, accent.copy(alpha = .90f), RoundedCornerShape(20.dp))
+            .background(Brush.horizontalGradient(listOf(accent.copy(alpha=.13f),Color(0xFF081327))), RoundedCornerShape(19.dp))
+            .border(1.3.dp, accent.copy(alpha=.84f), RoundedCornerShape(19.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 15.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .background(accent.copy(alpha = .12f), RoundedCornerShape(13.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("◈", color = accent, fontSize = 19.sp, fontWeight = FontWeight.Black)
+        Box(Modifier.size(39.dp).background(accent.copy(alpha=.13f),CircleShape).border(1.dp,accent.copy(alpha=.45f),CircleShape),contentAlignment=Alignment.Center) {
+            Text(title.take(1).uppercase(), color=accent, fontSize=15.sp, fontWeight=FontWeight.Black)
         }
-        Spacer(Modifier.width(13.dp))
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = Color(0xFFCBD4F8), fontSize = 11.sp)
+            Text(title,color=Color.White,fontSize=17.sp,fontWeight=FontWeight.Bold)
+            Text(subtitle,color=Color(0xFFCBD4F8),fontSize=11.sp)
         }
-        Text("›", color = Color.White, fontSize = 29.sp)
+        Text("›",color=Color.White,fontSize=28.sp)
     }
 }
 
 @Composable
-private fun HomeStatCard(
-    symbol: String,
-    value: String,
-    label: String,
-    modifier: Modifier,
-    accent: Color
-) {
+private fun HomeStatCard(symbol: String, value: String, label: String, modifier: Modifier, accent: Color) {
     Column(
-        modifier = modifier
-            .height(86.dp)
-            .background(Color(0xFF071123), RoundedCornerShape(16.dp))
-            .border(1.dp, Color(0xFF214B85), RoundedCornerShape(16.dp))
-            .padding(4.dp, 7.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        modifier.height(86.dp).background(Color(0xFF071123),RoundedCornerShape(15.dp)).border(1.dp,Color(0xFF214B85),RoundedCornerShape(15.dp)).padding(3.dp,7.dp),
+        horizontalAlignment=Alignment.CenterHorizontally,
+        verticalArrangement=Arrangement.Center
     ) {
-        Text(symbol, color = accent, fontSize = 17.sp)
-        Text(value, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        Text(label, color = Color(0xFFC9D0F3), fontSize = 8.5.sp, textAlign = TextAlign.Center)
+        Text(symbol,color=accent,fontSize=17.sp); Text(value,color=Color.White,fontSize=14.sp,fontWeight=FontWeight.Bold); Text(label,color=Color(0xFFC9D0F3),fontSize=8.5.sp,textAlign=TextAlign.Center)
     }
 }
 
 @Composable
 private fun HomeDigitalPlanet() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp),
-        contentAlignment = Alignment.TopCenter
-    ) {
+    Box(Modifier.fillMaxWidth().height(105.dp),contentAlignment=Alignment.TopCenter) {
         Canvas(Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val center = Offset(w / 2f, h * 1.10f)
-            val rx = w * .54f
-            val ry = h * .86f
-            val main = Color(0xFF21BFFF).copy(alpha = .80f)
-            val dim = Color(0xFF315D9B).copy(alpha = .62f)
-            val purple = Color(0xFF8F45FF).copy(alpha = .50f)
-            drawArc(main, 188f, 164f, false, Offset(center.x - rx, center.y - ry), Size(rx * 2, ry * 2), style = Stroke(3f))
-            for (i in -5..5) {
-                val sx = center.x + i * (w * .075f)
-                val ex = center.x + i * (w * .025f)
-                drawLine(if (i % 3 == 0) purple else dim, Offset(sx, h * .44f + abs(i) * 2.8f), Offset(ex, h), 1.2f)
+            val w=size.width; val h=size.height; val c=Offset(w/2,h*1.18f); val main=Color(0xFF21BFFF).copy(alpha=.62f)
+            drawArc(main,188f,164f,false,Offset(c.x-w*.48f,c.y-h*.78f),Size(w*.96f,h*1.56f),style=Stroke(2.2f,cap=StrokeCap.Round))
+            repeat(7) { i ->
+                val x=w*(.16f+i*.11f); drawLine(Color(0xFF315D9B).copy(alpha=.42f),Offset(x,h*.55f),Offset(c.x+(x-c.x)*.24f,h),1f)
             }
         }
-        Text(
-            "UN MONDE PLUS SÛR\nCOMMENCE PAR TOI",
-            color = Color(0xFFD6DCF8),
-            textAlign = TextAlign.Center,
-            fontSize = 9.5.sp,
-            letterSpacing = 2.4.sp,
-            lineHeight = 15.sp,
-            modifier = Modifier.padding(top = 8.dp)
-        )
+        Text("UN MONDE PLUS SÛR · COMMENCE PAR TOI",color=Color(0xFFD6DCF8),fontSize=8.sp,letterSpacing=1.5.sp,modifier=Modifier.padding(top=7.dp))
     }
 }
