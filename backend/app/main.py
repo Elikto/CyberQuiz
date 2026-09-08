@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import logging
@@ -5,6 +6,7 @@ import os
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from secrets import compare_digest
@@ -17,15 +19,20 @@ from pydantic import BaseModel, Field, field_validator
 
 load_dotenv()
 logger = logging.getLogger("cyberquiz.backend")
-app = FastAPI(title="CyberQuiz AI Backend", version="1.3.0")
+app = FastAPI(title="CyberQuiz AI Backend", version="1.4.0")
 
 CONTACT_RATE_LIMIT = 5
 CONTACT_RATE_WINDOW_SECONDS = 60 * 60
 CONTACT_MESSAGE_PART_SIZE = 1500
+URGENT_SMS_RATE_LIMIT = 10
+URGENT_SMS_RATE_WINDOW_SECONDS = 60 * 60
+TWILIO_SMS_BODY_MAX_CHARS = 1600
 RESEND_EMAILS_URL = "https://api.resend.com/emails"
 RESEND_CONTACTS_URL = "https://api.resend.com/contacts"
 _contact_attempts: dict[str, list[float]] = {}
 _contact_rate_lock = threading.Lock()
+_urgent_sms_attempts: list[float] = []
+_urgent_sms_rate_lock = threading.Lock()
 
 CONTACT_SUBJECTS: dict[str, str] = {
     "bug": "[CyberQuiz] Signalement de bug",
@@ -66,6 +73,7 @@ class ContactRequest(BaseModel):
     message: str = Field(min_length=1, max_length=3000)
     appVersion: str = Field(default="inconnue", max_length=80)
     platform: str = Field(default="Android", max_length=80)
+    urgent: bool = False
     submissionId: str | None = Field(default=None, min_length=8, max_length=80)
 
     @field_validator("message")
@@ -112,6 +120,15 @@ def _contact_enabled() -> bool:
     }
 
 
+def _urgent_sms_enabled() -> bool:
+    return os.getenv("CYBERQUIZ_URGENT_SMS_ENABLED", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def _contact_configuration() -> dict[str, str]:
     if not _contact_enabled():
         raise HTTPException(503, "Le service de contact est temporairement indisponible")
@@ -120,6 +137,11 @@ def _contact_configuration() -> dict[str, str]:
     inbox_segment_id = os.getenv("CYBERQUIZ_CONTACT_INBOX_SEGMENT_ID", "").strip()
     to_address = os.getenv("CYBERQUIZ_CONTACT_TO", "").strip()
     from_address = os.getenv("CYBERQUIZ_CONTACT_FROM", "").strip()
+    sms_account_sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
+    sms_auth_token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
+    sms_from_number = os.getenv("TWILIO_FROM_NUMBER", "").strip()
+    sms_to_number = os.getenv("CYBERQUIZ_URGENT_SMS_TO", "").strip()
+    sms_enabled = _urgent_sms_enabled()
 
     if not api_key or not inbox_segment_id:
         logger.error("Contact service enabled without Resend inbox configuration")
@@ -130,11 +152,26 @@ def _contact_configuration() -> dict[str, str]:
         to_address = ""
         from_address = ""
 
+    if sms_enabled and not all(
+        [sms_account_sid, sms_auth_token, sms_from_number, sms_to_number]
+    ):
+        logger.warning("Urgent SMS configuration is incomplete; SMS notifications disabled")
+        sms_enabled = False
+        sms_account_sid = ""
+        sms_auth_token = ""
+        sms_from_number = ""
+        sms_to_number = ""
+
     return {
         "api_key": api_key,
         "inbox_segment_id": inbox_segment_id,
         "to_address": to_address,
         "from_address": from_address,
+        "sms_enabled": "true" if sms_enabled else "",
+        "sms_account_sid": sms_account_sid,
+        "sms_auth_token": sms_auth_token,
+        "sms_from_number": sms_from_number,
+        "sms_to_number": sms_to_number,
     }
 
 
@@ -151,6 +188,20 @@ def _check_contact_rate_limit(client_id: str, now: float | None = None) -> None:
         _contact_attempts[client_id] = recent
 
 
+def _allow_urgent_sms_notification(now: float | None = None) -> bool:
+    timestamp = time.monotonic() if now is None else now
+    cutoff = timestamp - URGENT_SMS_RATE_WINDOW_SECONDS
+
+    with _urgent_sms_rate_lock:
+        recent = [attempt for attempt in _urgent_sms_attempts if attempt > cutoff]
+        if len(recent) >= URGENT_SMS_RATE_LIMIT:
+            _urgent_sms_attempts[:] = recent
+            return False
+        recent.append(timestamp)
+        _urgent_sms_attempts[:] = recent
+        return True
+
+
 def _resend_post(url: str, payload: dict[str, object], api_key: str) -> dict[str, object]:
     request = urllib.request.Request(
         url,
@@ -160,7 +211,7 @@ def _resend_post(url: str, payload: dict[str, object], api_key: str) -> dict[str
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "CyberQuiz-Backend/1.3",
+            "User-Agent": "CyberQuiz-Backend/1.4",
         },
     )
     with urllib.request.urlopen(request, timeout=8) as response:
@@ -170,6 +221,58 @@ def _resend_post(url: str, payload: dict[str, object], api_key: str) -> dict[str
         if not raw:
             return {}
         return json.loads(raw.decode("utf-8"))
+
+
+def _twilio_post(
+    account_sid: str,
+    auth_token: str,
+    form: dict[str, str],
+) -> dict[str, object]:
+    url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
+    credentials = base64.b64encode(f"{account_sid}:{auth_token}".encode("utf-8")).decode("ascii")
+    request = urllib.request.Request(
+        url,
+        data=urllib.parse.urlencode(form).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Basic {credentials}",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+            "User-Agent": "CyberQuiz-Backend/1.4",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=8) as response:
+        if response.status < 200 or response.status >= 300:
+            raise RuntimeError(f"Twilio returned HTTP {response.status}")
+        raw = response.read()
+        if not raw:
+            return {}
+        return json.loads(raw.decode("utf-8"))
+
+
+def _contact_subject(req: ContactRequest) -> str:
+    subject = CONTACT_SUBJECTS[req.reason]
+    return f"[URGENT] {subject}" if req.urgent else subject
+
+
+def _urgent_sms_text(req: ContactRequest) -> str:
+    prefix = "\n".join(
+        [
+            "URGENT CyberQuiz",
+            f"Objet : {_contact_subject(req)}",
+            f"Motif : {CONTACT_LABELS[req.reason]}",
+            f"Version : {req.appVersion}",
+            f"Plateforme : {req.platform}",
+            "",
+        ]
+    )
+    suffix = "... [message tronque]"
+    available = TWILIO_SMS_BODY_MAX_CHARS - len(prefix)
+    message = req.message
+    if len(message) > available:
+        keep = max(0, available - len(suffix))
+        message = message[:keep] + suffix
+    return (prefix + message)[:TWILIO_SMS_BODY_MAX_CHARS]
 
 
 def _submission_token(req: ContactRequest) -> str:
@@ -191,6 +294,7 @@ def _store_contact_submission(req: ContactRequest, config: dict[str, str]) -> st
             "cq_message_2": message_part_2,
             "cq_app_version": req.appVersion,
             "cq_platform": req.platform,
+            "cq_urgent": "Oui" if req.urgent else "Non",
             "cq_submitted_at": datetime.now(timezone.utc).isoformat(),
         },
         "segments": [{"id": config["inbox_segment_id"]}],
@@ -219,6 +323,7 @@ def _send_contact_email(req: ContactRequest, config: dict[str, str]) -> None:
             f"Motif : {CONTACT_LABELS[req.reason]}",
             f"Version CyberQuiz : {req.appVersion}",
             f"Plateforme : {req.platform}",
+            f"Urgent : {'Oui' if req.urgent else 'Non'}",
             "",
             req.message,
         ]
@@ -228,11 +333,33 @@ def _send_contact_email(req: ContactRequest, config: dict[str, str]) -> None:
         {
             "from": config["from_address"],
             "to": [config["to_address"]],
-            "subject": CONTACT_SUBJECTS[req.reason],
+            "subject": _contact_subject(req),
             "text": text,
         },
         config["api_key"],
     )
+
+
+def _send_contact_sms(req: ContactRequest, config: dict[str, str]) -> None:
+    if not req.urgent or not config.get("sms_enabled"):
+        return
+
+    _twilio_post(
+        config["sms_account_sid"],
+        config["sms_auth_token"],
+        {
+            "To": config["sms_to_number"],
+            "From": config["sms_from_number"],
+            "Body": _urgent_sms_text(req),
+        },
+    )
+
+
+def _send_contact_sms_best_effort(req: ContactRequest, config: dict[str, str]) -> None:
+    try:
+        _send_contact_sms(req, config)
+    except Exception:
+        logger.warning("Urgent SMS notification failed after message persistence", exc_info=True)
 
 
 def _send_contact_email_best_effort(req: ContactRequest, config: dict[str, str]) -> None:
@@ -266,6 +393,12 @@ def contact(
 
     if config.get("from_address") and config.get("to_address"):
         background_tasks.add_task(_send_contact_email_best_effort, req, config)
+
+    if req.urgent and config.get("sms_enabled"):
+        if _allow_urgent_sms_notification():
+            background_tasks.add_task(_send_contact_sms_best_effort, req, config)
+        else:
+            logger.warning("Urgent SMS notification skipped because the hourly safety cap was reached")
 
     return ContactResponse(sent=True)
 
