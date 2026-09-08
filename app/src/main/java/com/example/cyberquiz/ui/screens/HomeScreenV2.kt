@@ -1,5 +1,6 @@
 package com.example.cyberquiz.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -7,10 +8,12 @@ import androidx.compose.foundation.shape.*
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.*
 import androidx.compose.ui.geometry.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
@@ -34,7 +37,21 @@ fun HomeScreenV2(
     val p by vm.progress.collectAsState()
     val reviewItems by vm.reviewItems.collectAsState()
     val history by vm.quizHistory.collectAsState()
+    val context = LocalContext.current
+    val avatarPreferences = remember(context) {
+        context.getSharedPreferences("cyberquiz_player_cosmetics", Context.MODE_PRIVATE)
+    }
+    var selectedAvatarKey by rememberSaveable {
+        mutableStateOf(
+            avatarPreferences.getString(
+                "selected_avatar",
+                PlayerAvatarStyle.BEGINNER.storageKey
+            ) ?: PlayerAvatarStyle.BEGINNER.storageKey
+        )
+    }
+    var showAvatarPicker by rememberSaveable { mutableStateOf(false) }
     var updateAvailable by remember { mutableStateOf(false) }
+    val selectedAvatar = playerAvatarFromStorage(selectedAvatarKey)
     val activeReviewCount = reviewItems.count { !it.mastered }
     val xp = p.xp % 100
     val progress = (xp / 100f).coerceIn(0f, 1f)
@@ -69,10 +86,11 @@ fun HomeScreenV2(
             title = title,
             xp = xp,
             progress = progress,
-            onAvatarClick = onProfile
+            avatarStyle = selectedAvatar,
+            onAvatarClick = { showAvatarPicker = true }
         )
 
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(5.dp))
         HeroLogo()
 
         Row(verticalAlignment = Alignment.Bottom) {
@@ -125,6 +143,20 @@ fun HomeScreenV2(
         Spacer(Modifier.height(10.dp))
         DigitalPlanet()
     }
+
+    if (showAvatarPicker) {
+        PlayerAvatarPickerDialog(
+            selected = selectedAvatar,
+            onSelect = { style ->
+                selectedAvatarKey = style.storageKey
+                avatarPreferences.edit()
+                    .putString("selected_avatar", style.storageKey)
+                    .apply()
+                showAvatarPicker = false
+            },
+            onDismiss = { showAvatarPicker = false }
+        )
+    }
 }
 
 private enum class TopIcon { SETTINGS, PROFILE }
@@ -175,55 +207,66 @@ private fun PlayerProgressHeader(
     title: String,
     xp: Int,
     progress: Float,
+    avatarStyle: PlayerAvatarStyle,
     onAvatarClick: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 3.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        BeginnerHackerAvatar(onClick = onAvatarClick)
-        Spacer(Modifier.width(10.dp))
         Column(
-            modifier = Modifier.width(220.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.width(226.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
                     modifier = Modifier
-                        .background(Color(0xFF10213A), RoundedCornerShape(50.dp))
-                        .border(1.dp, Color(0xFF20DFFF).copy(alpha = .55f), RoundedCornerShape(50.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF132946), Color(0xFF0A1730))
+                            ),
+                            RoundedCornerShape(50.dp)
+                        )
+                        .border(1.dp, Color(0xFF25DFFF).copy(alpha = .62f), RoundedCornerShape(50.dp))
                         .padding(horizontal = 9.dp, vertical = 3.dp)
                 ) {
                     Text(
                         "NIV. $level",
-                        color = Color(0xFF21E3FF),
+                        color = Color(0xFF2DE8FF),
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Black,
-                        letterSpacing = .6.sp
+                        letterSpacing = .7.sp
                     )
                 }
                 Spacer(Modifier.width(7.dp))
                 Text(
                     title,
-                    color = Color(0xFFE8ECFF),
+                    color = Color(0xFFF1F4FF),
                     fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
                 )
             }
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(9.dp)
+                    .height(14.dp)
                     .background(
-                        Brush.horizontalGradient(listOf(Color(0xFF111B33), Color(0xFF182A4C))),
+                        Brush.horizontalGradient(
+                            listOf(Color(0xFF071323), Color(0xFF132946), Color(0xFF071323))
+                        ),
                         RoundedCornerShape(50.dp)
                     )
-                    .border(1.dp, Color(0xFF315D9B).copy(alpha = .8f), RoundedCornerShape(50.dp))
-                    .padding(1.dp)
+                    .border(1.dp, Color(0xFF3F69A2).copy(alpha = .78f), RoundedCornerShape(50.dp))
+                    .padding(2.dp)
             ) {
                 if (progress > 0f) {
                     Box(
@@ -232,137 +275,200 @@ private fun PlayerProgressHeader(
                             .fillMaxWidth(progress)
                             .background(
                                 Brush.horizontalGradient(
-                                    listOf(Color(0xFF7B34FF), Color(0xFFD54EFF), Color(0xFF21E3FF))
+                                    listOf(
+                                        Color(0xFF6A34FF),
+                                        Color(0xFFD54EFF),
+                                        Color(0xFF27DFFF),
+                                        Color(0xFF72F7FF)
+                                    )
                                 ),
                                 RoundedCornerShape(50.dp)
                             )
                     )
                 }
+                Canvas(Modifier.matchParentSize()) {
+                    for (i in 1..9) {
+                        val x = size.width * i / 10f
+                        drawLine(
+                            Color.White.copy(alpha = .12f),
+                            Offset(x, 1f),
+                            Offset(x, size.height - 1f),
+                            1f
+                        )
+                    }
+                }
             }
 
-            Text(
-                "$xp / 100 XP",
-                color = Color(0xFFAEB9EA),
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-@Composable
-private fun BeginnerHackerAvatar(onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(60.dp)
-            .background(
-                Brush.radialGradient(listOf(Color(0xFF18375B), Color(0xFF081123))),
-                RoundedCornerShape(18.dp)
-            )
-            .border(1.3.dp, Color(0xFF28DFF2).copy(alpha = .75f), RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(Modifier.size(48.dp)) {
-            val cx = size.width / 2f
-            val hood = Path().apply {
-                moveTo(cx, size.height * .06f)
-                cubicTo(size.width * .18f, size.height * .17f, size.width * .10f, size.height * .53f, size.width * .17f, size.height * .88f)
-                lineTo(size.width * .83f, size.height * .88f)
-                cubicTo(size.width * .90f, size.height * .53f, size.width * .82f, size.height * .17f, cx, size.height * .06f)
-                close()
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "PROGRESSION DU NIVEAU",
+                    color = Color(0xFF7891BE),
+                    fontSize = 7.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = .8.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "$xp / 100 XP",
+                    color = Color(0xFFCBD7F5),
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Black
+                )
             }
-            drawPath(
-                hood,
-                brush = Brush.verticalGradient(listOf(Color(0xFF293B68), Color(0xFF10172D)))
-            )
-            drawPath(hood, Color(0xFF6C8BCE), style = Stroke(2.2f))
+        }
 
-            val faceTop = size.height * .31f
-            drawOval(
-                color = Color(0xFF07101E),
-                topLeft = Offset(size.width * .28f, faceTop),
-                size = Size(size.width * .44f, size.height * .39f)
-            )
-            drawRoundRect(
-                brush = Brush.horizontalGradient(listOf(Color(0xFFB13DFF), Color(0xFF24DFF0))),
-                topLeft = Offset(size.width * .30f, size.height * .43f),
-                size = Size(size.width * .40f, size.height * .10f),
-                cornerRadius = CornerRadius(5f, 5f)
-            )
-            drawLine(
-                Color(0xFF35F3FF),
-                Offset(size.width * .38f, size.height * .47f),
-                Offset(size.width * .62f, size.height * .47f),
-                1.6f,
-                StrokeCap.Round
-            )
-            drawArc(
-                color = Color(0xFF89A5D8),
-                startAngle = 205f,
-                sweepAngle = 130f,
-                useCenter = false,
-                topLeft = Offset(size.width * .32f, size.height * .54f),
-                size = Size(size.width * .36f, size.height * .18f),
-                style = Stroke(1.7f, cap = StrokeCap.Round)
-            )
-        }
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(4.dp)
-                .size(14.dp)
-                .background(Color(0xFF0C1B2E), CircleShape)
-                .border(1.dp, Color(0xFFD652FF), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("›", color = Color(0xFF21E3FF), fontSize = 10.sp, fontWeight = FontWeight.Black)
-        }
+        Spacer(Modifier.width(12.dp))
+        PlayerAvatarButton(
+            style = avatarStyle,
+            onClick = onAvatarClick,
+            size = 64.dp
+        )
     }
 }
 
 @Composable
 private fun HeroLogo() {
-    Box(Modifier.fillMaxWidth().height(188.dp), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(202.dp),
+        contentAlignment = Alignment.Center
+    ) {
         Canvas(Modifier.fillMaxSize()) {
-            val w = size.width; val h = size.height; val cx = w / 2; val cy = h * .56f
-            drawCircle(Brush.radialGradient(listOf(Color(0xFF8B2DFF).copy(.28f), Color.Transparent), Offset(cx, cy), 150f), 150f, Offset(cx, cy))
-            drawCircle(Brush.radialGradient(listOf(Color(0xFF00C8FF).copy(.14f), Color.Transparent), Offset(cx, cy), 205f), 205f, Offset(cx, cy))
+            val w = size.width
+            val h = size.height
+            val cx = w / 2f
+            val cy = h / 2f
+            val cyan = Color(0xFF23DFFF)
+            val purple = Color(0xFFAA47FF)
+            val blue = Color(0xFF347DFF)
+            val grid = Color(0xFF2C6EA2).copy(alpha = .12f)
 
-            val cyan = Color(0xFF12CCFF).copy(.75f); val purple = Color(0xFF9E43FF).copy(.67f)
-            listOf(.19f, .31f, .43f, .55f, .67f, .79f).forEachIndexed { i, f ->
-                val y = h * f; val c = if (i % 2 == 0) cyan else purple; val edge = 18f + i * 7; val gap = 78f + (i % 3) * 10
-                val l = Path().apply { moveTo(edge, y); lineTo(cx - gap - 26, y); lineTo(cx - gap, y + if (i % 2 == 0) 13 else -13) }
-                val r = Path().apply { moveTo(w - edge, y); lineTo(cx + gap + 26, y); lineTo(cx + gap, y + if (i % 2 == 0) 13 else -13) }
-                drawPath(l, c, style = Stroke(2.1f, cap = StrokeCap.Round)); drawPath(r, c, style = Stroke(2.1f, cap = StrokeCap.Round))
-                drawCircle(c, 3.8f, Offset(edge, y)); drawCircle(c, 3.8f, Offset(w - edge, y))
+            drawCircle(
+                Brush.radialGradient(
+                    listOf(purple.copy(alpha = .25f), blue.copy(alpha = .10f), Color.Transparent),
+                    Offset(cx, cy),
+                    150f
+                ),
+                150f,
+                Offset(cx, cy)
+            )
+            drawCircle(
+                Brush.radialGradient(
+                    listOf(cyan.copy(alpha = .14f), Color.Transparent),
+                    Offset(cx, cy),
+                    205f
+                ),
+                205f,
+                Offset(cx, cy)
+            )
+
+            for (i in 1..9) {
+                val x = w * i / 10f
+                drawLine(grid, Offset(x, h * .08f), Offset(x, h * .92f), 1f)
             }
-            listOf(.18f, .27f, .73f, .82f).forEachIndexed { i, f ->
-                val x = w * f; val c = if (i % 2 == 0) cyan else purple
-                drawLine(c, Offset(x, h * .18f), Offset(x, h * .34f), 1.8f); drawCircle(c, 3.2f, Offset(x, h * .18f))
+            for (i in 1..6) {
+                val y = h * i / 7f
+                drawLine(grid, Offset(w * .04f, y), Offset(w * .96f, y), 1f)
             }
 
-            val top = h * .16f; val sw = 158f; val sh = 158f
+            val circuitYs = listOf(.17f, .29f, .41f, .59f, .71f, .83f)
+            circuitYs.forEachIndexed { index, yFraction ->
+                val y = h * yFraction
+                val accent = if (index % 2 == 0) cyan else purple
+                val elbowX = w * (.22f + (index % 3) * .035f)
+                val innerX = cx - (88f + (index % 2) * 12f)
+                val deltaY = if (index < 3) 12f else -12f
+
+                val left = Path().apply {
+                    moveTo(w * .035f, y)
+                    lineTo(elbowX, y)
+                    lineTo(elbowX + 18f, y + deltaY)
+                    lineTo(innerX, y + deltaY)
+                }
+                val right = Path().apply {
+                    moveTo(w * .965f, y)
+                    lineTo(w - elbowX, y)
+                    lineTo(w - elbowX - 18f, y + deltaY)
+                    lineTo(cx + (cx - innerX), y + deltaY)
+                }
+                drawPath(left, accent.copy(alpha = .72f), style = Stroke(2f, cap = StrokeCap.Round))
+                drawPath(right, accent.copy(alpha = .72f), style = Stroke(2f, cap = StrokeCap.Round))
+                drawCircle(accent, 3.3f, Offset(w * .035f, y))
+                drawCircle(accent, 3.3f, Offset(w * .965f, y))
+                drawCircle(accent.copy(alpha = .55f), 2.7f, Offset(elbowX, y))
+                drawCircle(accent.copy(alpha = .55f), 2.7f, Offset(w - elbowX, y))
+            }
+
+            listOf(.18f, .30f, .70f, .82f).forEachIndexed { index, xFraction ->
+                val x = w * xFraction
+                val accent = if (index % 2 == 0) cyan else purple
+                val topY = h * .08f
+                val endY = h * .25f
+                drawLine(accent.copy(alpha = .45f), Offset(x, topY), Offset(x, endY), 1.7f)
+                drawCircle(accent.copy(alpha = .85f), 3.1f, Offset(x, topY))
+            }
+
+            val shieldWidth = 148f
+            val shieldHeight = 142f
+            val top = cy - shieldHeight * .52f
             val outer = Path().apply {
-                moveTo(cx, top); lineTo(cx + sw * .48f, top + sh * .23f); lineTo(cx + sw * .43f, top + sh * .64f)
-                quadraticBezierTo(cx + sw * .32f, top + sh * .87f, cx, top + sh)
-                quadraticBezierTo(cx - sw * .32f, top + sh * .87f, cx - sw * .43f, top + sh * .64f)
-                lineTo(cx - sw * .48f, top + sh * .23f); close()
+                moveTo(cx, top)
+                lineTo(cx + shieldWidth * .48f, top + shieldHeight * .22f)
+                lineTo(cx + shieldWidth * .43f, top + shieldHeight * .63f)
+                quadraticBezierTo(cx + shieldWidth * .31f, top + shieldHeight * .86f, cx, top + shieldHeight)
+                quadraticBezierTo(cx - shieldWidth * .31f, top + shieldHeight * .86f, cx - shieldWidth * .43f, top + shieldHeight * .63f)
+                lineTo(cx - shieldWidth * .48f, top + shieldHeight * .22f)
+                close()
             }
             val inner = Path().apply {
-                moveTo(cx, top + 13); lineTo(cx + sw * .35f, top + sh * .29f); lineTo(cx + sw * .31f, top + sh * .60f)
-                quadraticBezierTo(cx + sw * .23f, top + sh * .77f, cx, top + sh * .88f)
-                quadraticBezierTo(cx - sw * .23f, top + sh * .77f, cx - sw * .31f, top + sh * .60f)
-                lineTo(cx - sw * .35f, top + sh * .29f); close()
+                moveTo(cx, top + 12f)
+                lineTo(cx + shieldWidth * .35f, top + shieldHeight * .28f)
+                lineTo(cx + shieldWidth * .31f, top + shieldHeight * .59f)
+                quadraticBezierTo(cx + shieldWidth * .22f, top + shieldHeight * .76f, cx, top + shieldHeight * .87f)
+                quadraticBezierTo(cx - shieldWidth * .22f, top + shieldHeight * .76f, cx - shieldWidth * .31f, top + shieldHeight * .59f)
+                lineTo(cx - shieldWidth * .35f, top + shieldHeight * .28f)
+                close()
             }
-            drawPath(outer, Brush.linearGradient(listOf(Color(0xFFF06CFF), Color(0xFF42D9FF), Color(0xFF247DFF))), style = Stroke(7f, cap = StrokeCap.Round))
-            drawPath(inner, Color(0xFF4AA8FF), style = Stroke(3f))
 
-            val lockTop = top + sh * .33f
-            drawArc(Color(0xFFEA83FF), 180f, 180f, false, Offset(cx - 24, lockTop), Size(48f, 51f), style = Stroke(7f, cap = StrokeCap.Round))
-            drawRoundRect(Brush.verticalGradient(listOf(Color(0xFFBB63FF), Color(0xFF408DFF))), Offset(cx - 30, lockTop + 26), Size(60f, 52f), CornerRadius(13f, 13f))
-            drawCircle(Color(0xFF08162F), 8.5f, Offset(cx, lockTop + 50)); drawLine(Color(0xFF08162F), Offset(cx, lockTop + 57), Offset(cx, lockTop + 68), 5f, StrokeCap.Round)
+            drawPath(
+                outer,
+                Brush.linearGradient(listOf(Color(0xFFF16EFF), Color(0xFF55E7FF), blue)),
+                style = Stroke(7f, cap = StrokeCap.Round)
+            )
+            drawPath(inner, Color(0xFF54B6FF).copy(alpha = .92f), style = Stroke(2.8f))
+
+            drawCircle(
+                brush = Brush.radialGradient(listOf(purple.copy(alpha = .18f), Color.Transparent)),
+                radius = 58f,
+                center = Offset(cx, cy + 5f)
+            )
+
+            val shackleTop = cy - 37f
+            drawArc(
+                color = Color(0xFFEE83FF),
+                startAngle = 180f,
+                sweepAngle = 180f,
+                useCenter = false,
+                topLeft = Offset(cx - 23f, shackleTop),
+                size = Size(46f, 50f),
+                style = Stroke(7f, cap = StrokeCap.Round)
+            )
+            val bodyTop = cy - 10f
+            drawRoundRect(
+                brush = Brush.verticalGradient(listOf(Color(0xFFC065FF), Color(0xFF3D94FF))),
+                topLeft = Offset(cx - 29f, bodyTop),
+                size = Size(58f, 52f),
+                cornerRadius = CornerRadius(13f, 13f)
+            )
+            drawCircle(Color(0xFF08162F), 8f, Offset(cx, bodyTop + 24f))
+            drawLine(
+                Color(0xFF08162F),
+                Offset(cx, bodyTop + 31f),
+                Offset(cx, bodyTop + 42f),
+                5f,
+                StrokeCap.Round
+            )
         }
     }
 }
