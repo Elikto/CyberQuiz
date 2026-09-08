@@ -143,6 +143,11 @@ object EngagementStore {
         return snapshotFromPrefs(context, metrics, baseline)
     }
 
+    fun currentCoins(context: Context): Int = prefs(context).getInt(KEY_COINS, 0)
+
+    fun unlockedAchievementIds(context: Context): Set<String> =
+        prefs(context).getStringSet(KEY_UNLOCKED_ACHIEVEMENTS, emptySet())?.toSet().orEmpty()
+
     fun spendCoins(context: Context, amount: Int): Boolean {
         if (amount <= 0) return true
         val prefs = prefs(context)
