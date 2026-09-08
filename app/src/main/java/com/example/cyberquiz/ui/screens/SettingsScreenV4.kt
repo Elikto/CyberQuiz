@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,11 +67,17 @@ fun SettingsScreenV4(
     val scope = rememberCoroutineScope()
     val activity = remember(context) { context.findActivityV4() }
 
+    var showContactForm by rememberSaveable { mutableStateOf(false) }
     var checkingUpdate by remember { mutableStateOf(false) }
     var installingUpdate by remember { mutableStateOf(false) }
     var updateChecked by remember { mutableStateOf(false) }
     var availableUpdate by remember { mutableStateOf<CyberQuizUpdateInfo?>(null) }
     var updateStatusText by remember { mutableStateOf<String?>(null) }
+
+    if (showContactForm) {
+        ContactScreen(onBack = { showContactForm = false })
+        return
+    }
 
     suspend fun refreshUpdateStatus() {
         if (checkingUpdate || installingUpdate) return
@@ -137,8 +144,8 @@ fun SettingsScreenV4(
 
         SettingsV4SectionLabel("AIDE & SOUTIEN")
         SettingsV4Item("?", "FAQ", "Questions fréquentes et aide", "BIENTÔT", SettingsV4Cyan)
-        SettingsV4Item("✉", "Nous contacter", "elikto@proton.me", "›", SettingsV4Purple) {
-            uriHandler.openUri("mailto:elikto@proton.me?subject=CyberQuiz%20-%20Contact")
+        SettingsV4Item("✉", "Nous contacter", "Formulaire de contact", "›", SettingsV4Purple) {
+            showContactForm = true
         }
         SettingsV4Item("♥", "Soutenir CyberQuiz", "paypal.me/EliktoCyber", "›", Color(0xFFFF678A)) {
             uriHandler.openUri("https://paypal.me/EliktoCyber")
