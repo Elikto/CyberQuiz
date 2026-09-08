@@ -46,6 +46,15 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
 
+      - name: Validate contact API configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$CYBERQUIZ_CONTACT_API_URL" || "$CYBERQUIZ_CONTACT_API_URL" != https://* ]]; then
+            echo "::error::Set repository variable CYBERQUIZ_CONTACT_API_URL to the deployed HTTPS /api/contact endpoint before publishing CyberQuiz."
+            exit 1
+          fi
+
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
