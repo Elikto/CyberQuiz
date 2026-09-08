@@ -21,6 +21,6 @@ jobs:
           RESPONSE="$(curl --fail-with-body --show-error --silent \
             -X POST https://cyberquiz-api.onrender.com/api/contact \
             -H 'Content-Type: application/json' \
-            --data '{"reason":"other","message":"Test automatique CyberQuiz après déploiement Render + Resend. Aucun retour nécessaire.","appVersion":"deployment-test","platform":"github-actions-smoke"}')"
+            --data '{"reason":"other","message":"Test automatique CyberQuiz persistance Inbox après PR 36. Aucun retour nécessaire.","appVersion":"deployment-test-pr36","platform":"github-actions-smoke"}')"
           printf '%s\n' "$RESPONSE"
           test "$RESPONSE" = '{"sent":true}'
