@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: cyberquiz-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install --disable-pip-version-check -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: CYBERQUIZ_CONTACT_ENABLED
+        value: "true"
+      - key: CYBERQUIZ_SMTP_HOST
+        value: smtp.resend.com
+      - key: CYBERQUIZ_SMTP_PORT
+        value: "465"
+      - key: CYBERQUIZ_SMTP_USERNAME
+        value: resend
+      - key: CYBERQUIZ_SMTP_PASSWORD
+        sync: false
+      - key: CYBERQUIZ_SMTP_SECURITY
+        value: ssl
+      - key: CYBERQUIZ_CONTACT_FROM
+        sync: false
+      - key: CYBERQUIZ_CONTACT_TO
+        value: elikto@proton.me
+      - key: CYBERQUIZ_ENABLE_GENERATION
+        value: "false"
