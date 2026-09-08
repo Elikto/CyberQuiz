@@ -1,0 +1,26 @@
+name: Contact endpoint smoke test
+
+on:
+  push:
+    branches:
+      - test/contact-endpoint-smoke
+
+permissions: {}
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check health
+        run: curl --fail --show-error --silent https://cyberquiz-api.onrender.com/health
+      - name: Send contact test
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESPONSE="$(curl --fail-with-body --show-error --silent \
+            -X POST https://cyberquiz-api.onrender.com/api/contact \
+            -H 'Content-Type: application/json' \
+            --data '{"reason":"other","message":"Test automatique CyberQuiz après déploiement Render + Resend. Aucun retour nécessaire.","appVersion":"deployment-test","platform":"github-actions-smoke"}')"
+          printf '%s\n' "$RESPONSE"
+          test "$RESPONSE" = '{"sent":true}'
