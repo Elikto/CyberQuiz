@@ -1,6 +1,7 @@
 import json
 import os
 import unittest
+import urllib.error
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
@@ -18,6 +19,7 @@ from app.main import (
     _contact_rate_lock,
     _send_contact_email,
     _store_contact_submission,
+    _submission_token,
     app,
 )
 
@@ -84,6 +86,14 @@ class ContactServiceTests(unittest.TestCase):
             _check_contact_rate_limit("203.0.113.10", now=float(CONTACT_RATE_LIMIT))
         self.assertEqual(ctx.exception.status_code, 429)
 
+    def test_submission_token_is_stable_for_client_retry_id(self):
+        request = ContactRequest(
+            reason="other",
+            message="Test",
+            submissionId="123e4567-e89b-12d3-a456-426614174000",
+        )
+        self.assertEqual(_submission_token(request), _submission_token(request))
+
     @patch("app.main._resend_post")
     def test_submission_is_persisted_as_resend_contact_in_inbox_segment(self, resend_post):
         resend_post.return_value = {"id": "contact_123"}
@@ -99,6 +109,7 @@ class ContactServiceTests(unittest.TestCase):
             message=message,
             appVersion="1.0.50",
             platform="Android 16",
+            submissionId="123e4567-e89b-12d3-a456-426614174000",
         )
 
         contact_id = _store_contact_submission(request, config)
@@ -117,8 +128,33 @@ class ContactServiceTests(unittest.TestCase):
             payload["properties"]["cq_message_1"] + payload["properties"]["cq_message_2"],
             message,
         )
-        self.assertTrue(payload["email"].startswith("cyberquiz-contact-"))
-        self.assertTrue(payload["email"].endswith("@example.com"))
+        expected_token = _submission_token(request)
+        self.assertEqual(payload["email"], f"cyberquiz-contact-{expected_token}@example.com")
+
+    @patch("app.main._resend_post")
+    def test_retry_conflict_is_treated_as_already_persisted(self, resend_post):
+        resend_post.side_effect = urllib.error.HTTPError(
+            url=RESEND_CONTACTS_URL,
+            code=409,
+            msg="Conflict",
+            hdrs=None,
+            fp=None,
+        )
+        config = {
+            "api_key": "re_test_secret",
+            "inbox_segment_id": "seg_test",
+            "from_address": "",
+            "to_address": "",
+        }
+        request = ContactRequest(
+            reason="support",
+            message="Retry après timeout",
+            submissionId="123e4567-e89b-12d3-a456-426614174000",
+        )
+
+        contact_id = _store_contact_submission(request, config)
+
+        self.assertTrue(contact_id.startswith("existing:"))
 
     @patch("app.main._resend_post")
     def test_contact_email_uses_server_side_subject(self, resend_post):
@@ -168,6 +204,7 @@ class ContactServiceTests(unittest.TestCase):
                     "message": "Message conservé même sans notification.",
                     "appVersion": "test",
                     "platform": "Android",
+                    "submissionId": "123e4567-e89b-12d3-a456-426614174000",
                 },
             )
 
