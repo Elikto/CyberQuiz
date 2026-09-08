@@ -99,7 +99,6 @@ fun HomeScreenV2(
     if (showLevels) {
         LevelProgressionScreen(
             currentLevel = p.level,
-            currentProgress = levelProgress,
             onBack = { showLevels = false }
         )
         return
@@ -119,19 +118,27 @@ fun HomeScreenV2(
             .padding(horizontal = 18.dp, vertical = 9.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            HomeTopButton(HomeTopIcon.SETTINGS, onSettings, updateAvailable)
+            HomeTopButton(HomeTopIcon.PROFILE, onProfile)
+        }
+
+        Spacer(Modifier.height(5.dp))
         HomePlayerHeader(
             level = p.level,
+            xpIntoLevel = xpIntoLevel,
             progress = levelProgress,
             coins = engagement.coins,
             avatar = selectedAvatar,
             banner = selectedBanner,
             frame = selectedFrame,
-            updateAvailable = updateAvailable,
             onLevelClick = { showLevels = true },
             onCoinsClick = { showShop = true },
-            onAvatarClick = { showPicker = true },
-            onSettings = onSettings,
-            onProfile = onProfile
+            onAvatarClick = { showPicker = true }
         )
 
         Spacer(Modifier.height(5.dp))
@@ -195,17 +202,15 @@ fun HomeScreenV2(
 @Composable
 private fun HomePlayerHeader(
     level: Int,
+    xpIntoLevel: Int,
     progress: Float,
     coins: Int,
     avatar: PlayerAvatarStyle,
     banner: PlayerBannerStyle,
     frame: PlayerFrameStyle,
-    updateAvailable: Boolean,
     onLevelClick: () -> Unit,
     onCoinsClick: () -> Unit,
-    onAvatarClick: () -> Unit,
-    onSettings: () -> Unit,
-    onProfile: () -> Unit
+    onAvatarClick: () -> Unit
 ) {
     Row(
         Modifier.fillMaxWidth(),
@@ -216,14 +221,15 @@ private fun HomePlayerHeader(
             banner = banner,
             frame = frame,
             onClick = onAvatarClick,
-            size = 44.dp,
+            size = 40.dp,
             showEditBadge = false
         )
         Spacer(Modifier.width(7.dp))
         CompactGameLevelBar(
             level = level,
+            xpIntoLevel = xpIntoLevel,
             progress = progress,
-            modifier = Modifier.width(150.dp),
+            modifier = Modifier.width(154.dp),
             onClick = onLevelClick
         )
         Spacer(Modifier.weight(1f))
@@ -236,10 +242,6 @@ private fun HomePlayerHeader(
         ) {
             Text("◈ $coins", color = Color(0xFFFFC86A), fontSize = 8.5.sp, fontWeight = FontWeight.Black)
         }
-        Spacer(Modifier.width(5.dp))
-        HomeTopButton(HomeTopIcon.SETTINGS, onSettings, updateAvailable)
-        Spacer(Modifier.width(4.dp))
-        HomeTopButton(HomeTopIcon.PROFILE, onProfile)
     }
 }
 

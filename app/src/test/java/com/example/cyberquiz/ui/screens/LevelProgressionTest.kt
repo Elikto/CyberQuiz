@@ -14,6 +14,14 @@ class LevelProgressionTest {
     }
 
     @Test
+    fun `every roadmap level has a visible avatar presentation`() {
+        val roadmap = levelRoadmap()
+        assertEquals(30, roadmap.map { it.avatar }.size)
+        assertTrue(roadmap.all { !it.avatar.mystery })
+        assertTrue(roadmap.all { !it.banner.mystery })
+    }
+
+    @Test
     fun `level roles cover key progression milestones`() {
         assertEquals("Recrue cyber", playerRoleForLevel(1))
         assertEquals("Analyste SOC", playerRoleForLevel(5))
@@ -23,19 +31,19 @@ class LevelProgressionTest {
     }
 
     @Test
-    fun `level five lists all real cosmetic unlocks`() {
+    fun `level five lists all real cosmetic unlocks with preview types`() {
         val rewards = levelRewards(5)
-        assertTrue(rewards.contains("Avatar · Chasseur de malwares"))
-        assertTrue(rewards.contains("Bannière · Radar SOC"))
-        assertTrue(rewards.contains("Contour · Hexagone SOC"))
+        assertTrue(rewards.any { it.kind == LevelRewardKind.AVATAR && it.name == "Chasseur de malwares" && it.avatar != null })
+        assertTrue(rewards.any { it.kind == LevelRewardKind.BANNER && it.name == "Radar SOC" && it.banner != null })
+        assertTrue(rewards.any { it.kind == LevelRewardKind.FRAME && it.name == "Hexagone SOC" && it.frame != null })
     }
 
     @Test
-    fun `level one explains the starter cosmetic pack`() {
+    fun `level one exposes each starter cosmetic instead of summary text`() {
         val rewards = levelRewards(1)
-        assertTrue(rewards.contains("Pack de départ · 5 avatars"))
-        assertTrue(rewards.contains("4 bannières"))
-        assertTrue(rewards.contains("3 contours"))
+        assertEquals(5, rewards.count { it.kind == LevelRewardKind.AVATAR })
+        assertEquals(4, rewards.count { it.kind == LevelRewardKind.BANNER })
+        assertEquals(3, rewards.count { it.kind == LevelRewardKind.FRAME })
     }
 
     @Test
