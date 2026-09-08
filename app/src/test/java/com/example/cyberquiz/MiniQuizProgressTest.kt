@@ -4,6 +4,7 @@ import com.example.cyberquiz.model.QuizHistoryEntry
 import com.example.cyberquiz.model.QuizSessionConfig
 import com.example.cyberquiz.model.QuizSessionMode
 import com.example.cyberquiz.model.categoryMiniQuizAttempts
+import com.example.cyberquiz.model.categoryQuizAttempts
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -24,7 +25,7 @@ class MiniQuizProgressTest {
     }
 
     @Test
-    fun `only completed five question single category quizzes are included`() {
+    fun `only completed five question single category quizzes are included in mini quiz history`() {
         val history = listOf(
             entry(id = "valid", category = "Linux", questionCount = 5, endedAt = 100L, correct = 3),
             entry(id = "wrong-count", category = "Linux", questionCount = 10, endedAt = 200L, correct = 7),
@@ -46,6 +47,22 @@ class MiniQuizProgressTest {
         assertEquals("valid", attempts.single().historyId)
         assertEquals(3, attempts.single().correct)
         assertEquals(5, attempts.single().answered)
+    }
+
+    @Test
+    fun `completed category quizzes of different lengths are kept in category history`() {
+        val history = listOf(
+            entry(id = "five", category = "Linux", questionCount = 5, endedAt = 100L, correct = 4),
+            entry(id = "ten", category = "Linux", questionCount = 10, endedAt = 200L, correct = 7),
+            entry(id = "partial", category = "Linux", questionCount = 20, endedAt = 300L, correct = 8, answered = 11),
+            entry(id = "other", category = "Windows", questionCount = 10, endedAt = 400L, correct = 9)
+        )
+
+        val attempts = categoryQuizAttempts(history, "Linux")
+
+        assertEquals(listOf("five", "ten"), attempts.map { it.historyId })
+        assertEquals(listOf(5, 10), attempts.map { it.questionCount })
+        assertEquals(listOf(1, 2), attempts.map { it.number })
     }
 
     private fun entry(
