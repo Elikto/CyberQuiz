@@ -68,10 +68,15 @@ val achievementDefinitions: List<AchievementDefinition> = listOf(
     AchievementDefinition("first_answer", "Premier paquet", "Réponds à ta première question", 40) { it.answered >= 1 },
     AchievementDefinition("questions_10", "Début de carrière", "Réponds à 10 questions", 60) { it.answered >= 10 },
     AchievementDefinition("questions_100", "Centurion", "Réponds à 100 questions", 150) { it.answered >= 100 },
+    AchievementDefinition("questions_500", "Archive massive", "Réponds à 500 questions", 320) { it.answered >= 500 },
     AchievementDefinition("streak_10", "Combo x10", "Atteins une série de 10 bonnes réponses", 100) { it.bestStreak >= 10 },
     AchievementDefinition("streak_25", "Pare-feu humain", "Atteins une série de 25 bonnes réponses", 220) { it.bestStreak >= 25 },
     AchievementDefinition("level_5", "Analyste confirmé", "Atteins le niveau 5", 100) { it.level >= 5 },
     AchievementDefinition("level_10", "Hacker éthique", "Atteins le niveau 10", 200) { it.level >= 10 },
+    AchievementDefinition("level_20", "Architecte suprême", "Atteins le niveau 20", 400) { it.level >= 20 },
+    AchievementDefinition("xp_2500", "Noyau chargé", "Cumule 2 500 XP", 300) { it.xp >= 2500 },
+    AchievementDefinition("quiz_25", "Opérateur régulier", "Termine 25 quiz", 240) { it.quizCount >= 25 },
+    AchievementDefinition("quiz_100", "Vétéran CyberQuiz", "Termine 100 quiz", 500) { it.quizCount >= 100 },
     AchievementDefinition("accuracy_80", "Haute précision", "Maintiens 80 % de réussite sur au moins 25 réponses", 140) {
         it.answered >= 25 && it.correct * 100 / it.answered >= 80
     }
