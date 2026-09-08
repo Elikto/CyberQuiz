@@ -66,11 +66,12 @@ fun HomeScreenV2(
     var selectedFrame by remember { mutableStateOf(storedPlayerFrame(context)) }
     var showPicker by rememberSaveable { mutableStateOf(false) }
     var showShop by rememberSaveable { mutableStateOf(false) }
+    var showLevels by rememberSaveable { mutableStateOf(false) }
     var updateAvailable by remember { mutableStateOf(false) }
 
     val activeReviewCount = reviewItems.count { !it.mastered }
     val xpIntoLevel = p.xp % 100
-    val levelProgress = (xpIntoLevel / 100f).coerceIn(0f, 1f)
+    val levelProgress = if (p.level >= MAX_PLAYER_LEVEL) 1f else (xpIntoLevel / 100f).coerceIn(0f, 1f)
     val accuracy = if (p.answered == 0) 0 else p.correct * 100 / p.answered
 
     fun reload() {
@@ -95,6 +96,15 @@ fun HomeScreenV2(
         return
     }
 
+    if (showLevels) {
+        LevelProgressionScreen(
+            currentLevel = p.level,
+            currentProgress = levelProgress,
+            onBack = { showLevels = false }
+        )
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -109,16 +119,6 @@ fun HomeScreenV2(
             .padding(horizontal = 18.dp, vertical = 9.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            HomeTopButton(HomeTopIcon.SETTINGS, onSettings, updateAvailable)
-            HomeTopButton(HomeTopIcon.PROFILE, onProfile)
-        }
-
-        Spacer(Modifier.height(6.dp))
         HomePlayerHeader(
             level = p.level,
             progress = levelProgress,
@@ -126,8 +126,12 @@ fun HomeScreenV2(
             avatar = selectedAvatar,
             banner = selectedBanner,
             frame = selectedFrame,
+            updateAvailable = updateAvailable,
+            onLevelClick = { showLevels = true },
             onCoinsClick = { showShop = true },
-            onAvatarClick = { showPicker = true }
+            onAvatarClick = { showPicker = true },
+            onSettings = onSettings,
+            onProfile = onProfile
         )
 
         Spacer(Modifier.height(5.dp))
@@ -169,7 +173,7 @@ fun HomeScreenV2(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             HomeStatCard("🔥", p.streak.toString(), "Série", Modifier.weight(1f), Color(0xFFFFA61A))
             HomeStatCard("★", p.xp.toString(), "XP", Modifier.weight(1f), Color(0xFFD64CFF))
-            HomeStatCard("▥", p.level.toString(), "Niveau", Modifier.weight(1f), Color(0xFF1AC3FF))
+            HomeStatCard("▥", p.level.coerceAtMost(MAX_PLAYER_LEVEL).toString(), "Niveau", Modifier.weight(1f), Color(0xFF1AC3FF))
             HomeStatCard("🏆", "$accuracy%", "Réussite", Modifier.weight(1f), Color(0xFFFFCC33))
         }
         Spacer(Modifier.height(10.dp))
@@ -196,58 +200,46 @@ private fun HomePlayerHeader(
     avatar: PlayerAvatarStyle,
     banner: PlayerBannerStyle,
     frame: PlayerFrameStyle,
+    updateAvailable: Boolean,
+    onLevelClick: () -> Unit,
     onCoinsClick: () -> Unit,
-    onAvatarClick: () -> Unit
+    onAvatarClick: () -> Unit,
+    onSettings: () -> Unit,
+    onProfile: () -> Unit
 ) {
     Row(
         Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            "NIV. $level",
-            color = Color(0xFF43E8FF),
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Black
+        CyberAvatarView(
+            style = avatar,
+            banner = banner,
+            frame = frame,
+            onClick = onAvatarClick,
+            size = 44.dp,
+            showEditBadge = false
         )
         Spacer(Modifier.width(7.dp))
-        Box(
-            Modifier
-                .width(100.dp)
-                .height(5.dp)
-                .background(Color(0xFF142039), RoundedCornerShape(50.dp))
-        ) {
-            if (progress > 0f) {
-                Box(
-                    Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(progress)
-                        .background(
-                            Brush.horizontalGradient(listOf(Color(0xFF8254FF), Color(0xFF29DFFF))),
-                            RoundedCornerShape(50.dp)
-                        )
-                )
-            }
-        }
-
+        CompactGameLevelBar(
+            level = level,
+            progress = progress,
+            modifier = Modifier.width(150.dp),
+            onClick = onLevelClick
+        )
         Spacer(Modifier.weight(1f))
         Box(
             Modifier
                 .background(Color(0xFF21163A), RoundedCornerShape(50.dp))
                 .border(1.dp, Color(0xFFFFB84A).copy(alpha = .55f), RoundedCornerShape(50.dp))
                 .clickable(onClick = onCoinsClick)
-                .padding(horizontal = 9.dp, vertical = 5.dp)
+                .padding(horizontal = 8.dp, vertical = 5.dp)
         ) {
-            Text("◈ $coins", color = Color(0xFFFFC86A), fontSize = 9.sp, fontWeight = FontWeight.Black)
+            Text("◈ $coins", color = Color(0xFFFFC86A), fontSize = 8.5.sp, fontWeight = FontWeight.Black)
         }
-        Spacer(Modifier.width(7.dp))
-        CyberAvatarView(
-            style = avatar,
-            banner = banner,
-            frame = frame,
-            onClick = onAvatarClick,
-            size = 51.dp,
-            showEditBadge = false
-        )
+        Spacer(Modifier.width(5.dp))
+        HomeTopButton(HomeTopIcon.SETTINGS, onSettings, updateAvailable)
+        Spacer(Modifier.width(4.dp))
+        HomeTopButton(HomeTopIcon.PROFILE, onProfile)
     }
 }
 
@@ -257,32 +249,32 @@ private enum class HomeTopIcon { SETTINGS, PROFILE }
 private fun HomeTopButton(icon: HomeTopIcon, onClick: () -> Unit, showBadge: Boolean = false) {
     Box(
         Modifier
-            .size(40.dp)
+            .size(34.dp)
             .background(Brush.radialGradient(listOf(Color(0xFF172A57), Color(0xFF081123))), CircleShape)
-            .border(1.1.dp, Color(0xFF7898F2), CircleShape)
+            .border(1.dp, Color(0xFF7898F2), CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(Modifier.size(23.dp)) {
+        Canvas(Modifier.size(19.dp)) {
             when (icon) {
                 HomeTopIcon.SETTINGS -> {
                     val c = center
                     repeat(8) { i ->
                         val a = Math.toRadians(i * 45.0)
                         val x = cos(a).toFloat(); val y = sin(a).toFloat()
-                        drawLine(Color(0xFFE0E7FF), Offset(c.x+x*8f,c.y+y*8f), Offset(c.x+x*10f,c.y+y*10f), 2.5f, StrokeCap.Round)
+                        drawLine(Color(0xFFE0E7FF), Offset(c.x+x*6.6f,c.y+y*6.6f), Offset(c.x+x*8.4f,c.y+y*8.4f), 2.1f, StrokeCap.Round)
                     }
-                    drawCircle(Color(0xFFE0E7FF), 6.2f, c, style = Stroke(2.4f))
-                    drawCircle(Color(0xFF081123), 2.3f, c)
+                    drawCircle(Color(0xFFE0E7FF), 5.2f, c, style = Stroke(2.1f))
+                    drawCircle(Color(0xFF081123), 2f, c)
                 }
                 HomeTopIcon.PROFILE -> {
-                    drawCircle(Color(0xFFE0E7FF), 4.1f, Offset(size.width/2,size.height*.31f), style=Stroke(2.5f))
-                    drawArc(Color(0xFFE0E7FF),198f,144f,false,Offset(size.width*.17f,size.height*.46f),Size(size.width*.66f,size.height*.48f),style=Stroke(2.5f,cap=StrokeCap.Round))
+                    drawCircle(Color(0xFFE0E7FF), 3.5f, Offset(size.width/2,size.height*.31f), style=Stroke(2.1f))
+                    drawArc(Color(0xFFE0E7FF),198f,144f,false,Offset(size.width*.17f,size.height*.46f),Size(size.width*.66f,size.height*.48f),style=Stroke(2.1f,cap=StrokeCap.Round))
                 }
             }
         }
         if (showBadge && icon == HomeTopIcon.SETTINGS) {
-            Box(Modifier.align(Alignment.TopEnd).size(10.dp).background(Color(0xFFFF4F6D), CircleShape).border(1.3.dp,Color(0xFF081123),CircleShape))
+            Box(Modifier.align(Alignment.TopEnd).size(9.dp).background(Color(0xFFFF4F6D), CircleShape).border(1.2.dp,Color(0xFF081123),CircleShape))
         }
     }
 }
