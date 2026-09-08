@@ -23,6 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
@@ -78,6 +80,7 @@ fun ContactScreen(onBack: () -> Unit) {
     var selectedReasonIndex by rememberSaveable { mutableStateOf(0) }
     var reasonMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var message by rememberSaveable { mutableStateOf("") }
+    var urgent by rememberSaveable { mutableStateOf(false) }
     var sendError by rememberSaveable { mutableStateOf<String?>(null) }
     var sendSuccess by rememberSaveable { mutableStateOf<String?>(null) }
     val selectedReason = contactReasons[selectedReasonIndex]
@@ -241,6 +244,58 @@ fun ContactScreen(onBack: () -> Unit) {
             )
         )
 
+        ContactSectionLabel("PRIORITÉ")
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    if (urgent) ContactOrange.copy(alpha = .10f) else Color(0xFF081329),
+                    RoundedCornerShape(16.dp)
+                )
+                .border(
+                    1.dp,
+                    if (urgent) ContactOrange.copy(alpha = .55f) else ContactBorder,
+                    RoundedCornerShape(16.dp)
+                )
+                .clickable {
+                    urgent = !urgent
+                    sendError = null
+                    sendSuccess = null
+                }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = urgent,
+                onCheckedChange = {
+                    urgent = it
+                    sendError = null
+                    sendSuccess = null
+                },
+                colors = CheckboxDefaults.colors(
+                    checkedColor = ContactOrange,
+                    uncheckedColor = ContactMuted,
+                    checkmarkColor = Color(0xFF111111)
+                )
+            )
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Urgent",
+                    color = if (urgent) ContactOrange else ContactText,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Black
+                )
+                Text(
+                    "Si cette case est cochée, CyberQuiz enverra aussi une alerte SMS en plus du mail.",
+                    color = ContactMuted,
+                    fontSize = 10.5.sp,
+                    lineHeight = 14.sp
+                )
+            }
+        )
+
         sendError?.let { error ->
             ContactStatusMessage(
                 text = error,
@@ -266,10 +321,12 @@ fun ContactScreen(onBack: () -> Unit) {
                 CyberQuizContactQueue.enqueue(
                     context = context,
                     reason = pendingReason,
-                    message = pendingMessage
+                    message = pendingMessage,
+                    urgent = urgent
                 ).fold(
                     onSuccess = {
                         message = ""
+                        urgent = false
                         sendSuccess = "Message pris en charge. CyberQuiz l'envoie en arrière-plan et réessaiera automatiquement si nécessaire."
                     },
                     onFailure = { error ->
