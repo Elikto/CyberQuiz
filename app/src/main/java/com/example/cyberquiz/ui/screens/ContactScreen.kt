@@ -288,7 +288,7 @@ fun ContactScreen(onBack: () -> Unit) {
                     fontWeight = FontWeight.Black
                 )
                 Text(
-                    "Si cette case est cochée, CyberQuiz enverra aussi une alerte SMS en plus du mail.",
+                    "Si cette case est cochée, CyberQuiz enverra aussi une alerte Telegram en plus du mail.",
                     color = ContactMuted,
                     fontSize = 10.5.sp,
                     lineHeight = 14.sp
