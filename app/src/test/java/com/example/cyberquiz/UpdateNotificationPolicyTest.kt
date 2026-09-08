@@ -1,6 +1,8 @@
 package com.example.cyberquiz
 
+import com.example.cyberquiz.update.UPDATE_CHECK_INTERVAL_MINUTES
 import com.example.cyberquiz.update.shouldNotifyUpdate
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -55,5 +57,10 @@ class UpdateNotificationPolicyTest {
                 lastNotifiedVersionCode = 11
             )
         )
+    }
+
+    @Test
+    fun `background update checks use the fastest supported periodic interval`() {
+        assertEquals(15L, UPDATE_CHECK_INTERVAL_MINUTES)
     }
 }
