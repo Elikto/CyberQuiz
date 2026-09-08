@@ -4,45 +4,77 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cyberquiz.engagement.EngagementStore
+
+private enum class QuickCosmeticTab { AVATAR, BANNER, FRAME }
 
 @Composable
 internal fun PlayerAvatarPickerDialog(
-    selected: PlayerAvatarStyle,
-    onSelect: (PlayerAvatarStyle) -> Unit,
+    playerLevel: Int,
+    onSelectionChanged: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    val achievements = remember { EngagementStore.unlockedAchievementIds(context) }
+    val purchasedFrames = remember { EngagementStore.purchasedFrameKeys(context) }
+    var selectedTab by rememberSaveable { mutableStateOf(QuickCosmeticTab.AVATAR) }
+    var avatar by remember { mutableStateOf(storedPlayerAvatar(context)) }
+    var banner by remember { mutableStateOf(storedPlayerBanner(context)) }
+    var frame by remember { mutableStateOf(storedPlayerFrame(context)) }
+
+    val availableAvatars = remember(playerLevel, achievements) {
+        PlayerAvatarStyle.entries.filter { isAvatarUnlocked(it, playerLevel, achievements) }
+    }
+    val availableBanners = remember(playerLevel) {
+        PlayerBannerStyle.entries.filter { isBannerUnlocked(it, playerLevel) }
+    }
+    val availableFrames = remember(playerLevel, purchasedFrames, achievements) {
+        PlayerFrameStyle.entries.filter {
+            isFrameUnlocked(it, playerLevel, purchasedFrames, achievements)
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Color(0xFF081225),
         title = {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    "Choisis ton avatar",
+                    "Personnalise ton profil",
                     color = Color(0xFFF5F7FF),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Black
                 )
                 Text(
-                    "5 avatars de départ · la collection complète est dans Mon profil.",
+                    "Change rapidement ton avatar, ta bannière ou ton contour.",
                     color = Color(0xFF9FAED3),
                     fontSize = 10.sp,
                     lineHeight = 14.sp
@@ -50,21 +82,65 @@ internal fun PlayerAvatarPickerDialog(
             }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                starterPlayerAvatarStyles.chunked(2).forEach { rowItems ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(9.dp)
-                    ) {
-                        rowItems.forEach { style ->
-                            AvatarChoiceCard(
-                                style = style,
-                                selected = style == selected,
-                                modifier = Modifier.weight(1f),
-                                onClick = { onSelect(style) }
-                            )
-                        }
-                        if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF071329), RoundedCornerShape(14.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    QuickTab("AVATAR", selectedTab == QuickCosmeticTab.AVATAR, Modifier.weight(1f)) {
+                        selectedTab = QuickCosmeticTab.AVATAR
+                    }
+                    QuickTab("BANNIÈRE", selectedTab == QuickCosmeticTab.BANNER, Modifier.weight(1f)) {
+                        selectedTab = QuickCosmeticTab.BANNER
+                    }
+                    QuickTab("CONTOUR", selectedTab == QuickCosmeticTab.FRAME, Modifier.weight(1f)) {
+                        selectedTab = QuickCosmeticTab.FRAME
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 390.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    when (selectedTab) {
+                        QuickCosmeticTab.AVATAR -> QuickAvatarGrid(
+                            styles = availableAvatars,
+                            selected = avatar,
+                            banner = banner,
+                            frame = frame,
+                            onSelect = { style ->
+                                avatar = style
+                                storePlayerAvatar(context, style)
+                                onSelectionChanged()
+                            }
+                        )
+                        QuickCosmeticTab.BANNER -> QuickBannerGrid(
+                            styles = availableBanners,
+                            selected = banner,
+                            avatar = avatar,
+                            frame = frame,
+                            onSelect = { style ->
+                                banner = style
+                                storePlayerBanner(context, style)
+                                onSelectionChanged()
+                            }
+                        )
+                        QuickCosmeticTab.FRAME -> QuickFrameGrid(
+                            styles = availableFrames,
+                            selected = frame,
+                            avatar = avatar,
+                            banner = banner,
+                            onSelect = { style ->
+                                frame = style
+                                storePlayerFrame(context, style)
+                                onSelectionChanged()
+                            }
+                        )
                     }
                 }
             }
@@ -72,62 +148,174 @@ internal fun PlayerAvatarPickerDialog(
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("FERMER", color = Color(0xFF8FA9D8), fontWeight = FontWeight.Bold)
+                Text("TERMINÉ", color = Color(0xFF19F2E5), fontWeight = FontWeight.Black)
             }
         }
     )
 }
 
 @Composable
-internal fun AvatarChoiceCard(
-    style: PlayerAvatarStyle,
-    selected: Boolean,
-    modifier: Modifier,
-    onClick: () -> Unit
-) {
-    val accent = if (selected) Color(0xFF38E69A) else Color(0xFF19BFFF)
-    Column(
+private fun QuickTab(label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Box(
         modifier = modifier
-            .aspectRatio(.92f)
             .background(
-                Brush.verticalGradient(
-                    listOf(accent.copy(alpha = if (selected) .16f else .07f), Color(0xFF0A152A))
-                ),
-                RoundedCornerShape(18.dp)
+                if (selected) Color(0xFFD652FF).copy(alpha = .24f) else Color.Transparent,
+                RoundedCornerShape(10.dp)
             )
             .border(
-                if (selected) 1.7.dp else 1.dp,
-                accent.copy(alpha = if (selected) .95f else .36f),
-                RoundedCornerShape(18.dp)
+                if (selected) 1.dp else 0.dp,
+                if (selected) Color(0xFFD652FF) else Color.Transparent,
+                RoundedCornerShape(10.dp)
             )
             .clickable(onClick = onClick)
-            .padding(10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
     ) {
-        PlayerAvatarButton(
-            style = style,
-            onClick = onClick,
-            size = 54.dp,
-            syncWithStoredSelection = false,
-            showEditBadge = false
+        Text(
+            label,
+            color = if (selected) Color.White else Color(0xFF91A3CA),
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Black
         )
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                style.displayName,
-                color = Color(0xFFF5F7FF),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Black,
-                textAlign = TextAlign.Center,
-                maxLines = 2
-            )
-            Text(
-                if (selected) "SÉLECTIONNÉ" else style.subtitle,
-                color = if (selected) accent else Color(0xFF9FAED3),
-                fontSize = 7.sp,
-                fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
-                textAlign = TextAlign.Center
+    }
+}
+
+@Composable
+private fun QuickAvatarGrid(
+    styles: List<PlayerAvatarStyle>,
+    selected: PlayerAvatarStyle,
+    banner: PlayerBannerStyle,
+    frame: PlayerFrameStyle,
+    onSelect: (PlayerAvatarStyle) -> Unit
+) {
+    QuickGrid(styles) { style, modifier ->
+        QuickChoiceCard(
+            title = style.displayName,
+            subtitle = if (style == selected) "ÉQUIPÉ" else style.subtitle,
+            selected = style == selected,
+            modifier = modifier,
+            onClick = { onSelect(style) }
+        ) {
+            CyberAvatarView(
+                style = style,
+                banner = banner,
+                frame = frame,
+                onClick = { onSelect(style) },
+                size = 54.dp,
+                showEditBadge = false
             )
         }
+    }
+}
+
+@Composable
+private fun QuickBannerGrid(
+    styles: List<PlayerBannerStyle>,
+    selected: PlayerBannerStyle,
+    avatar: PlayerAvatarStyle,
+    frame: PlayerFrameStyle,
+    onSelect: (PlayerBannerStyle) -> Unit
+) {
+    QuickGrid(styles) { style, modifier ->
+        QuickChoiceCard(
+            title = style.displayName,
+            subtitle = if (style == selected) "ÉQUIPÉE" else style.subtitle,
+            selected = style == selected,
+            modifier = modifier,
+            onClick = { onSelect(style) }
+        ) {
+            CyberAvatarView(
+                style = avatar,
+                banner = style,
+                frame = frame,
+                onClick = { onSelect(style) },
+                size = 54.dp,
+                showEditBadge = false
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuickFrameGrid(
+    styles: List<PlayerFrameStyle>,
+    selected: PlayerFrameStyle,
+    avatar: PlayerAvatarStyle,
+    banner: PlayerBannerStyle,
+    onSelect: (PlayerFrameStyle) -> Unit
+) {
+    QuickGrid(styles) { style, modifier ->
+        QuickChoiceCard(
+            title = style.displayName,
+            subtitle = if (style == selected) "ÉQUIPÉ" else style.subtitle,
+            selected = style == selected,
+            modifier = modifier,
+            onClick = { onSelect(style) }
+        ) {
+            CyberAvatarView(
+                style = avatar,
+                banner = banner,
+                frame = style,
+                onClick = { onSelect(style) },
+                size = 54.dp,
+                showEditBadge = false
+            )
+        }
+    }
+}
+
+@Composable
+private fun <T> QuickGrid(
+    items: List<T>,
+    card: @Composable (T, Modifier) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items.chunked(2).forEach { rowItems ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                rowItems.forEach { item -> card(item, Modifier.weight(1f)) }
+                if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickChoiceCard(
+    title: String,
+    subtitle: String,
+    selected: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit,
+    preview: @Composable () -> Unit
+) {
+    val accent = if (selected) Color(0xFF38E69A) else Color(0xFF244777)
+    Column(
+        modifier = modifier
+            .background(Color(0xFF0A152A), RoundedCornerShape(16.dp))
+            .border(if (selected) 1.5.dp else 1.dp, accent, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(9.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        preview()
+        Text(
+            title,
+            color = Color(0xFFF5F7FF),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Black,
+            textAlign = TextAlign.Center,
+            maxLines = 2
+        )
+        Text(
+            subtitle,
+            color = if (selected) Color(0xFF38E69A) else Color(0xFF9FAED3),
+            fontSize = 7.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 2
+        )
     }
 }
