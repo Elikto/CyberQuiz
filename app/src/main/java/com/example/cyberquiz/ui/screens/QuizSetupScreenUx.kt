@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -38,6 +39,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.cyberquiz.model.ActiveQuizSessionSummary
 import com.example.cyberquiz.model.Category
 import com.example.cyberquiz.model.QuizSessionConfig
@@ -71,6 +74,7 @@ fun QuizSetupScreenUx(
     var modeName by rememberSaveable { mutableStateOf(lastConfig.mode.name) }
     var questionCount by rememberSaveable { mutableStateOf(lastConfig.questionCount) }
     var selectedCategories by remember { mutableStateOf(lastConfig.categories.ifEmpty { allCategories.toSet() }) }
+    var showQuizForm by rememberSaveable { mutableStateOf(false) }
     var showPreviousConfirmation by rememberSaveable { mutableStateOf(false) }
     var abandonSession by remember { mutableStateOf<ActiveQuizSessionSummary?>(null) }
 
@@ -97,12 +101,17 @@ fun QuizSetupScreenUx(
     ) {
         SetupUxHeader(onBack)
 
-        Text("Préparer le quiz", color = SetupUxText, fontSize = 27.sp, fontWeight = FontWeight.Black)
+        Text("Choisis ton prochain quiz", color = SetupUxText, fontSize = 25.sp, fontWeight = FontWeight.Black)
         Text(
-            "Tu peux garder jusqu'à ${QuizViewModel.MAX_ACTIVE_SESSIONS} quiz en cours et les reprendre plus tard sans perdre ta progression.",
+            "Lance une nouvelle session ou reprends un quiz déjà commencé.",
             color = SetupUxMuted,
             fontSize = 12.sp,
             lineHeight = 18.sp
+        )
+
+        NewQuizLaunchCard(
+            enabled = hasFreeSlot,
+            onClick = { showQuizForm = true }
         )
 
         PreviousChoiceCardUx(
@@ -123,91 +132,145 @@ fun QuizSetupScreenUx(
             }
         }
 
-        SetupUxSection("NOUVEAU QUIZ")
         if (!hasFreeSlot) {
             SetupUxInfo(
                 "La limite de ${QuizViewModel.MAX_ACTIVE_SESSIONS} quiz en cours est atteinte. Termine ou arrête une session avant d'en créer une autre.",
                 SetupUxOrange
             )
-        } else {
-            Text("1 · DIFFICULTÉ", color = SetupUxBlue, fontSize = 10.sp, fontWeight = FontWeight.Black)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                ModeChip("FACILE", QuizSessionMode.EASY, selectedMode, SetupUxGreen, Modifier.weight(1f)) { modeName = it.name }
-                ModeChip("MOYEN", QuizSessionMode.MEDIUM, selectedMode, SetupUxOrange, Modifier.weight(1f)) { modeName = it.name }
-                ModeChip("DIFFICILE", QuizSessionMode.HARD, selectedMode, SetupUxRed, Modifier.weight(1f)) { modeName = it.name }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                ModeChip("ALÉATOIRE", QuizSessionMode.RANDOM, selectedMode, SetupUxPurple, Modifier.weight(1f)) { modeName = it.name }
-                ModeChip("MES DIFFICULTÉS", QuizSessionMode.DIFFICULTIES, selectedMode, SetupUxCyan, Modifier.weight(1f)) { modeName = it.name }
-            }
+        }
 
-            if (selectedMode == QuizSessionMode.DIFFICULTIES) {
-                SetupUxInfo(
-                    "$activeReviewCount question${if (activeReviewCount > 1) "s" else ""} à revoir dans les catégories choisies.",
-                    if (activeReviewCount > 0) SetupUxCyan else SetupUxOrange
-                )
-            }
+        Spacer(Modifier.height(8.dp))
+    }
 
-            Text("2 · CATÉGORIES", color = SetupUxBlue, fontSize = 10.sp, fontWeight = FontWeight.Black)
-            CategorySelectorUx(
-                categories = allCategories,
-                selected = selectedCategories,
-                onToggleAll = {
-                    selectedCategories = if (selectedCategories.size == allCategories.size) emptySet() else allCategories.toSet()
-                },
-                onToggle = { category ->
-                    selectedCategories = if (category in selectedCategories) {
-                        selectedCategories - category
-                    } else {
-                        selectedCategories + category
+    if (showQuizForm) {
+        Dialog(
+            onDismissRequest = { showQuizForm = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth(.94f)
+                    .heightIn(max = 720.dp)
+                    .background(
+                        Brush.verticalGradient(listOf(Color(0xFF101A36), Color(0xFF071329))),
+                        RoundedCornerShape(25.dp)
+                    )
+                    .border(1.4.dp, SetupUxPurple.copy(alpha = .72f), RoundedCornerShape(25.dp))
+                    .verticalScroll(rememberScrollState())
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(13.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "NOUVEAU QUIZ",
+                            color = SetupUxPurple,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.4.sp
+                        )
+                        Text(
+                            "Configurer le quiz",
+                            color = SetupUxText,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .background(Color(0xFF17233A), CircleShape)
+                            .border(1.dp, SetupUxBorder, CircleShape)
+                            .clickable { showQuizForm = false },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("×", color = SetupUxMuted, fontSize = 20.sp)
                     }
                 }
-            )
 
-            Text("3 · NOMBRE DE QUESTIONS", color = SetupUxBlue, fontSize = 10.sp, fontWeight = FontWeight.Black)
-            QuestionCountSelectorUx(
-                selected = questionCount,
-                onSelected = { questionCount = it }
-            )
+                Text("1 · DIFFICULTÉ", color = SetupUxBlue, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    ModeChip("FACILE", QuizSessionMode.EASY, selectedMode, SetupUxGreen, Modifier.weight(1f)) { modeName = it.name }
+                    ModeChip("MOYEN", QuizSessionMode.MEDIUM, selectedMode, SetupUxOrange, Modifier.weight(1f)) { modeName = it.name }
+                    ModeChip("DIFFICILE", QuizSessionMode.HARD, selectedMode, SetupUxRed, Modifier.weight(1f)) { modeName = it.name }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    ModeChip("ALÉATOIRE", QuizSessionMode.RANDOM, selectedMode, SetupUxPurple, Modifier.weight(1f)) { modeName = it.name }
+                    ModeChip("MES DIFFICULTÉS", QuizSessionMode.DIFFICULTIES, selectedMode, SetupUxCyan, Modifier.weight(1f)) { modeName = it.name }
+                }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp)
-                    .background(
-                        if (canStart) {
-                            Brush.horizontalGradient(listOf(Color(0xFF6B1AA1), Color(0xFF18458C)))
+                if (selectedMode == QuizSessionMode.DIFFICULTIES) {
+                    SetupUxInfo(
+                        "$activeReviewCount question${if (activeReviewCount > 1) "s" else ""} à revoir dans les catégories choisies.",
+                        if (activeReviewCount > 0) SetupUxCyan else SetupUxOrange
+                    )
+                }
+
+                Text("2 · CATÉGORIES", color = SetupUxBlue, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                CategorySelectorUx(
+                    categories = allCategories,
+                    selected = selectedCategories,
+                    onToggleAll = {
+                        selectedCategories = if (selectedCategories.size == allCategories.size) {
+                            emptySet()
                         } else {
-                            Brush.horizontalGradient(listOf(Color(0xFF252B3D), Color(0xFF182033)))
-                        },
-                        RoundedCornerShape(17.dp)
-                    )
-                    .border(
-                        1.2.dp,
-                        if (canStart) SetupUxPurple else Color(0xFF39445E),
-                        RoundedCornerShape(17.dp)
-                    )
-                    .clickable(enabled = canStart) {
-                        onStart(
-                            QuizSessionConfig(
-                                mode = selectedMode,
-                                categories = selectedCategories,
-                                questionCount = questionCount
-                            )
-                        )
+                            allCategories.toSet()
+                        }
                     },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    if (canStart) "LANCER LE QUIZ" else "CONFIGURATION INCOMPLÈTE",
-                    color = if (canStart) SetupUxText else SetupUxMuted,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = .7.sp
+                    onToggle = { category ->
+                        selectedCategories = if (category in selectedCategories) {
+                            selectedCategories - category
+                        } else {
+                            selectedCategories + category
+                        }
+                    }
                 )
+
+                Text("3 · NOMBRE DE QUESTIONS", color = SetupUxBlue, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                QuestionCountSelectorUx(
+                    selected = questionCount,
+                    onSelected = { questionCount = it }
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                        .background(
+                            if (canStart) {
+                                Brush.horizontalGradient(listOf(Color(0xFF6B1AA1), Color(0xFF18458C)))
+                            } else {
+                                Brush.horizontalGradient(listOf(Color(0xFF252B3D), Color(0xFF182033)))
+                            },
+                            RoundedCornerShape(17.dp)
+                        )
+                        .border(
+                            1.2.dp,
+                            if (canStart) SetupUxPurple else Color(0xFF39445E),
+                            RoundedCornerShape(17.dp)
+                        )
+                        .clickable(enabled = canStart) {
+                            showQuizForm = false
+                            onStart(
+                                QuizSessionConfig(
+                                    mode = selectedMode,
+                                    categories = selectedCategories,
+                                    questionCount = questionCount
+                                )
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        if (canStart) "LANCER LE QUIZ" else "CONFIGURATION INCOMPLÈTE",
+                        color = if (canStart) SetupUxText else SetupUxMuted,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = .7.sp
+                    )
+                }
             }
         }
-        Spacer(Modifier.height(8.dp))
     }
 
     if (showPreviousConfirmation) {
@@ -270,6 +333,56 @@ fun QuizSetupScreenUx(
 }
 
 @Composable
+private fun NewQuizLaunchCard(enabled: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .background(
+                if (enabled) {
+                    Brush.horizontalGradient(listOf(Color(0xFF5A1A83), Color(0xFF163D80), Color(0xFF081A34)))
+                } else {
+                    Brush.horizontalGradient(listOf(Color(0xFF242A39), Color(0xFF151D2D)))
+                },
+                RoundedCornerShape(20.dp)
+            )
+            .border(
+                1.5.dp,
+                if (enabled) SetupUxPurple else Color(0xFF39445E),
+                RoundedCornerShape(20.dp)
+            )
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .background(SetupUxPurple.copy(alpha = if (enabled) .16f else .06f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("▶", color = if (enabled) SetupUxText else SetupUxMuted, fontSize = 17.sp)
+        }
+        Spacer(Modifier.width(13.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                "COMMENCER UN QUIZ",
+                color = if (enabled) SetupUxText else SetupUxMuted,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = .6.sp
+            )
+            Text(
+                if (enabled) "Choisir difficulté, catégories et nombre de questions" else "Aucune place disponible",
+                color = SetupUxMuted,
+                fontSize = 9.sp
+            )
+        }
+        Text("›", color = if (enabled) SetupUxCyan else SetupUxMuted, fontSize = 26.sp)
+    }
+}
+
+@Composable
 private fun SetupUxHeader(onBack: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -291,7 +404,7 @@ private fun SetupUxHeader(onBack: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text("CYBER QUIZ", color = SetupUxCyan, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.5.sp)
-            Text("CONFIGURATION DE SESSION", color = SetupUxMuted, fontSize = 8.sp, letterSpacing = 1.2.sp)
+            Text("SESSIONS DE QUIZ", color = SetupUxMuted, fontSize = 8.sp, letterSpacing = 1.2.sp)
         }
         Spacer(Modifier.width(42.dp))
     }
@@ -419,9 +532,8 @@ private fun CategoryRowUx(text: String, selected: Boolean, accent: Color, onClic
 
 @Composable
 private fun QuestionCountSelectorUx(selected: Int, onSelected: (Int) -> Unit) {
-    val options = listOf(5, 10, 20, 50, 100, 200, 0)
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        options.chunked(3).forEach { rowOptions ->
+        QUIZ_QUESTION_COUNT_OPTIONS.chunked(3).forEach { rowOptions ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 rowOptions.forEach { count ->
                     val active = selected == count
@@ -434,7 +546,12 @@ private fun QuestionCountSelectorUx(selected: Int, onSelected: (Int) -> Unit) {
                             .clickable { onSelected(count) },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(if (count == 0) "INFINI" else count.toString(), color = if (active) SetupUxText else SetupUxMuted, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                        Text(
+                            quizQuestionCountLabel(count),
+                            color = if (active) SetupUxText else SetupUxMuted,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black
+                        )
                     }
                 }
                 repeat(3 - rowOptions.size) { Spacer(Modifier.weight(1f)) }
