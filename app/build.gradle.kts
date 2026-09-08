@@ -9,7 +9,7 @@ val cyberVersionName = providers.gradleProperty("cyberVersionName").orElse("1.0"
 val roomSchemaLocation = providers.gradleProperty("roomSchemaLocation").orElse("$projectDir/schemas").get()
 val cyberContactApiUrl = providers.gradleProperty("cyberContactApiUrl")
     .orElse(providers.environmentVariable("CYBERQUIZ_CONTACT_API_URL"))
-    .orElse("")
+    .orElse("https://cyberquiz-api.onrender.com/api/contact")
     .get()
 val updateKeystorePath = System.getenv("CYBERQUIZ_KEYSTORE_PATH")
 val updateKeystorePassword = System.getenv("CYBERQUIZ_KEYSTORE_PASSWORD")
