@@ -17,6 +17,7 @@ internal object CyberQuizContactClient {
     suspend fun send(
         reason: String,
         message: String,
+        urgent: Boolean,
         submissionId: String
     ): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
@@ -35,6 +36,7 @@ internal object CyberQuizContactClient {
                 .put("message", message.trim())
                 .put("appVersion", BuildConfig.VERSION_NAME)
                 .put("platform", "Android ${Build.VERSION.RELEASE}")
+                .put("urgent", urgent)
                 .put("submissionId", submissionId)
                 .toString()
                 .toByteArray(Charsets.UTF_8)
