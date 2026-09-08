@@ -1,3 +1,4 @@
+import json
 import os
 import unittest
 from unittest.mock import MagicMock, patch
@@ -7,6 +8,7 @@ from fastapi import HTTPException
 from app.main import (
     CONTACT_RATE_LIMIT,
     ContactRequest,
+    RESEND_EMAILS_URL,
     _check_contact_rate_limit,
     _contact_attempts,
     _contact_configuration,
@@ -26,7 +28,7 @@ class ContactServiceTests(unittest.TestCase):
                 _contact_configuration()
         self.assertEqual(ctx.exception.status_code, 503)
 
-    def test_enabled_contact_requires_complete_smtp_configuration(self):
+    def test_enabled_contact_requires_complete_resend_configuration(self):
         with patch.dict(
             os.environ,
             {"CYBERQUIZ_CONTACT_ENABLED": "true"},
@@ -36,24 +38,19 @@ class ContactServiceTests(unittest.TestCase):
                 _contact_configuration()
         self.assertEqual(ctx.exception.status_code, 503)
 
-    def test_contact_configuration_accepts_tls_server_settings(self):
+    def test_contact_configuration_accepts_resend_settings(self):
         env = {
             "CYBERQUIZ_CONTACT_ENABLED": "true",
-            "CYBERQUIZ_SMTP_HOST": "smtp.example.com",
-            "CYBERQUIZ_SMTP_PORT": "587",
-            "CYBERQUIZ_SMTP_USERNAME": "user",
-            "CYBERQUIZ_SMTP_PASSWORD": "secret",
-            "CYBERQUIZ_SMTP_SECURITY": "starttls",
-            "CYBERQUIZ_CONTACT_FROM": "sender@example.com",
+            "RESEND_API_KEY": "re_test_secret",
+            "CYBERQUIZ_CONTACT_FROM": "CyberQuiz <contact@example.com>",
             "CYBERQUIZ_CONTACT_TO": "elikto@proton.me",
         }
         with patch.dict(os.environ, env, clear=True):
             config = _contact_configuration()
 
-        self.assertEqual(config["host"], "smtp.example.com")
-        self.assertEqual(config["port"], 587)
+        self.assertEqual(config["api_key"], "re_test_secret")
+        self.assertEqual(config["from_address"], "CyberQuiz <contact@example.com>")
         self.assertEqual(config["to_address"], "elikto@proton.me")
-        self.assertEqual(config["security"], "starttls")
 
     def test_blank_contact_message_is_rejected(self):
         with self.assertRaises(ValueError):
@@ -67,17 +64,14 @@ class ContactServiceTests(unittest.TestCase):
             _check_contact_rate_limit("203.0.113.10", now=float(CONTACT_RATE_LIMIT))
         self.assertEqual(ctx.exception.status_code, 429)
 
-    @patch("app.main.smtplib.SMTP")
-    def test_contact_email_uses_server_side_subject_and_tls(self, smtp_cls):
-        server = MagicMock()
-        smtp_cls.return_value.__enter__.return_value = server
+    @patch("app.main.urllib.request.urlopen")
+    def test_contact_email_uses_server_side_subject_and_resend_https(self, urlopen):
+        response = MagicMock()
+        response.status = 200
+        urlopen.return_value.__enter__.return_value = response
         config = {
-            "host": "smtp.example.com",
-            "port": 587,
-            "username": "user",
-            "password": "secret",
-            "security": "starttls",
-            "from_address": "sender@example.com",
+            "api_key": "re_test_secret",
+            "from_address": "CyberQuiz <contact@example.com>",
             "to_address": "elikto@proton.me",
         }
         request = ContactRequest(
@@ -89,13 +83,15 @@ class ContactServiceTests(unittest.TestCase):
 
         _send_contact_email(request, config)
 
-        server.starttls.assert_called_once()
-        server.login.assert_called_once_with("user", "secret")
-        server.send_message.assert_called_once()
-        email = server.send_message.call_args.args[0]
-        self.assertEqual(email["Subject"], "[CyberQuiz] Signalement de bug")
-        self.assertEqual(email["To"], "elikto@proton.me")
-        self.assertIn("Le bouton ne répond plus.", email.get_content())
+        urlopen.assert_called_once()
+        http_request = urlopen.call_args.args[0]
+        self.assertEqual(http_request.full_url, RESEND_EMAILS_URL)
+        self.assertEqual(http_request.get_method(), "POST")
+        self.assertEqual(http_request.get_header("Authorization"), "Bearer re_test_secret")
+        payload = json.loads(http_request.data.decode("utf-8"))
+        self.assertEqual(payload["subject"], "[CyberQuiz] Signalement de bug")
+        self.assertEqual(payload["to"], ["elikto@proton.me"])
+        self.assertIn("Le bouton ne répond plus.", payload["text"])
 
 
 if __name__ == "__main__":
