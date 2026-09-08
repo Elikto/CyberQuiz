@@ -16,20 +16,22 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cyberquiz.model.CATEGORY_MINI_QUIZ_SIZE
 import com.example.cyberquiz.model.QuizSessionConfig
 import com.example.cyberquiz.model.QuizSessionMode
 import com.example.cyberquiz.ui.screens.CategoriesScreenV3
+import com.example.cyberquiz.ui.screens.CyberMiniQuizCategoriesScreen
 import com.example.cyberquiz.ui.screens.HomeScreenV2
 import com.example.cyberquiz.ui.screens.ProfileScreenV3
 import com.example.cyberquiz.ui.screens.QuizHistoryScreen
-import com.example.cyberquiz.ui.screens.QuizScreenV8
-import com.example.cyberquiz.ui.screens.QuizSetupScreen
+import com.example.cyberquiz.ui.screens.QuizSetupScreenUx
 import com.example.cyberquiz.ui.screens.QuizType
 import com.example.cyberquiz.ui.screens.QuizUnavailableScreen
+import com.example.cyberquiz.ui.screens.ResumableQuizScreen
 import com.example.cyberquiz.ui.screens.ReviewScreen
 import com.example.cyberquiz.ui.screens.SettingsScreenV4
+import com.example.cyberquiz.ui.screens.StatisticsScreenUx
 import com.example.cyberquiz.ui.screens.StatisticsScreenV2
-import com.example.cyberquiz.ui.screens.StatisticsScreenV3
 import com.example.cyberquiz.ui.screens.UniverseHomeScreen
 import com.example.cyberquiz.ui.screens.UpdateHistoryScreen
 import com.example.cyberquiz.ui.screens.isPlayableNow
@@ -116,7 +118,15 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
         screen = AppScreen.QUIZ_SETUP
     }
 
-    BackHandler(enabled = screen != AppScreen.HOME) {
+    fun startConfigured(config: QuizSessionConfig) {
+        if (vm.activeSessions.value.size >= QuizViewModel.MAX_ACTIVE_SESSIONS) return
+        configuredQuizUi = true
+        quizQuestionTotal = config.questionCount.takeIf { it > 0 }
+        vm.startConfiguredQuiz(config)
+        navigateTo(AppScreen.QUIZ)
+    }
+
+    BackHandler(enabled = screen != AppScreen.HOME && screen != AppScreen.QUIZ) {
         goBack()
     }
 
@@ -167,15 +177,10 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                 }
             }
 
-            AppScreen.QUIZ_SETUP -> QuizSetupScreen(
+            AppScreen.QUIZ_SETUP -> QuizSetupScreenUx(
                 vm = vm,
                 onBack = { goBack() },
-                onStart = { config ->
-                    configuredQuizUi = true
-                    quizQuestionTotal = config.questionCount.takeIf { it > 0 }
-                    vm.startConfiguredQuiz(config)
-                    navigateTo(AppScreen.QUIZ)
-                },
+                onStart = { config -> startConfigured(config) },
                 onResume = { sessionId ->
                     configuredQuizUi = true
                     quizQuestionTotal = vm.activeSessions.value
@@ -191,7 +196,7 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                 }
             )
 
-            AppScreen.QUIZ -> QuizScreenV8(
+            AppScreen.QUIZ -> ResumableQuizScreen(
                 vm = vm,
                 configuredSession = configuredQuizUi,
                 questionTotal = quizQuestionTotal,
@@ -202,7 +207,7 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
 
             AppScreen.STATS -> {
                 if (selectedQuizType == QuizType.CYBERSECURITY) {
-                    StatisticsScreenV3(
+                    StatisticsScreenUx(
                         vm = vm,
                         onBack = { goBack() },
                         onReviewConcept = { concept ->
@@ -210,18 +215,13 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                             navigateTo(AppScreen.REVIEW)
                         },
                         onThemeQuiz = { category, questionCount ->
-                            if (vm.activeSessions.value.size < QuizViewModel.MAX_ACTIVE_SESSIONS) {
-                                configuredQuizUi = true
-                                quizQuestionTotal = questionCount.takeIf { it > 0 }
-                                vm.startConfiguredQuiz(
-                                    QuizSessionConfig(
-                                        mode = QuizSessionMode.RANDOM,
-                                        categories = setOf(category),
-                                        questionCount = questionCount
-                                    )
+                            startConfigured(
+                                QuizSessionConfig(
+                                    mode = QuizSessionMode.RANDOM,
+                                    categories = setOf(category),
+                                    questionCount = questionCount
                                 )
-                                navigateTo(AppScreen.QUIZ)
-                            }
+                            )
                         }
                     )
                 } else {
@@ -232,16 +232,40 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                 }
             }
 
-            AppScreen.CATEGORIES -> CategoriesScreenV3(
-                vm = vm,
-                selectedQuizType = selectedQuizType,
-                onBack = { goBack() },
-                onQuiz = {
-                    configuredQuizUi = false
-                    quizQuestionTotal = null
-                    navigateTo(AppScreen.QUIZ)
+            AppScreen.CATEGORIES -> {
+                if (selectedQuizType == QuizType.CYBERSECURITY) {
+                    CyberMiniQuizCategoriesScreen(
+                        vm = vm,
+                        onBack = { goBack() },
+                        onCategoryQuiz = { category ->
+                            startConfigured(
+                                QuizSessionConfig(
+                                    mode = QuizSessionMode.RANDOM,
+                                    categories = setOf(category),
+                                    questionCount = CATEGORY_MINI_QUIZ_SIZE
+                                )
+                            )
+                        },
+                        onAdaptiveQuiz = {
+                            configuredQuizUi = false
+                            quizQuestionTotal = null
+                            vm.start(quizType = selectedQuizType.name)
+                            navigateTo(AppScreen.QUIZ)
+                        }
+                    )
+                } else {
+                    CategoriesScreenV3(
+                        vm = vm,
+                        selectedQuizType = selectedQuizType,
+                        onBack = { goBack() },
+                        onQuiz = {
+                            configuredQuizUi = false
+                            quizQuestionTotal = null
+                            navigateTo(AppScreen.QUIZ)
+                        }
+                    )
                 }
-            )
+            }
 
             AppScreen.REVIEW -> ReviewScreen(
                 vm = vm,
@@ -254,17 +278,14 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                     navigateTo(AppScreen.QUIZ)
                 },
                 onCategoryQuiz = { category, questionCount ->
-                    if (questionCount > 0 && vm.activeSessions.value.size < QuizViewModel.MAX_ACTIVE_SESSIONS) {
-                        configuredQuizUi = true
-                        quizQuestionTotal = questionCount
-                        vm.startConfiguredQuiz(
+                    if (questionCount > 0) {
+                        startConfigured(
                             QuizSessionConfig(
                                 mode = QuizSessionMode.DIFFICULTIES,
                                 categories = setOf(category),
                                 questionCount = questionCount
                             )
                         )
-                        navigateTo(AppScreen.QUIZ)
                     }
                 }
             )
