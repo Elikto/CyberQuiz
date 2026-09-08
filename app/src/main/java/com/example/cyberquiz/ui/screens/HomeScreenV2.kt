@@ -63,8 +63,14 @@ fun HomeScreenV2(
             TopButton(TopIcon.PROFILE, onProfile)
         }
 
-        Spacer(Modifier.height(8.dp))
-        CompactLevelProgress(p.level, title, xp, progress)
+        Spacer(Modifier.height(7.dp))
+        PlayerProgressHeader(
+            level = p.level,
+            title = title,
+            xp = xp,
+            progress = progress,
+            onAvatarClick = onProfile
+        )
 
         Spacer(Modifier.height(4.dp))
         HeroLogo()
@@ -164,53 +170,154 @@ private fun TopButton(icon: TopIcon, onClick: () -> Unit, showBadge: Boolean = f
 }
 
 @Composable
-private fun CompactLevelProgress(level: Int, title: String, xp: Int, progress: Float) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 2.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp)
+private fun PlayerProgressHeader(
+    level: Int,
+    title: String,
+    xp: Int,
+    progress: Float,
+    onAvatarClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "NIV. $level",
-                color = Color(0xFF21E3FF),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = .7.sp
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                title,
-                color = Color(0xFFE8ECFF),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f)
-            )
+        BeginnerHackerAvatar(onClick = onAvatarClick)
+        Spacer(Modifier.width(10.dp))
+        Column(
+            modifier = Modifier.width(220.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .background(Color(0xFF10213A), RoundedCornerShape(50.dp))
+                        .border(1.dp, Color(0xFF20DFFF).copy(alpha = .55f), RoundedCornerShape(50.dp))
+                        .padding(horizontal = 9.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        "NIV. $level",
+                        color = Color(0xFF21E3FF),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = .6.sp
+                    )
+                }
+                Spacer(Modifier.width(7.dp))
+                Text(
+                    title,
+                    color = Color(0xFFE8ECFF),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(9.dp)
+                    .background(
+                        Brush.horizontalGradient(listOf(Color(0xFF111B33), Color(0xFF182A4C))),
+                        RoundedCornerShape(50.dp)
+                    )
+                    .border(1.dp, Color(0xFF315D9B).copy(alpha = .8f), RoundedCornerShape(50.dp))
+                    .padding(1.dp)
+            ) {
+                if (progress > 0f) {
+                    Box(
+                        Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(progress)
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(Color(0xFF7B34FF), Color(0xFFD54EFF), Color(0xFF21E3FF))
+                                ),
+                                RoundedCornerShape(50.dp)
+                            )
+                    )
+                }
+            }
+
             Text(
                 "$xp / 100 XP",
                 color = Color(0xFFAEB9EA),
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun BeginnerHackerAvatar(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(60.dp)
+            .background(
+                Brush.radialGradient(listOf(Color(0xFF18375B), Color(0xFF081123))),
+                RoundedCornerShape(18.dp)
+            )
+            .border(1.3.dp, Color(0xFF28DFF2).copy(alpha = .75f), RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(Modifier.size(48.dp)) {
+            val cx = size.width / 2f
+            val hood = Path().apply {
+                moveTo(cx, size.height * .06f)
+                cubicTo(size.width * .18f, size.height * .17f, size.width * .10f, size.height * .53f, size.width * .17f, size.height * .88f)
+                lineTo(size.width * .83f, size.height * .88f)
+                cubicTo(size.width * .90f, size.height * .53f, size.width * .82f, size.height * .17f, cx, size.height * .06f)
+                close()
+            }
+            drawPath(
+                hood,
+                brush = Brush.verticalGradient(listOf(Color(0xFF293B68), Color(0xFF10172D)))
+            )
+            drawPath(hood, Color(0xFF6C8BCE), style = Stroke(2.2f))
+
+            val faceTop = size.height * .31f
+            drawOval(
+                color = Color(0xFF07101E),
+                topLeft = Offset(size.width * .28f, faceTop),
+                size = Size(size.width * .44f, size.height * .39f)
+            )
+            drawRoundRect(
+                brush = Brush.horizontalGradient(listOf(Color(0xFFB13DFF), Color(0xFF24DFF0))),
+                topLeft = Offset(size.width * .30f, size.height * .43f),
+                size = Size(size.width * .40f, size.height * .10f),
+                cornerRadius = CornerRadius(5f, 5f)
+            )
+            drawLine(
+                Color(0xFF35F3FF),
+                Offset(size.width * .38f, size.height * .47f),
+                Offset(size.width * .62f, size.height * .47f),
+                1.6f,
+                StrokeCap.Round
+            )
+            drawArc(
+                color = Color(0xFF89A5D8),
+                startAngle = 205f,
+                sweepAngle = 130f,
+                useCenter = false,
+                topLeft = Offset(size.width * .32f, size.height * .54f),
+                size = Size(size.width * .36f, size.height * .18f),
+                style = Stroke(1.7f, cap = StrokeCap.Round)
             )
         }
         Box(
-            Modifier
-                .fillMaxWidth()
-                .height(5.dp)
-                .background(Color(0xFF20365E), RoundedCornerShape(50.dp))
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(4.dp)
+                .size(14.dp)
+                .background(Color(0xFF0C1B2E), CircleShape)
+                .border(1.dp, Color(0xFFD652FF), CircleShape),
+            contentAlignment = Alignment.Center
         ) {
-            if (progress > 0f) {
-                Box(
-                    Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(progress)
-                        .background(
-                            Brush.horizontalGradient(listOf(Color(0xFF7B34FF), Color(0xFFD54EFF), Color(0xFF21E3FF))),
-                            RoundedCornerShape(50.dp)
-                        )
-                )
-            }
+            Text("›", color = Color(0xFF21E3FF), fontSize = 10.sp, fontWeight = FontWeight.Black)
         }
     }
 }
