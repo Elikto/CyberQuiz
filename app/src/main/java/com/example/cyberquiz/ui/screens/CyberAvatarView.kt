@@ -1,25 +1,20 @@
 package com.example.cyberquiz.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 private val CyberAvatarAccents = listOf(
     0xFF27E9FF, 0xFF4EA1FF, 0xFFE35BFF, 0xFFD8E2FF, 0xFFFFC857,
@@ -42,12 +37,28 @@ internal fun CyberAvatarView(
     frame: PlayerFrameStyle = PlayerFrameStyle.CYAN_PULSE,
     onClick: () -> Unit,
     size: Dp = 64.dp,
-    showEditBadge: Boolean = true
+    showEditBadge: Boolean = false,
+    shopAvatarStyle: ShopAvatarStyle? = null,
+    shopBannerStyle: ShopBannerStyle? = null,
+    syncShopSelection: Boolean = true
 ) {
-    val accent = CyberAvatarAccents[style.ordinal]
+    val context = LocalContext.current
+    val storedBaseAvatar = storedPlayerAvatar(context)
+    val storedBaseBanner = storedPlayerBanner(context)
+    val activeShopAvatar = when {
+        !syncShopSelection -> shopAvatarStyle
+        style == storedBaseAvatar -> storedShopAvatar(context)
+        else -> null
+    }
+    val activeShopBanner = when {
+        !syncShopSelection -> shopBannerStyle
+        banner == storedBaseBanner -> storedShopBanner(context)
+        else -> null
+    }
+
+    val accent = activeShopAvatar?.let(::shopAvatarAccent) ?: CyberAvatarAccents[style.ordinal]
     val secondary = CyberAvatarSecondaries[style.ordinal]
-    val outerShape = RoundedCornerShape(24.dp)
-    val innerShape = RoundedCornerShape(19.dp)
+    val innerShape = RoundedCornerShape(18.dp)
 
     Box(
         modifier = Modifier
@@ -55,54 +66,46 @@ internal fun CyberAvatarView(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        PlayerFrameDecoration(
-            style = frame,
-            modifier = Modifier.fillMaxSize()
-        )
+        PlayerFrameDecoration(style = frame, modifier = Modifier.fillMaxSize())
 
         Box(
             modifier = Modifier
                 .size(size)
                 .clip(innerShape)
-                .background(Color(0xFF050A15), innerShape)
-                .border(1.2.dp, accent.copy(alpha = .80f), innerShape),
+                .background(Color(0xFF050A15), innerShape),
             contentAlignment = Alignment.Center
         ) {
-            PlayerBannerBackdrop(
-                style = banner,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(innerShape)
-            )
+            if (activeShopBanner != null) {
+                ShopBannerBackdrop(
+                    style = activeShopBanner,
+                    modifier = Modifier.fillMaxSize().clip(innerShape)
+                )
+            } else {
+                PlayerBannerBackdrop(
+                    style = banner,
+                    modifier = Modifier.fillMaxSize().clip(innerShape)
+                )
+            }
             Box(
                 Modifier
                     .fillMaxSize()
                     .clip(innerShape)
                     .background(
-                        Brush.radialGradient(
-                            listOf(Color.Transparent, Color(0x66020812))
-                        )
+                        Brush.radialGradient(listOf(Color.Transparent, Color(0x66020812)))
                     )
             )
-            StylizedAvatarArtwork(
-                style = style,
-                accent = accent,
-                secondary = secondary,
-                modifier = Modifier.size(size - 10.dp)
-            )
-        }
-
-        if (showEditBadge) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(1.dp)
-                    .size(18.dp)
-                    .background(Color(0xEE071221), CircleShape)
-                    .border(1.dp, accent, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("+", color = accent, fontSize = 11.sp, fontWeight = FontWeight.Black)
+            if (activeShopAvatar != null) {
+                ShopAvatarArtwork(
+                    style = activeShopAvatar,
+                    modifier = Modifier.size(size - 10.dp)
+                )
+            } else {
+                StylizedAvatarArtwork(
+                    style = style,
+                    accent = accent,
+                    secondary = secondary,
+                    modifier = Modifier.size(size - 10.dp)
+                )
             }
         }
     }
