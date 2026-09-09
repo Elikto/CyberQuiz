@@ -14,9 +14,10 @@ class LevelProgressionTest {
     }
 
     @Test
-    fun `every roadmap level has a visible avatar presentation`() {
+    fun `every roadmap level has an avatar and coin chest reward`() {
         val roadmap = levelRoadmap()
-        assertEquals(30, roadmap.map { it.avatar }.size)
+        assertTrue(roadmap.all { entry -> entry.rewards.any { it.kind == LevelRewardKind.AVATAR } })
+        assertTrue(roadmap.all { entry -> entry.rewards.any { it.kind == LevelRewardKind.COINS && it.coinAmount > 0 } })
         assertTrue(roadmap.all { !it.avatar.mystery })
         assertTrue(roadmap.all { !it.banner.mystery })
     }
@@ -31,19 +32,21 @@ class LevelProgressionTest {
     }
 
     @Test
-    fun `level five lists all real cosmetic unlocks with preview types`() {
+    fun `level five chest contains avatar coins and real cosmetic unlocks`() {
         val rewards = levelRewards(5)
         assertTrue(rewards.any { it.kind == LevelRewardKind.AVATAR && it.name == "Chasseur de malwares" && it.avatar != null })
+        assertTrue(rewards.any { it.kind == LevelRewardKind.COINS && it.coinAmount == 15 })
         assertTrue(rewards.any { it.kind == LevelRewardKind.BANNER && it.name == "Radar SOC" && it.banner != null })
         assertTrue(rewards.any { it.kind == LevelRewardKind.FRAME && it.name == "Hexagone SOC" && it.frame != null })
     }
 
     @Test
-    fun `level one exposes each starter cosmetic instead of summary text`() {
-        val rewards = levelRewards(1)
-        assertEquals(5, rewards.count { it.kind == LevelRewardKind.AVATAR })
-        assertEquals(4, rewards.count { it.kind == LevelRewardKind.BANNER })
-        assertEquals(3, rewards.count { it.kind == LevelRewardKind.FRAME })
+    fun `ordinary level chest only needs avatar and coins`() {
+        val rewards = levelRewards(3)
+        assertEquals(1, rewards.count { it.kind == LevelRewardKind.AVATAR })
+        assertEquals(1, rewards.count { it.kind == LevelRewardKind.COINS })
+        assertEquals(0, rewards.count { it.kind == LevelRewardKind.BANNER })
+        assertEquals(0, rewards.count { it.kind == LevelRewardKind.FRAME })
     }
 
     @Test
