@@ -107,6 +107,15 @@ fun dailyMissionProgress(
     )
 }
 
+fun claimableMissionIds(
+    progress: List<DailyMissionProgress>,
+    claimedMissionIds: Set<String>
+): Set<String> = progress
+    .asSequence()
+    .filter { it.completed && it.definition.id !in claimedMissionIds }
+    .map { it.definition.id }
+    .toSet()
+
 fun newlyUnlockedAchievementIds(
     metrics: EngagementMetrics,
     alreadyUnlocked: Set<String>
