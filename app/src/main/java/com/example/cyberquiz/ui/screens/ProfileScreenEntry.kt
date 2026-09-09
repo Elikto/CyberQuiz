@@ -28,7 +28,7 @@ import com.example.cyberquiz.model.EngagementMetrics
 import com.example.cyberquiz.viewmodel.QuizViewModel
 
 @Composable
-fun ProfileScreenV5(
+fun ProfileScreenEntry(
     selectedQuizType: QuizType,
     onQuizTypeSelected: (QuizType) -> Unit,
     onFriends: () -> Unit,
