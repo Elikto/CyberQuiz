@@ -6,4 +6,4 @@ python-dotenv==1.2.3
 argon2-cffi==25.1.0
 PyJWT==2.13.0
 psycopg[binary]==3.3.5
-google-auth==2.57.1
+google-auth[requests]==2.57.1
