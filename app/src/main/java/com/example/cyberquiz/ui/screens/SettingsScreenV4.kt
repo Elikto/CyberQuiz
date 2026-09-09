@@ -227,7 +227,7 @@ private fun SettingsV4UpdateCard(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Image(
-            painter = painterResource(R.mipmap.ic_launcher),
+            painter = painterResource(R.drawable.cyberquiz_app_icon),
             contentDescription = "Logo CyberQuiz",
             modifier = Modifier
                 .size(56.dp)
