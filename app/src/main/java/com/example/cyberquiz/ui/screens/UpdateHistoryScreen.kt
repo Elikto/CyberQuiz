@@ -59,6 +59,64 @@ internal fun updateVersionNumber(version: String): Int =
 internal fun sortUpdateHistory(entries: List<UpdateHistoryEntry>): List<UpdateHistoryEntry> =
     entries.distinctBy { it.version }.sortedByDescending { updateVersionNumber(it.version) }
 
+private val frenchUpdateWords = setOf(
+    "ajout", "ajoute", "ajouté", "amélioration", "améliorations", "améliore", "amélioré",
+    "correction", "corrections", "corrige", "corrigé", "suppression", "mise", "mises",
+    "niveau", "niveaux", "quête", "quêtes", "récompense", "récompenses", "paramètres",
+    "historique", "boutique", "écran", "application", "version", "profil", "désormais",
+    "avec", "dans", "pour", "les", "des", "une", "du", "et"
+)
+
+private fun updateTokens(value: String): Set<String> =
+    Regex("[A-Za-zÀ-ÿ]+")
+        .findAll(value.lowercase())
+        .map { it.value }
+        .toSet()
+
+internal fun frenchUpdateChange(rawChange: String): String {
+    val cleaned = rawChange
+        .replace(Regex("\\s+"), " ")
+        .replace(Regex("\\s*\\(#\\d+\\)\\s*$"), "")
+        .trim()
+
+    if (cleaned.isBlank()) return "Mise à jour technique de CyberQuiz."
+
+    val tokens = updateTokens(cleaned)
+    val hasFrenchSignal = tokens.any { it in frenchUpdateWords } ||
+        cleaned.any { it in "àâäçéèêëîïôöùûüÿœÀÂÄÇÉÈÊËÎÏÔÖÙÛÜŸŒ" }
+
+    if (hasFrenchSignal) return cleaned
+
+    val lower = cleaned.lowercase()
+    return when {
+        listOf("update history", "release history", "history complete", "every release").any(lower::contains) ->
+            "Amélioration de l’historique des mises à jour et de sa génération automatique."
+
+        listOf("quest", "quests", "reward", "rewards", "chest", "chests").any(lower::contains) ->
+            "Ajout et amélioration des quêtes, récompenses et coffres de niveau."
+
+        listOf("level", "levels", "progress", "progression", "xp").any(lower::contains) ->
+            "Amélioration de la progression des niveaux et de l’expérience joueur."
+
+        listOf("avatar", "banner", "frame", "cosmetic", "shop").any(lower::contains) ->
+            "Amélioration des avatars, bannières, contours et de la boutique cosmétique."
+
+        listOf("settings", "setting", "crash", "logo").any(lower::contains) ->
+            "Correction et amélioration de l’écran Paramètres."
+
+        listOf("profile", "account").any(lower::contains) ->
+            "Amélioration du profil joueur et de sa présentation."
+
+        listOf("contact", "email", "telegram", "notification").any(lower::contains) ->
+            "Amélioration du système de contact et des notifications."
+
+        listOf("quiz", "question", "category", "statistics", "stats").any(lower::contains) ->
+            "Amélioration des quiz, des catégories et du suivi de progression."
+
+        else -> "Améliorations et corrections diverses de CyberQuiz."
+    }
+}
+
 private fun loadBundledUpdateHistory(context: Context): List<UpdateHistoryEntry> = runCatching {
     val json = context.assets.open("update_history.json").bufferedReader().use { it.readText() }
     val array = JSONArray(json)
@@ -70,6 +128,7 @@ private fun loadBundledUpdateHistory(context: Context): List<UpdateHistoryEntry>
                 for (changeIndex in 0 until changesArray.length()) {
                     changesArray.optString(changeIndex)
                         .takeIf { it.isNotBlank() }
+                        ?.let(::frenchUpdateChange)
                         ?.let(::add)
                 }
             }
