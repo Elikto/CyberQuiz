@@ -173,4 +173,16 @@ interface QuizDao {
         concept: String,
         timestamp: Long
     )
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun replaceProgressForSync(item: ProgressEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun replaceCategoryProgressForSync(item: CategoryProgressEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun replaceConceptProgressForSync(item: ConceptProgressEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun replaceReviewItemForSync(item: ReviewItemEntity)
 }
