@@ -9,7 +9,6 @@ import com.example.cyberquiz.data.database.CyberQuizDatabase
 import com.example.cyberquiz.data.database.ProgressEntity
 import com.example.cyberquiz.data.database.ReviewItemEntity
 import com.example.cyberquiz.data.repository.QuizHistoryStore
-import com.example.cyberquiz.data.repository.QuizRepository
 import com.example.cyberquiz.model.QuizHistoryEntry
 import com.example.cyberquiz.model.QuizHistoryQuestion
 import com.example.cyberquiz.model.QuizSessionConfig
@@ -41,7 +40,10 @@ internal object ProgressSyncManager {
     private val syncMutex = Mutex()
     private val schedulingLock = Any()
     private var pendingJob: Job? = null
+    private var rerunRequested = false
     private var initialized = false
+
+    // These references are deliberately retained for the lifetime of the application process.
     private var roomObserver: InvalidationTracker.Observer? = null
     private var historyListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
     private var engagementListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
@@ -92,10 +94,27 @@ internal object ProgressSyncManager {
     fun request(context: Context, delayMs: Long = 900L) {
         val appContext = context.applicationContext
         synchronized(schedulingLock) {
-            pendingJob?.cancel()
+            if (pendingJob?.isActive == true) {
+                rerunRequested = true
+                return
+            }
+            rerunRequested = false
             pendingJob = scope.launch {
                 delay(delayMs)
-                runCatching { syncCurrentSession(appContext) }
+                while (true) {
+                    runCatching { syncCurrentSession(appContext) }
+                    val runAgain = synchronized(schedulingLock) {
+                        if (rerunRequested) {
+                            rerunRequested = false
+                            true
+                        } else {
+                            pendingJob = null
+                            false
+                        }
+                    }
+                    if (!runAgain) break
+                    delay(250L)
+                }
             }
         }
     }
@@ -109,11 +128,12 @@ internal object ProgressSyncManager {
             val previousAccountId = state.getString(STATE_ACCOUNT_ID, null)
             val sameAccount = previousAccountId == user.id
 
-            val dao = CyberQuizDatabase.get(appContext).quizDao()
-            QuizRepository(dao).init()
             val local = buildLocalSnapshot(appContext)
             val remote = ProgressSyncApiClient.get(token)
 
+            // Existing cloud data belongs to the account, so it is authoritative when a
+            // different account is selected on this device. For the same account, merge
+            // monotonically so an older phone cannot erase cumulative learning progress.
             val target = when {
                 remote.snapshot == null -> local
                 !sameAccount -> remote.snapshot
@@ -239,14 +259,15 @@ internal object ProgressSyncManager {
         val dao = CyberQuizDatabase.get(context).quizDao()
         snapshot.progress.forEach { item ->
             val existing = dao.progressSnapshot(item.quizType) ?: return@forEach
+            val answered = item.answered.coerceAtLeast(0)
             dao.replaceProgressForSync(
                 ProgressEntity(
                     id = existing.id,
                     quizType = item.quizType,
                     xp = item.xp.coerceAtLeast(0),
                     level = item.level.coerceAtLeast(1),
-                    answered = item.answered.coerceAtLeast(0),
-                    correct = item.correct.coerceIn(0, item.answered.coerceAtLeast(0)),
+                    answered = answered,
+                    correct = item.correct.coerceIn(0, answered),
                     streak = item.streak.coerceAtLeast(0),
                     bestStreak = maxOf(item.bestStreak, item.streak).coerceAtLeast(0),
                     totalResponseMs = item.totalResponseMs.coerceAtLeast(0L)
