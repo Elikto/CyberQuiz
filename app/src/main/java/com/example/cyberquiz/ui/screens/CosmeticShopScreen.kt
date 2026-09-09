@@ -1,5 +1,6 @@
 package com.example.cyberquiz.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,6 +43,8 @@ fun CosmeticShopScreen(
     metrics: EngagementMetrics,
     onBack: () -> Unit
 ) {
+    BackHandler(onBack = onBack)
+
     val context = LocalContext.current
     var snapshot by remember(metrics) { mutableStateOf(EngagementStore.sync(context, metrics)) }
     var mainTab by rememberSaveable { mutableStateOf(ShopMainTab.SHOP) }

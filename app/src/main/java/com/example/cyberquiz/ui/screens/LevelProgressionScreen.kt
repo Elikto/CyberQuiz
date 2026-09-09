@@ -1,8 +1,10 @@
 package com.example.cyberquiz.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -31,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cyberquiz.ui.theme.CyberBackground
@@ -274,6 +278,8 @@ fun LevelProgressionScreen(
     currentLevel: Int,
     onBack: () -> Unit
 ) {
+    BackHandler(onBack = onBack)
+
     val displayLevel = currentLevel.coerceIn(1, MAX_PLAYER_LEVEL)
     val roadmap = levelRoadmap()
     val currentIndex = (MAX_PLAYER_LEVEL - displayLevel).coerceIn(0, roadmap.lastIndex)
@@ -293,7 +299,7 @@ fun LevelProgressionScreen(
             )
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Box(
             modifier = Modifier
@@ -310,20 +316,24 @@ fun LevelProgressionScreen(
 
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(9.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
             items(roadmap, key = { it.level }) { entry ->
-                LevelRoadmapCard(entry = entry, currentLevel = displayLevel)
+                LevelRoadmapNode(
+                    entry = entry,
+                    currentLevel = displayLevel,
+                    showConnector = entry.level != 1
+                )
             }
         }
     }
 }
 
 @Composable
-private fun LevelRoadmapCard(
+private fun LevelRoadmapNode(
     entry: LevelRoadmapEntry,
-    currentLevel: Int
+    currentLevel: Int,
+    showConnector: Boolean
 ) {
     val current = entry.level == currentLevel
     val unlocked = entry.level < currentLevel
@@ -335,72 +345,28 @@ private fun LevelRoadmapCard(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                if (current) {
-                    Brush.horizontalGradient(listOf(Color(0xFF17143F), Color(0xFF08182D)))
-                } else {
-                    Brush.horizontalGradient(listOf(Color(0xFF091326), Color(0xFF07101E)))
-                },
-                RoundedCornerShape(17.dp)
-            )
-            .border(
-                if (current) 1.5.dp else 1.dp,
-                accent.copy(alpha = if (current) .95f else .4f),
-                RoundedCornerShape(17.dp)
-            )
-            .padding(horizontal = 11.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(9.dp)
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            CyberAvatarView(
-                style = entry.avatar,
-                banner = entry.banner,
-                frame = entry.frame,
-                onClick = {},
-                size = if (current) 55.dp else 50.dp,
-                showEditBadge = false,
-                syncShopSelection = false
-            )
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    "NIV. ${entry.level}",
-                    color = accent,
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.Black
-                )
-                Text(
-                    entry.role,
-                    color = if (future) Color(0xFFA8B4D0) else Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Black
-                )
-                Text(
-                    when {
-                        current -> "NIVEAU ACTUEL"
-                        unlocked -> "DÉBLOQUÉ"
-                        else -> "À VENIR"
-                    },
-                    color = accent.copy(alpha = .9f),
-                    fontSize = 6.8.sp,
-                    fontWeight = FontWeight.Black
-                )
-            }
-        }
+        LevelIdentityCard(
+            entry = entry,
+            current = current,
+            unlocked = unlocked,
+            future = future,
+            accent = accent
+        )
 
         if (entry.rewards.isNotEmpty()) {
-            Text(
-                "DÉBLOCAGES",
-                color = Color(0xFF91A5CE),
-                fontSize = 7.5.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = .9.sp
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
                 entry.rewards.forEach { reward ->
-                    LevelRewardPreview(
+                    LevelRewardPreviewCard(
                         reward = reward,
                         fallbackAvatar = entry.avatar,
                         fallbackBanner = entry.banner,
@@ -411,11 +377,96 @@ private fun LevelRoadmapCard(
                 }
             }
         }
+
+        if (showConnector) {
+            Spacer(Modifier.height(7.dp))
+            Box(
+                Modifier
+                    .width(2.dp)
+                    .height(28.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(accent.copy(alpha = .62f), Color(0xFF314563).copy(alpha = .35f))
+                        ),
+                        RoundedCornerShape(50.dp)
+                    )
+            )
+            Spacer(Modifier.height(7.dp))
+        } else {
+            Spacer(Modifier.height(12.dp))
+        }
     }
 }
 
 @Composable
-private fun LevelRewardPreview(
+private fun LevelIdentityCard(
+    entry: LevelRoadmapEntry,
+    current: Boolean,
+    unlocked: Boolean,
+    future: Boolean,
+    accent: Color
+) {
+    val shape = RoundedCornerShape(22.dp)
+
+    Column(
+        modifier = Modifier
+            .size(166.dp)
+            .background(
+                if (current) {
+                    Brush.radialGradient(
+                        listOf(Color(0xFF1C1A52), Color(0xFF091528), Color(0xFF07101E))
+                    )
+                } else {
+                    Brush.verticalGradient(listOf(Color(0xFF0B162B), Color(0xFF060D19)))
+                },
+                shape
+            )
+            .border(if (current) 1.8.dp else 1.dp, accent.copy(alpha = if (current) .95f else .48f), shape)
+            .padding(10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        CyberAvatarView(
+            style = entry.avatar,
+            banner = entry.banner,
+            frame = entry.frame,
+            onClick = {},
+            size = if (current) 78.dp else 72.dp,
+            showEditBadge = false,
+            syncShopSelection = false
+        )
+        Spacer(Modifier.height(7.dp))
+        Text(
+            "NIV. ${entry.level}",
+            color = accent,
+            fontSize = 8.5.sp,
+            fontWeight = FontWeight.Black
+        )
+        Text(
+            entry.role,
+            color = if (future) Color(0xFFAAB7D4) else Color.White,
+            fontSize = 12.sp,
+            lineHeight = 14.sp,
+            fontWeight = FontWeight.Black,
+            textAlign = TextAlign.Center,
+            maxLines = 2
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            when {
+                current -> "ACTUEL"
+                unlocked -> "DÉBLOQUÉ"
+                else -> "À VENIR"
+            },
+            color = accent.copy(alpha = .88f),
+            fontSize = 6.5.sp,
+            fontWeight = FontWeight.Black
+        )
+    }
+}
+
+@Composable
+private fun LevelRewardPreviewCard(
     reward: LevelRewardItem,
     fallbackAvatar: PlayerAvatarStyle,
     fallbackBanner: PlayerBannerStyle,
@@ -423,46 +474,68 @@ private fun LevelRewardPreview(
     future: Boolean,
     accent: Color
 ) {
-    val avatar = reward.avatar ?: fallbackAvatar
-    val banner = reward.banner ?: fallbackBanner
-    val frame = reward.frame ?: fallbackFrame
-    val typeLabel = when (reward.kind) {
-        LevelRewardKind.AVATAR -> "AVATAR"
-        LevelRewardKind.BANNER -> "BANNIÈRE"
-        LevelRewardKind.FRAME -> "CONTOUR"
-    }
+    val shape = RoundedCornerShape(13.dp)
 
-    Row(
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF081226), RoundedCornerShape(12.dp))
-            .border(1.dp, accent.copy(alpha = .25f), RoundedCornerShape(12.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .width(104.dp)
+            .height(98.dp)
+            .background(Color(0xFF081226), shape)
+            .border(1.dp, accent.copy(alpha = .28f), shape)
+            .padding(horizontal = 6.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        CyberAvatarView(
-            style = avatar,
-            banner = banner,
-            frame = frame,
-            onClick = {},
-            size = 36.dp,
-            showEditBadge = false,
-            syncShopSelection = false
-        )
-        Spacer(Modifier.width(8.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(
-                typeLabel,
-                color = accent,
-                fontSize = 6.5.sp,
-                fontWeight = FontWeight.Black
-            )
-            Text(
-                reward.name,
-                color = if (future) Color(0xFFAAB7D4) else Color(0xFFE4EBFF),
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.Bold
-            )
+        when (reward.kind) {
+            LevelRewardKind.AVATAR -> {
+                CyberAvatarView(
+                    style = reward.avatar ?: fallbackAvatar,
+                    banner = fallbackBanner,
+                    frame = PlayerFrameStyle.CYAN_PULSE,
+                    onClick = {},
+                    size = 49.dp,
+                    showEditBadge = false,
+                    syncShopSelection = false
+                )
+            }
+
+            LevelRewardKind.BANNER -> {
+                Box(
+                    modifier = Modifier
+                        .width(88.dp)
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF050914))
+                        .border(1.dp, accent.copy(alpha = .32f), RoundedCornerShape(10.dp))
+                ) {
+                    PlayerBannerBackdrop(
+                        style = reward.banner ?: fallbackBanner,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+
+            LevelRewardKind.FRAME -> {
+                CyberAvatarView(
+                    style = fallbackAvatar,
+                    banner = fallbackBanner,
+                    frame = reward.frame ?: fallbackFrame,
+                    onClick = {},
+                    size = 49.dp,
+                    showEditBadge = false,
+                    syncShopSelection = false
+                )
+            }
         }
+
+        Text(
+            reward.name,
+            color = if (future) Color(0xFFAAB7D4) else Color(0xFFE4EBFF),
+            fontSize = 7.4.sp,
+            lineHeight = 9.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            maxLines = 2
+        )
     }
 }
