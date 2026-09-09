@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cyberquiz.model.QuizSessionConfig
 import com.example.cyberquiz.model.QuizSessionMode
+import com.example.cyberquiz.social.SharedQuizViewModel
 import com.example.cyberquiz.ui.screens.CategoriesScreenV3
 import com.example.cyberquiz.ui.screens.CyberMiniQuizCategoriesScreen
 import com.example.cyberquiz.ui.screens.HomeScreenV2
@@ -34,6 +35,8 @@ import com.example.cyberquiz.ui.screens.QuizUnavailableScreen
 import com.example.cyberquiz.ui.screens.ResumableQuizScreen
 import com.example.cyberquiz.ui.screens.ReviewScreen
 import com.example.cyberquiz.ui.screens.SettingsScreenV4
+import com.example.cyberquiz.ui.screens.SharedFriendQuizScreen
+import com.example.cyberquiz.ui.screens.SocialHubScreen
 import com.example.cyberquiz.ui.screens.StatisticsScreenUx
 import com.example.cyberquiz.ui.screens.StatisticsScreenV2
 import com.example.cyberquiz.ui.screens.UniverseHomeScreen
@@ -55,6 +58,8 @@ enum class AppScreen {
     REVIEW,
     HISTORY,
     PROFILE,
+    SOCIAL,
+    SHARED_QUIZ,
     SETTINGS,
     UPDATE_HISTORY,
     UNAVAILABLE_QUIZ
@@ -99,7 +104,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
+private fun CyberQuizApp(
+    vm: QuizViewModel = viewModel(),
+    sharedQuizVm: SharedQuizViewModel = viewModel()
+) {
     val context = LocalContext.current
     val preferences = remember(context) {
         context.getSharedPreferences(CYBERQUIZ_PREFERENCES, Context.MODE_PRIVATE)
@@ -159,7 +167,12 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
         navigateTo(AppScreen.QUIZ)
     }
 
-    BackHandler(enabled = screen != AppScreen.HOME && screen != AppScreen.QUIZ) {
+    BackHandler(
+        enabled = screen != AppScreen.HOME &&
+            screen != AppScreen.QUIZ &&
+            screen != AppScreen.SOCIAL &&
+            screen != AppScreen.SHARED_QUIZ
+    ) {
         goBack()
     }
 
@@ -348,7 +361,23 @@ private fun CyberQuizApp(vm: QuizViewModel = viewModel()) {
                         .putString("selected_quiz_type", type.name)
                         .apply()
                 },
+                onFriends = { navigateTo(AppScreen.SOCIAL) },
                 onBack = { goBack() }
+            )
+
+            AppScreen.SOCIAL -> SocialHubScreen(
+                playerLevel = vm.progress.value.level.coerceAtLeast(1),
+                sharedQuizViewModel = sharedQuizVm,
+                onSharedQuizStart = { navigateTo(AppScreen.SHARED_QUIZ) },
+                onBack = { goBack() }
+            )
+
+            AppScreen.SHARED_QUIZ -> SharedFriendQuizScreen(
+                viewModel = sharedQuizVm,
+                onBackToFriends = {
+                    previousScreen = AppScreen.PROFILE
+                    screen = AppScreen.SOCIAL
+                }
             )
 
             AppScreen.SETTINGS -> SettingsScreenV4(
