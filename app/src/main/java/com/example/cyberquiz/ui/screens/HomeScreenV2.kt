@@ -4,7 +4,19 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,8 +24,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -96,8 +114,6 @@ fun HomeScreenV2(
 
     LaunchedEffect(p.level, p.xp, p.answered) {
         val saved = LevelRewardStore.snapshot(context)
-        // Progress starts with an empty placeholder while Room loads. Avoid treating that
-        // temporary level 1 as a real baseline for existing players.
         if (p.xp > 0 || p.answered > 0 || saved.pendingLevels.isNotEmpty() || saved.claimedLevels.isNotEmpty()) {
             levelRewardState = LevelRewardStore.sync(context, p.level)
         }
@@ -164,7 +180,7 @@ fun HomeScreenV2(
             HomeTopButton(HomeTopIcon.PROFILE, onProfile)
         }
 
-        Spacer(Modifier.height(5.dp))
+        Spacer(Modifier.height(7.dp))
         HomePlayerHeader(
             level = p.level,
             xpIntoLevel = xpIntoLevel,
@@ -184,7 +200,7 @@ fun HomeScreenV2(
             onAvatarClick = { showPicker = true }
         )
 
-        Spacer(Modifier.height(5.dp))
+        Spacer(Modifier.height(8.dp))
         HomeHeroLogo()
 
         Row(verticalAlignment = Alignment.Bottom) {
@@ -207,14 +223,22 @@ fun HomeScreenV2(
         Spacer(Modifier.height(9.dp))
         HomeMenuCard(
             "À revoir",
-            if (activeReviewCount == 0) "Aucune notion en attente" else "$activeReviewCount notion${if (activeReviewCount > 1) "s" else ""} à retravailler",
+            if (activeReviewCount == 0) {
+                "Aucune notion en attente"
+            } else {
+                "$activeReviewCount notion${if (activeReviewCount > 1) "s" else ""} à retravailler"
+            },
             Color(0xFFFFB84A),
             onReview
         )
         Spacer(Modifier.height(9.dp))
         HomeMenuCard(
             "Historique",
-            if (history.isEmpty()) "Aucun quiz terminé" else "${history.size} quiz terminé${if (history.size > 1) "s" else ""}",
+            if (history.isEmpty()) {
+                "Aucun quiz terminé"
+            } else {
+                "${history.size} quiz terminé${if (history.size > 1) "s" else ""}"
+            },
             Color(0xFF8B7CFF),
             onHistory
         )
@@ -272,7 +296,13 @@ private fun LevelReachedDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("NOUVEAU NIVEAU", color = Color(0xFFFFC857), fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.6.sp)
+                Text(
+                    "NOUVEAU NIVEAU",
+                    color = Color(0xFFFFC857),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.6.sp
+                )
                 Spacer(Modifier.height(5.dp))
                 Text("NIVEAU $level", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black)
                 Text(
@@ -338,30 +368,42 @@ private fun HomePlayerHeader(
             banner = banner,
             frame = frame,
             onClick = onAvatarClick,
-            size = 40.dp,
+            size = 42.dp,
             showEditBadge = false
         )
-        Spacer(Modifier.width(7.dp))
+        Spacer(Modifier.width(12.dp))
         CompactGameLevelBar(
             level = level,
             xpIntoLevel = xpIntoLevel,
             progress = progress,
-            modifier = Modifier.width(140.dp),
+            modifier = Modifier.width(166.dp),
             hasRewardNotification = hasRewardNotification,
             onClick = onLevelClick
         )
         Spacer(Modifier.weight(1f))
-        Box(
-            Modifier
-                .background(Color(0xFF21163A), RoundedCornerShape(50.dp))
-                .border(1.dp, Color(0xFFFFB84A).copy(alpha = .55f), RoundedCornerShape(50.dp))
-                .clickable(onClick = onCoinsClick)
-                .padding(horizontal = 8.dp, vertical = 5.dp)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text("◈ $coins", color = Color(0xFFFFC86A), fontSize = 8.5.sp, fontWeight = FontWeight.Black)
+            HomeCoinButton(coins = coins, onClick = onCoinsClick)
+            HomeQuestButton(showBadge = hasQuestNotification, onClick = onQuestClick)
         }
-        Spacer(Modifier.width(5.dp))
-        HomeQuestButton(showBadge = hasQuestNotification, onClick = onQuestClick)
+    }
+}
+
+@Composable
+private fun HomeCoinButton(coins: Int, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .background(Color(0xFF21163A), RoundedCornerShape(50.dp))
+            .border(1.2.dp, Color(0xFFFFB84A).copy(alpha = .68f), RoundedCornerShape(50.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text("◈", color = Color(0xFFFFC86A), fontSize = 14.sp, fontWeight = FontWeight.Black)
+        Text(coins.toString(), color = Color(0xFFFFD58A), fontSize = 10.sp, fontWeight = FontWeight.Black)
     }
 }
 
@@ -369,32 +411,32 @@ private fun HomePlayerHeader(
 private fun HomeQuestButton(showBadge: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
-            .size(30.dp)
+            .size(37.dp)
             .background(Brush.radialGradient(listOf(Color(0xFF203A54), Color(0xFF081522))), CircleShape)
-            .border(1.dp, Color(0xFF19F2E5).copy(alpha = .72f), CircleShape)
+            .border(1.2.dp, Color(0xFF19F2E5).copy(alpha = .78f), CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(Modifier.size(16.dp)) {
+        Canvas(Modifier.size(21.dp)) {
             val ink = Color(0xFFDAFFFB)
             drawRoundRect(
                 color = ink,
                 topLeft = Offset(size.width * .20f, size.height * .14f),
                 size = Size(size.width * .62f, size.height * .72f),
-                cornerRadius = CornerRadius(2.5f, 2.5f),
-                style = Stroke(1.5f)
+                cornerRadius = CornerRadius(3f, 3f),
+                style = Stroke(1.8f)
             )
-            drawLine(ink, Offset(size.width * .34f, size.height * .35f), Offset(size.width * .68f, size.height * .35f), 1.35f, StrokeCap.Round)
-            drawLine(ink, Offset(size.width * .34f, size.height * .52f), Offset(size.width * .68f, size.height * .52f), 1.35f, StrokeCap.Round)
-            drawLine(ink, Offset(size.width * .34f, size.height * .69f), Offset(size.width * .56f, size.height * .69f), 1.35f, StrokeCap.Round)
-            drawLine(Color(0xFF19F2E5), Offset(size.width * .63f, size.height * .66f), Offset(size.width * .69f, size.height * .73f), 1.5f, StrokeCap.Round)
-            drawLine(Color(0xFF19F2E5), Offset(size.width * .69f, size.height * .73f), Offset(size.width * .82f, size.height * .59f), 1.5f, StrokeCap.Round)
+            drawLine(ink, Offset(size.width * .34f, size.height * .35f), Offset(size.width * .68f, size.height * .35f), 1.6f, StrokeCap.Round)
+            drawLine(ink, Offset(size.width * .34f, size.height * .52f), Offset(size.width * .68f, size.height * .52f), 1.6f, StrokeCap.Round)
+            drawLine(ink, Offset(size.width * .34f, size.height * .69f), Offset(size.width * .56f, size.height * .69f), 1.6f, StrokeCap.Round)
+            drawLine(Color(0xFF19F2E5), Offset(size.width * .63f, size.height * .66f), Offset(size.width * .69f, size.height * .73f), 1.9f, StrokeCap.Round)
+            drawLine(Color(0xFF19F2E5), Offset(size.width * .69f, size.height * .73f), Offset(size.width * .82f, size.height * .59f), 1.9f, StrokeCap.Round)
         }
         if (showBadge) {
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
-                    .size(9.dp)
+                    .size(10.dp)
                     .background(Color(0xFFFF4F6D), CircleShape)
                     .border(1.2.dp, Color(0xFF081123), CircleShape)
             )
@@ -408,32 +450,59 @@ private enum class HomeTopIcon { SETTINGS, PROFILE }
 private fun HomeTopButton(icon: HomeTopIcon, onClick: () -> Unit, showBadge: Boolean = false) {
     Box(
         Modifier
-            .size(34.dp)
+            .size(42.dp)
             .background(Brush.radialGradient(listOf(Color(0xFF172A57), Color(0xFF081123))), CircleShape)
-            .border(1.dp, Color(0xFF7898F2), CircleShape)
+            .border(1.2.dp, Color(0xFF7898F2), CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(Modifier.size(19.dp)) {
+        Canvas(Modifier.size(24.dp)) {
             when (icon) {
                 HomeTopIcon.SETTINGS -> {
                     val c = center
                     repeat(8) { i ->
                         val a = Math.toRadians(i * 45.0)
-                        val x = cos(a).toFloat(); val y = sin(a).toFloat()
-                        drawLine(Color(0xFFE0E7FF), Offset(c.x+x*6.6f,c.y+y*6.6f), Offset(c.x+x*8.4f,c.y+y*8.4f), 2.1f, StrokeCap.Round)
+                        val x = cos(a).toFloat()
+                        val y = sin(a).toFloat()
+                        drawLine(
+                            Color(0xFFE0E7FF),
+                            Offset(c.x + x * 8.1f, c.y + y * 8.1f),
+                            Offset(c.x + x * 10.5f, c.y + y * 10.5f),
+                            2.6f,
+                            StrokeCap.Round
+                        )
                     }
-                    drawCircle(Color(0xFFE0E7FF), 5.2f, c, style = Stroke(2.1f))
-                    drawCircle(Color(0xFF081123), 2f, c)
+                    drawCircle(Color(0xFFE0E7FF), 6.5f, c, style = Stroke(2.6f))
+                    drawCircle(Color(0xFF081123), 2.5f, c)
                 }
+
                 HomeTopIcon.PROFILE -> {
-                    drawCircle(Color(0xFFE0E7FF), 3.5f, Offset(size.width/2,size.height*.31f), style=Stroke(2.1f))
-                    drawArc(Color(0xFFE0E7FF),198f,144f,false,Offset(size.width*.17f,size.height*.46f),Size(size.width*.66f,size.height*.48f),style=Stroke(2.1f,cap=StrokeCap.Round))
+                    drawCircle(
+                        Color(0xFFE0E7FF),
+                        4.4f,
+                        Offset(size.width / 2, size.height * .31f),
+                        style = Stroke(2.6f)
+                    )
+                    drawArc(
+                        Color(0xFFE0E7FF),
+                        198f,
+                        144f,
+                        false,
+                        Offset(size.width * .17f, size.height * .46f),
+                        Size(size.width * .66f, size.height * .48f),
+                        style = Stroke(2.6f, cap = StrokeCap.Round)
+                    )
                 }
             }
         }
         if (showBadge && icon == HomeTopIcon.SETTINGS) {
-            Box(Modifier.align(Alignment.TopEnd).size(9.dp).background(Color(0xFFFF4F6D), CircleShape).border(1.2.dp,Color(0xFF081123),CircleShape))
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .size(10.dp)
+                    .background(Color(0xFFFF4F6D), CircleShape)
+                    .border(1.2.dp, Color(0xFF081123), CircleShape)
+            )
         }
     }
 }
@@ -441,30 +510,88 @@ private fun HomeTopButton(icon: HomeTopIcon, onClick: () -> Unit, showBadge: Boo
 @Composable
 private fun HomeHeroLogo() {
     Box(
-        Modifier.fillMaxWidth().height(126.dp),
+        Modifier.fillMaxWidth().height(136.dp),
         contentAlignment = Alignment.Center
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            val w=size.width; val h=size.height; val cx=w/2f; val cy=h/2f
-            val cyan=Color(0xFF23DFFF); val purple=Color(0xFFAA47FF)
-            drawCircle(Brush.radialGradient(listOf(purple.copy(alpha=.18f),cyan.copy(alpha=.07f),Color.Transparent),Offset(cx,cy),110f),110f,Offset(cx,cy))
+            val w = size.width
+            val h = size.height
+            val cx = w / 2f
+            val cy = h / 2f
+            val cyan = Color(0xFF23DFFF)
+            val purple = Color(0xFFAA47FF)
+            drawCircle(
+                Brush.radialGradient(
+                    listOf(purple.copy(alpha = .18f), cyan.copy(alpha = .07f), Color.Transparent),
+                    Offset(cx, cy),
+                    116f
+                ),
+                116f,
+                Offset(cx, cy)
+            )
             repeat(5) { i ->
-                val y=h*(.17f+i*.16f); val accent=if(i%2==0)cyan else purple
-                val left=Path().apply { moveTo(w*.08f,y); lineTo(w*.30f,y); lineTo(w*.36f,cy) }
-                val right=Path().apply { moveTo(w*.92f,y); lineTo(w*.70f,y); lineTo(w*.64f,cy) }
-                drawPath(left,accent.copy(alpha=.38f),style=Stroke(1.4f,cap=StrokeCap.Round))
-                drawPath(right,accent.copy(alpha=.38f),style=Stroke(1.4f,cap=StrokeCap.Round))
-                drawCircle(accent.copy(alpha=.7f),2.4f,Offset(w*.08f,y)); drawCircle(accent.copy(alpha=.7f),2.4f,Offset(w*.92f,y))
+                val y = h * (.17f + i * .16f)
+                val accent = if (i % 2 == 0) cyan else purple
+                val left = Path().apply {
+                    moveTo(w * .08f, y)
+                    lineTo(w * .30f, y)
+                    lineTo(w * .36f, cy)
+                }
+                val right = Path().apply {
+                    moveTo(w * .92f, y)
+                    lineTo(w * .70f, y)
+                    lineTo(w * .64f, cy)
+                }
+                drawPath(left, accent.copy(alpha = .38f), style = Stroke(1.4f, cap = StrokeCap.Round))
+                drawPath(right, accent.copy(alpha = .38f), style = Stroke(1.4f, cap = StrokeCap.Round))
+                drawCircle(accent.copy(alpha = .7f), 2.4f, Offset(w * .08f, y))
+                drawCircle(accent.copy(alpha = .7f), 2.4f, Offset(w * .92f, y))
             }
-            val shield=Path().apply {
-                moveTo(cx,cy-43f); lineTo(cx+45f,cy-26f); lineTo(cx+39f,cy+22f)
-                quadraticBezierTo(cx+26f,cy+48f,cx,cy+58f); quadraticBezierTo(cx-26f,cy+48f,cx-39f,cy+22f)
-                lineTo(cx-45f,cy-26f); close()
+            val shield = Path().apply {
+                moveTo(cx, cy - 47f)
+                lineTo(cx + 49f, cy - 28f)
+                lineTo(cx + 43f, cy + 25f)
+                quadraticBezierTo(cx + 29f, cy + 53f, cx, cy + 64f)
+                quadraticBezierTo(cx - 29f, cy + 53f, cx - 43f, cy + 25f)
+                lineTo(cx - 49f, cy - 28f)
+                close()
             }
-            drawPath(shield,Brush.linearGradient(listOf(Color(0xFFE75DFF),Color(0xFF45DBFF))),style=Stroke(5f,cap=StrokeCap.Round))
-            drawArc(Color(0xFFEE83FF),180f,180f,false,Offset(cx-17f,cy-27f),Size(34f,36f),style=Stroke(5f,cap=StrokeCap.Round))
-            drawRoundRect(Brush.verticalGradient(listOf(Color(0xFFC065FF),Color(0xFF3D94FF))),Offset(cx-22f,cy-7f),Size(44f,38f),CornerRadius(10f,10f))
-            drawCircle(Color(0xFF08162F),5.5f,Offset(cx,cy+10f)); drawLine(Color(0xFF08162F),Offset(cx,cy+15f),Offset(cx,cy+23f),3.5f,StrokeCap.Round)
+            drawPath(
+                shield,
+                Brush.linearGradient(listOf(Color(0xFFE75DFF), Color(0xFF45DBFF))),
+                style = Stroke(5.5f, cap = StrokeCap.Round)
+            )
+
+            drawArc(
+                Color(0xFFEE83FF),
+                180f,
+                180f,
+                false,
+                Offset(cx - 29f, cy - 42f),
+                Size(58f, 56f),
+                style = Stroke(7f, cap = StrokeCap.Round)
+            )
+            drawRoundRect(
+                Brush.verticalGradient(listOf(Color(0xFFC065FF), Color(0xFF3D94FF))),
+                Offset(cx - 38f, cy - 8f),
+                Size(76f, 56f),
+                CornerRadius(14f, 14f)
+            )
+            drawRoundRect(
+                Color(0xFFEEF3FF).copy(alpha = .20f),
+                Offset(cx - 38f, cy - 8f),
+                Size(76f, 56f),
+                CornerRadius(14f, 14f),
+                style = Stroke(2f)
+            )
+            drawCircle(Color(0xFF08162F), 8.5f, Offset(cx, cy + 13f))
+            drawLine(
+                Color(0xFF08162F),
+                Offset(cx, cy + 21f),
+                Offset(cx, cy + 34f),
+                5f,
+                StrokeCap.Round
+            )
         }
     }
 }
@@ -475,45 +602,83 @@ private fun HomeMenuCard(title: String, subtitle: String, accent: Color, onClick
         Modifier
             .fillMaxWidth()
             .height(72.dp)
-            .background(Brush.horizontalGradient(listOf(accent.copy(alpha=.13f),Color(0xFF081327))), RoundedCornerShape(19.dp))
-            .border(1.3.dp, accent.copy(alpha=.84f), RoundedCornerShape(19.dp))
+            .background(
+                Brush.horizontalGradient(listOf(accent.copy(alpha = .13f), Color(0xFF081327))),
+                RoundedCornerShape(19.dp)
+            )
+            .border(1.3.dp, accent.copy(alpha = .84f), RoundedCornerShape(19.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 15.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(39.dp).background(accent.copy(alpha=.13f),CircleShape).border(1.dp,accent.copy(alpha=.45f),CircleShape),contentAlignment=Alignment.Center) {
-            Text(title.take(1).uppercase(), color=accent, fontSize=15.sp, fontWeight=FontWeight.Black)
+        Box(
+            Modifier
+                .size(39.dp)
+                .background(accent.copy(alpha = .13f), CircleShape)
+                .border(1.dp, accent.copy(alpha = .45f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(title.take(1).uppercase(), color = accent, fontSize = 15.sp, fontWeight = FontWeight.Black)
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(title,color=Color.White,fontSize=17.sp,fontWeight=FontWeight.Bold)
-            Text(subtitle,color=Color(0xFFCBD4F8),fontSize=11.sp)
+            Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text(subtitle, color = Color(0xFFCBD4F8), fontSize = 11.sp)
         }
-        Text("›",color=Color.White,fontSize=28.sp)
+        Text("›", color = Color.White, fontSize = 28.sp)
     }
 }
 
 @Composable
 private fun HomeStatCard(symbol: String, value: String, label: String, modifier: Modifier, accent: Color) {
     Column(
-        modifier.height(86.dp).background(Color(0xFF071123),RoundedCornerShape(15.dp)).border(1.dp,Color(0xFF214B85),RoundedCornerShape(15.dp)).padding(3.dp,7.dp),
-        horizontalAlignment=Alignment.CenterHorizontally,
-        verticalArrangement=Arrangement.Center
+        modifier
+            .height(86.dp)
+            .background(Color(0xFF071123), RoundedCornerShape(15.dp))
+            .border(1.dp, Color(0xFF214B85), RoundedCornerShape(15.dp))
+            .padding(3.dp, 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Text(symbol,color=accent,fontSize=17.sp); Text(value,color=Color.White,fontSize=14.sp,fontWeight=FontWeight.Bold); Text(label,color=Color(0xFFC9D0F3),fontSize=8.5.sp,textAlign=TextAlign.Center)
+        Text(symbol, color = accent, fontSize = 17.sp)
+        Text(value, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = Color(0xFFC9D0F3), fontSize = 8.5.sp, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
 private fun HomeDigitalPlanet() {
-    Box(Modifier.fillMaxWidth().height(105.dp),contentAlignment=Alignment.TopCenter) {
+    Box(Modifier.fillMaxWidth().height(105.dp), contentAlignment = Alignment.TopCenter) {
         Canvas(Modifier.fillMaxSize()) {
-            val w=size.width; val h=size.height; val c=Offset(w/2,h*1.18f); val main=Color(0xFF21BFFF).copy(alpha=.62f)
-            drawArc(main,188f,164f,false,Offset(c.x-w*.48f,c.y-h*.78f),Size(w*.96f,h*1.56f),style=Stroke(2.2f,cap=StrokeCap.Round))
+            val w = size.width
+            val h = size.height
+            val c = Offset(w / 2, h * 1.18f)
+            val main = Color(0xFF21BFFF).copy(alpha = .62f)
+            drawArc(
+                main,
+                188f,
+                164f,
+                false,
+                Offset(c.x - w * .48f, c.y - h * .78f),
+                Size(w * .96f, h * 1.56f),
+                style = Stroke(2.2f, cap = StrokeCap.Round)
+            )
             repeat(7) { i ->
-                val x=w*(.16f+i*.11f); drawLine(Color(0xFF315D9B).copy(alpha=.42f),Offset(x,h*.55f),Offset(c.x+(x-c.x)*.24f,h),1f)
+                val x = w * (.16f + i * .11f)
+                drawLine(
+                    Color(0xFF315D9B).copy(alpha = .42f),
+                    Offset(x, h * .55f),
+                    Offset(c.x + (x - c.x) * .24f, h),
+                    1f
+                )
             }
         }
-        Text("UN MONDE PLUS SÛR · COMMENCE PAR TOI",color=Color(0xFFD6DCF8),fontSize=8.sp,letterSpacing=1.5.sp,modifier=Modifier.padding(top=7.dp))
+        Text(
+            "UN MONDE PLUS SÛR · COMMENCE PAR TOI",
+            color = Color(0xFFD6DCF8),
+            fontSize = 8.sp,
+            letterSpacing = 1.5.sp,
+            modifier = Modifier.padding(top = 7.dp)
+        )
     }
 }

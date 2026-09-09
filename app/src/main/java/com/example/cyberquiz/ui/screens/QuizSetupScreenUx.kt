@@ -58,6 +58,26 @@ private val SetupUxMuted = Color(0xFF9FAED3)
 private val SetupUxPanel = Color(0xFF081226)
 private val SetupUxBorder = Color(0xFF284B7A)
 
+internal data class CategoryToggleResult(
+    val selected: Set<String>,
+    val expanded: Boolean
+)
+
+internal fun defaultNewQuizCategories(categories: List<String>): Set<String> = categories.toSet()
+
+internal fun toggleAllQuizCategories(
+    categories: List<String>,
+    selected: Set<String>,
+    expanded: Boolean
+): CategoryToggleResult {
+    val allSelected = selected.size == categories.size && selected.containsAll(categories)
+    return if (allSelected) {
+        CategoryToggleResult(selected = emptySet(), expanded = true)
+    } else {
+        CategoryToggleResult(selected = categories.toSet(), expanded = expanded)
+    }
+}
+
 @Composable
 fun QuizSetupScreenUx(
     vm: QuizViewModel,
@@ -73,7 +93,8 @@ fun QuizSetupScreenUx(
 
     var modeName by rememberSaveable { mutableStateOf(lastConfig.mode.name) }
     var questionCount by rememberSaveable { mutableStateOf(lastConfig.questionCount) }
-    var selectedCategories by remember { mutableStateOf(lastConfig.categories.ifEmpty { allCategories.toSet() }) }
+    var selectedCategories by remember { mutableStateOf(defaultNewQuizCategories(allCategories)) }
+    var categoriesExpanded by rememberSaveable { mutableStateOf(false) }
     var showQuizForm by rememberSaveable { mutableStateOf(false) }
     var showPreviousConfirmation by rememberSaveable { mutableStateOf(false) }
     var abandonSession by remember { mutableStateOf<ActiveQuizSessionSummary?>(null) }
@@ -111,7 +132,11 @@ fun QuizSetupScreenUx(
 
         NewQuizLaunchCard(
             enabled = hasFreeSlot,
-            onClick = { showQuizForm = true }
+            onClick = {
+                selectedCategories = defaultNewQuizCategories(allCategories)
+                categoriesExpanded = false
+                showQuizForm = true
+            }
         )
 
         PreviousChoiceCardUx(
@@ -210,12 +235,16 @@ fun QuizSetupScreenUx(
                 CategorySelectorUx(
                     categories = allCategories,
                     selected = selectedCategories,
+                    expanded = categoriesExpanded,
+                    onToggleExpanded = { categoriesExpanded = !categoriesExpanded },
                     onToggleAll = {
-                        selectedCategories = if (selectedCategories.size == allCategories.size) {
-                            emptySet()
-                        } else {
-                            allCategories.toSet()
-                        }
+                        val result = toggleAllQuizCategories(
+                            categories = allCategories,
+                            selected = selectedCategories,
+                            expanded = categoriesExpanded
+                        )
+                        selectedCategories = result.selected
+                        categoriesExpanded = result.expanded
                     },
                     onToggle = { category ->
                         selectedCategories = if (category in selectedCategories) {
@@ -225,6 +254,10 @@ fun QuizSetupScreenUx(
                         }
                     }
                 )
+
+                if (selectedCategories.isEmpty()) {
+                    SetupUxInfo("Sélectionne au moins une catégorie pour lancer le quiz.", SetupUxOrange)
+                }
 
                 Text("3 · NOMBRE DE QUESTIONS", color = SetupUxBlue, fontSize = 10.sp, fontWeight = FontWeight.Black)
                 QuestionCountSelectorUx(
@@ -416,7 +449,9 @@ private fun PreviousChoiceCardUx(config: QuizSessionConfig, enabled: Boolean, on
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                Brush.horizontalGradient(listOf(SetupUxPurple.copy(alpha = .12f), SetupUxBlue.copy(alpha = .07f), SetupUxPanel)),
+                Brush.horizontalGradient(
+                    listOf(SetupUxPurple.copy(alpha = .12f), SetupUxBlue.copy(alpha = .07f), SetupUxPanel)
+                ),
                 RoundedCornerShape(18.dp)
             )
             .border(1.dp, SetupUxPurple.copy(alpha = if (enabled) .55f else .25f), RoundedCornerShape(18.dp))
@@ -425,8 +460,20 @@ private fun PreviousChoiceCardUx(config: QuizSessionConfig, enabled: Boolean, on
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text("TON CHOIX PRÉCÉDENT", color = SetupUxPurple, fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
-            Text(sessionDescriptionUx(config), color = SetupUxText, fontSize = 14.sp, fontWeight = FontWeight.Bold, lineHeight = 19.sp)
+            Text(
+                "TON CHOIX PRÉCÉDENT",
+                color = SetupUxPurple,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.2.sp
+            )
+            Text(
+                sessionDescriptionUx(config),
+                color = SetupUxText,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 19.sp
+            )
             Text(
                 if (enabled) "Appuie pour le relancer" else "Libère d'abord une place parmi les quiz en cours",
                 color = SetupUxMuted,
@@ -453,7 +500,13 @@ private fun ActiveSessionCardUx(
         verticalArrangement = Arrangement.spacedBy(9.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("QUIZ EN COURS $number", color = SetupUxCyan, fontSize = 9.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
+            Text(
+                "QUIZ EN COURS $number",
+                color = SetupUxCyan,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Black,
+                modifier = Modifier.weight(1f)
+            )
             Text(
                 if (session.config.infinite) "∞" else "${session.answered}/${session.config.questionCount}",
                 color = SetupUxPurple,
@@ -490,19 +543,122 @@ private fun SetupUxAction(text: String, accent: Color, modifier: Modifier, onCli
 private fun CategorySelectorUx(
     categories: List<String>,
     selected: Set<String>,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
     onToggleAll: () -> Unit,
     onToggle: (String) -> Unit
 ) {
+    val allSelected = selected.size == categories.size && selected.containsAll(categories)
+    val summary = when {
+        allSelected -> "Toutes les catégories"
+        selected.isEmpty() -> "Aucune catégorie"
+        selected.size == 1 -> selected.first()
+        else -> "${selected.size} catégories sélectionnées"
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFF071429), RoundedCornerShape(16.dp))
             .border(1.dp, SetupUxBorder, RoundedCornerShape(16.dp))
-            .padding(vertical = 5.dp)
     ) {
-        CategoryRowUx("Toutes les catégories", selected.size == categories.size, SetupUxCyan, onToggleAll)
-        categories.forEach { category ->
-            CategoryRowUx(category, category in selected, SetupUxBlue) { onToggle(category) }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 13.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CategoryCheckboxUx(
+                selected = allSelected,
+                accent = SetupUxCyan,
+                onClick = onToggleAll
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onToggleExpanded),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    summary,
+                    color = if (selected.isEmpty()) SetupUxOrange else SetupUxText,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black
+                )
+                Text(
+                    if (allSelected) {
+                        "Tout est sélectionné · décoche pour choisir"
+                    } else {
+                        "${selected.size}/${categories.size} sélectionnées"
+                    },
+                    color = SetupUxMuted,
+                    fontSize = 8.5.sp
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clickable(onClick = onToggleExpanded),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    if (expanded) "⌃" else "⌄",
+                    color = SetupUxCyan,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
+        }
+
+        if (expanded) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(SetupUxBorder.copy(alpha = .55f))
+            )
+
+            categories.forEach { category ->
+                CategoryRowUx(category, category in selected, SetupUxBlue) { onToggle(category) }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggleExpanded)
+                    .padding(horizontal = 13.dp, vertical = 9.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "REPLIER LES CATÉGORIES",
+                    color = SetupUxCyan,
+                    fontSize = 8.5.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = .8.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryCheckboxUx(
+    selected: Boolean,
+    accent: Color,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(22.dp)
+            .background(if (selected) accent.copy(alpha = .16f) else Color(0xFF08101E), RoundedCornerShape(6.dp))
+            .border(1.2.dp, if (selected) accent else Color(0xFF36517C), RoundedCornerShape(6.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        if (selected) {
+            Text("✓", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Black)
         }
     }
 }
@@ -541,7 +697,10 @@ private fun QuestionCountSelectorUx(selected: Int, onSelected: (Int) -> Unit) {
                         modifier = Modifier
                             .weight(1f)
                             .height(40.dp)
-                            .background(if (active) SetupUxPurple.copy(alpha = .15f) else Color(0xFF08152B), RoundedCornerShape(12.dp))
+                            .background(
+                                if (active) SetupUxPurple.copy(alpha = .15f) else Color(0xFF08152B),
+                                RoundedCornerShape(12.dp)
+                            )
                             .border(1.dp, if (active) SetupUxPurple else SetupUxBorder, RoundedCornerShape(12.dp))
                             .clickable { onSelected(count) },
                         contentAlignment = Alignment.Center
@@ -578,7 +737,13 @@ private fun ModeChip(
             .clickable { onSelected(mode) },
         contentAlignment = Alignment.Center
     ) {
-        Text(text, color = if (selected) accent else SetupUxMuted, fontSize = 8.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
+        Text(
+            text,
+            color = if (selected) accent else SetupUxMuted,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Black,
+            textAlign = TextAlign.Center
+        )
     }
 }
 

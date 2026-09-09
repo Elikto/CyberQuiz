@@ -15,6 +15,16 @@ class LevelProgressionTest {
     }
 
     @Test
+    fun `roadmap index matches descending level order`() {
+        assertEquals(0, roadmapIndexForLevel(30))
+        assertEquals(10, roadmapIndexForLevel(20))
+        assertEquals(15, roadmapIndexForLevel(15))
+        assertEquals(29, roadmapIndexForLevel(1))
+        assertEquals(0, roadmapIndexForLevel(999))
+        assertEquals(29, roadmapIndexForLevel(0))
+    }
+
+    @Test
     fun `every roadmap level has an avatar and coin chest reward`() {
         val roadmap = levelRoadmap()
         assertTrue(roadmap.all { entry -> entry.rewards.any { it.kind == LevelRewardKind.AVATAR } })
