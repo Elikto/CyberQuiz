@@ -149,6 +149,14 @@ object EngagementStore {
 
     fun currentCoins(context: Context): Int = prefs(context).getInt(KEY_COINS, 0)
 
+    fun grantCoins(context: Context, amount: Int): Int {
+        if (amount <= 0) return currentCoins(context)
+        val prefs = prefs(context)
+        val updated = prefs.getInt(KEY_COINS, 0) + amount
+        prefs.edit().putInt(KEY_COINS, updated).commit()
+        return updated
+    }
+
     fun unlockedAchievementIds(context: Context): Set<String> =
         prefs(context).getStringSet(KEY_UNLOCKED_ACHIEVEMENTS, emptySet())?.toSet().orEmpty()
 
