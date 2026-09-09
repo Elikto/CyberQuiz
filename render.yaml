@@ -26,7 +26,9 @@ services:
       - key: CYBERQUIZ_ENABLE_GENERATION
         value: "false"
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: cyberquiz-contact-db
+          property: connectionString
       - key: CYBERQUIZ_AUTH_JWT_SECRET
         sync: false
       - key: CYBERQUIZ_GOOGLE_CLIENT_ID
