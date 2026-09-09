@@ -26,6 +26,7 @@ jobs:
   build-apk:
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
     env:
       CYBERQUIZ_CONTACT_API_URL: https://cyberquiz-api.onrender.com/api/contact
@@ -69,6 +70,100 @@ jobs:
           echo "CYBERQUIZ_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Generate bundled update history
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/build-apk.yml/runs?status=success&per_page=100" > "$RUNNER_TEMP/cyberquiz-build-runs.json"
+          python3 - <<'PY'
+          import datetime as dt
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          asset = Path("app/src/main/assets/update_history.json")
+          seed = []
+          if asset.exists():
+              try:
+                  seed = json.loads(asset.read_text(encoding="utf-8"))
+              except (json.JSONDecodeError, OSError):
+                  seed = []
+
+          by_version = {
+              item.get("version"): item
+              for item in seed
+              if isinstance(item, dict) and item.get("version")
+          }
+
+          months = [
+              "janvier", "février", "mars", "avril", "mai", "juin",
+              "juillet", "août", "septembre", "octobre", "novembre", "décembre"
+          ]
+
+          def french_date(value: str) -> str:
+              try:
+                  parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+                  return f"{parsed.day} {months[parsed.month - 1]} {parsed.year}"
+              except Exception:
+                  return "Date inconnue"
+
+          def clean_changes(message: str):
+              message = (message or "").strip()
+              if not message:
+                  return ["Mise à jour technique de CyberQuiz."]
+              paragraphs = [re.sub(r"\s+", " ", p).strip() for p in re.split(r"\n\s*\n", message) if p.strip()]
+              changes = []
+              for index, paragraph in enumerate(paragraphs[:4]):
+                  if paragraph.lower().startswith("co-authored-by:"):
+                      continue
+                  if index == 0:
+                      paragraph = re.sub(r"\s*\(#\d+\)\s*$", "", paragraph)
+                  if paragraph and paragraph not in changes:
+                      changes.append(paragraph)
+              return changes or ["Mise à jour technique de CyberQuiz."]
+
+          runs = json.loads(Path(os.environ["RUNNER_TEMP"]).joinpath("cyberquiz-build-runs.json").read_text(encoding="utf-8"))
+          for run in runs.get("workflow_runs", []):
+              number = int(run.get("run_number") or 0)
+              if number <= 0:
+                  continue
+              version = f"1.0.{number}"
+              if version in by_version:
+                  continue
+              head_commit = run.get("head_commit") or {}
+              by_version[version] = {
+                  "version": version,
+                  "date": french_date(run.get("created_at", "")),
+                  "changes": clean_changes(head_commit.get("message", "")),
+              }
+
+          current_version = os.environ["CYBERQUIZ_VERSION_NAME"]
+          current_message = subprocess.check_output(
+              ["git", "log", "-1", "--pretty=%B", os.environ["GITHUB_SHA"]],
+              text=True,
+          )
+          by_version[current_version] = {
+              "version": current_version,
+              "date": french_date(dt.datetime.now(dt.timezone.utc).isoformat()),
+              "changes": clean_changes(current_message),
+          }
+
+          def version_number(item):
+              try:
+                  return int(item["version"].rsplit(".", 1)[1])
+              except Exception:
+                  return -1
+
+          history = sorted(by_version.values(), key=version_number, reverse=True)
+          asset.write_text(json.dumps(history, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          print(f"Generated {len(history)} update history entries; current={current_version}")
+          PY
 
       - name: Run Android release lint
         run: |
