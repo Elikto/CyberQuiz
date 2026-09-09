@@ -435,3 +435,8 @@ Les questions doivent être techniquement exactes et pédagogiques."""
     except Exception:
         logger.exception("Question generation failed")
         raise HTTPException(502, "Génération temporairement indisponible") from None
+
+
+from .social import router as social_router
+
+app.include_router(social_router)
