@@ -63,8 +63,16 @@ private val frenchUpdateWords = setOf(
     "ajout", "ajoute", "ajouté", "amélioration", "améliorations", "améliore", "amélioré",
     "correction", "corrections", "corrige", "corrigé", "suppression", "mise", "mises",
     "niveau", "niveaux", "quête", "quêtes", "récompense", "récompenses", "paramètres",
-    "historique", "boutique", "écran", "application", "version", "profil", "désormais",
-    "avec", "dans", "pour", "les", "des", "une", "du", "et"
+    "historique", "boutique", "écran", "profil", "désormais", "avec", "dans", "pour",
+    "les", "des", "une", "du", "et"
+)
+
+private val englishUpdateWords = setOf(
+    "add", "added", "adding", "fix", "fixed", "fixes", "update", "updated", "updates",
+    "improve", "improved", "improvements", "remove", "removed", "keep", "keeps", "refactor",
+    "new", "with", "and", "for", "every", "release", "screen", "settings", "shop", "level",
+    "levels", "quest", "quests", "reward", "rewards", "history", "complete", "animated",
+    "animation", "profile", "avatar", "banner", "frame", "chest", "chests", "progress"
 )
 
 private fun updateTokens(value: String): Set<String> =
@@ -82,10 +90,11 @@ internal fun frenchUpdateChange(rawChange: String): String {
     if (cleaned.isBlank()) return "Mise à jour technique de CyberQuiz."
 
     val tokens = updateTokens(cleaned)
+    val hasEnglishSignal = tokens.any { it in englishUpdateWords }
     val hasFrenchSignal = tokens.any { it in frenchUpdateWords } ||
         cleaned.any { it in "àâäçéèêëîïôöùûüÿœÀÂÄÇÉÈÊËÎÏÔÖÙÛÜŸŒ" }
 
-    if (hasFrenchSignal) return cleaned
+    if (hasFrenchSignal && !hasEnglishSignal) return cleaned
 
     val lower = cleaned.lowercase()
     return when {
