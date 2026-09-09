@@ -101,23 +101,11 @@ object EngagementStore {
         }
         val updatedUnlocked = unlocked + newlyUnlocked
 
-        val claimed = prefs.getStringSet(KEY_CLAIMED_MISSIONS, emptySet())?.toSet().orEmpty()
-        val missionProgress = dailyMissionProgress(metrics, baseline)
-        val newlyClaimed = missionProgress
-            .filter { it.completed && it.definition.id !in claimed }
-            .map { it.definition.id }
-            .toSet()
-        if (newlyClaimed.isNotEmpty()) {
-            coins += dailyMissionDefinitions
-                .filter { it.id in newlyClaimed }
-                .sumOf { it.rewardCoins }
-        }
-        val updatedClaimed = claimed + newlyClaimed
-
+        // Daily missions are intentionally NOT auto-claimed here. Completing one leaves a
+        // visible reward notification until the player explicitly presses "Récolter".
         prefs.edit()
             .putInt(KEY_COINS, coins)
             .putStringSet(KEY_UNLOCKED_ACHIEVEMENTS, updatedUnlocked)
-            .putStringSet(KEY_CLAIMED_MISSIONS, updatedClaimed)
             .commit()
 
         return snapshotFromPrefs(context, metrics, baseline)
@@ -145,6 +133,30 @@ object EngagementStore {
             metrics
         }
         return snapshotFromPrefs(context, metrics, baseline)
+    }
+
+    fun claimMission(
+        context: Context,
+        missionId: String,
+        metrics: EngagementMetrics,
+        nowMillis: Long = System.currentTimeMillis()
+    ): Int {
+        val currentSnapshot = sync(context, metrics, nowMillis)
+        val mission = currentSnapshot.missions.firstOrNull { it.definition.id == missionId } ?: return 0
+        if (!mission.completed || missionId in currentSnapshot.claimedMissionIds) return 0
+
+        val prefs = prefs(context)
+        val claimed = prefs.getStringSet(KEY_CLAIMED_MISSIONS, emptySet())?.toSet().orEmpty()
+        if (missionId in claimed) return 0
+
+        // Persist the claim before adding coins so repeated taps cannot duplicate the reward.
+        val saved = prefs.edit()
+            .putStringSet(KEY_CLAIMED_MISSIONS, claimed + missionId)
+            .commit()
+        if (!saved) return 0
+
+        grantCoins(context, mission.definition.rewardCoins)
+        return mission.definition.rewardCoins
     }
 
     fun currentCoins(context: Context): Int = prefs(context).getInt(KEY_COINS, 0)
