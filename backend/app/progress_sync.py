@@ -9,11 +9,11 @@ from pydantic import BaseModel, Field, field_validator
 
 from .social import _connect, _current_user_id, _ensure_schema
 
-router = APIRouter(prefix="/api/social", tags=["social"])
+router = APIRouter(tags=["social"])
 
 _PROGRESS_SCHEMA_LOCK = threading.Lock()
 _PROGRESS_SCHEMA_READY = False
-_MAX_SNAPSHOT_BYTES = 512 * 1024
+_MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024
 _SNAPSHOT_VERSION = 1
 
 
