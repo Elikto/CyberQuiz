@@ -1,0 +1,136 @@
+[
+  {
+    "version": "1.0.57",
+    "date": "9 septembre 2026",
+    "changes": [
+      "Correction du crash à l’ouverture des Paramètres.",
+      "Le logo CyberQuiz utilise désormais une ressource compatible avec Compose."
+    ]
+  },
+  {
+    "version": "1.0.56",
+    "date": "9 septembre 2026",
+    "changes": [
+      "Ajout des coffres de montée de niveau et des CyberCoins associés.",
+      "Les récompenses des niveaux futurs sont désormais masquées et floutées."
+    ]
+  },
+  {
+    "version": "1.0.55",
+    "date": "9 septembre 2026",
+    "changes": [
+      "Refonte visuelle de la progression des niveaux.",
+      "Correction du geste retour depuis la progression et la boutique."
+    ]
+  },
+  {
+    "version": "1.0.54",
+    "date": "9 septembre 2026",
+    "changes": [
+      "Les cartes de niveaux affichent désormais l’avatar, le niveau, le rôle et les aperçus de récompenses."
+    ]
+  },
+  {
+    "version": "1.0.53",
+    "date": "9 septembre 2026",
+    "changes": [
+      "Ajout de la page verticale de progression jusqu’au niveau 30.",
+      "La barre XP et le rôle du joueur ouvrent directement son niveau actuel."
+    ]
+  },
+  {
+    "version": "1.0.52",
+    "date": "9 septembre 2026",
+    "changes": [
+      "Ajout d’une vraie boutique CyberCoins avec avatars, bannières et contours.",
+      "Ajout des onglets Quête du jour et Succès."
+    ]
+  },
+  {
+    "version": "1.0.51",
+    "date": "8 septembre 2026",
+    "changes": [
+      "Amélioration de la boutique cosmétique, des avatars, des bannières et des contours.",
+      "Nouvelle présentation du profil et de l’en-tête d’accueil."
+    ]
+  },
+  {
+    "version": "1.0.50",
+    "date": "8 septembre 2026",
+    "changes": [
+      "Ajout des CyberCoins, quêtes quotidiennes, succès et récompenses de connexion.",
+      "Ajout de nouveaux contours d’avatar."
+    ]
+  },
+  {
+    "version": "1.0.49",
+    "date": "8 septembre 2026",
+    "changes": [
+      "Ajout du catalogue complet d’avatars et de bannières cosmétiques."
+    ]
+  },
+  {
+    "version": "1.0.33",
+    "date": "7 septembre 2026",
+    "changes": [
+      "Suppression complète du pop-up de mise à jour au lancement de l’application.",
+      "Les nouvelles versions sont signalées par une pastille sur l’icône Paramètres."
+    ]
+  },
+  {
+    "version": "1.0.32",
+    "date": "7 septembre 2026",
+    "changes": [
+      "Amélioration de la carte Nous contacter dans les Paramètres."
+    ]
+  },
+  {
+    "version": "1.0.31",
+    "date": "7 septembre 2026",
+    "changes": [
+      "Migration vers le package Android com.elikto.cyberquiz."
+    ]
+  },
+  {
+    "version": "1.0.30",
+    "date": "7 septembre 2026",
+    "changes": [
+      "La consultation des mises à jour ouvre désormais une page complète avec historique."
+    ]
+  },
+  {
+    "version": "1.0.29",
+    "date": "7 septembre 2026",
+    "changes": [
+      "Les mises à jour deviennent non intrusives et nécessitent une action volontaire."
+    ]
+  },
+  {
+    "version": "1.0.28",
+    "date": "7 septembre 2026",
+    "changes": [
+      "Ajout du contrôle de recherche de mise à jour dans les Paramètres."
+    ]
+  },
+  {
+    "version": "1.0.27",
+    "date": "7 septembre 2026",
+    "changes": [
+      "Fiabilisation de la chaîne de publication et de la signature des APK Android."
+    ]
+  },
+  {
+    "version": "1.0.24",
+    "date": "7 septembre 2026",
+    "changes": [
+      "Renforcement de la vérification de signature et ajout des analyses de sécurité automatiques."
+    ]
+  },
+  {
+    "version": "1.0.21",
+    "date": "7 septembre 2026",
+    "changes": [
+      "Renforcement du système de mise à jour avec contrôle SHA-256, package, version et certificat."
+    ]
+  }
+]

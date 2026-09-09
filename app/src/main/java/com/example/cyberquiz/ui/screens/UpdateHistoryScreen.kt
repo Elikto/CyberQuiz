@@ -1,5 +1,6 @@
 package com.example.cyberquiz.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,17 +24,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cyberquiz.BuildConfig
 import com.example.cyberquiz.ui.theme.CyberBackground
+import org.json.JSONArray
 
 private val HistoryPurple = Color(0xFFD652FF)
 private val HistoryBlue = Color(0xFF19BFFF)
@@ -43,102 +47,55 @@ private val HistoryText = Color(0xFFF5F7FF)
 private val HistoryMuted = Color(0xFF9FAED3)
 private val HistoryBorder = Color(0xFF244777)
 
-private data class UpdateHistoryEntry(
+internal data class UpdateHistoryEntry(
     val version: String,
     val date: String,
     val changes: List<String>
 )
 
-private val previousUpdates = listOf(
-    UpdateHistoryEntry(
-        version = "1.0.33",
-        date = "7 septembre 2026",
-        changes = listOf(
-            "Suppression complète du pop-up de mise à jour au lancement de l'application.",
-            "Les nouvelles versions sont désormais signalées uniquement par une petite pastille sur l'icône Paramètres.",
-            "La vérification des mises à jour reste silencieuse et aucune installation ne démarre automatiquement."
-        )
-    ),
-    UpdateHistoryEntry(
-        version = "1.0.32",
-        date = "7 septembre 2026",
-        changes = listOf(
-            "La carte Nous contacter des Paramètres affiche maintenant l'adresse elikto@proton.me.",
-            "Un appui sur cette carte ouvre directement l'application de messagerie pour écrire à CyberQuiz."
-        )
-    ),
-    UpdateHistoryEntry(
-        version = "1.0.31",
-        date = "7 septembre 2026",
-        changes = listOf(
-            "CyberQuiz utilise désormais le package Android com.elikto.cyberquiz, enregistré dans Android Developer Console.",
-            "La nouvelle identité Android correspond à une installation propre et repart donc à zéro.",
-            "La chaîne de publication vérifie désormais le nom de package de l'APK avant sa publication."
-        )
-    ),
-    UpdateHistoryEntry(
-        version = "1.0.30",
-        date = "7 septembre 2026",
-        changes = listOf(
-            "La consultation des mises à jour ouvre désormais une page complète au lieu d'une petite fenêtre.",
-            "Tous les changements sont présentés en français, avec la date de chaque mise à jour.",
-            "Les anciennes versions sont regroupées sous la dernière version et restent repliées par défaut.",
-            "Le contrôle de mise à jour dans Paramètres est devenu un simple bouton circulaire et discret."
-        )
-    ),
-    UpdateHistoryEntry(
-        version = "1.0.29",
-        date = "7 septembre 2026",
-        changes = listOf(
-            "Les mises à jour sont devenues non intrusives : aucun grand pop-up n'apparaît au lancement de l'application.",
-            "La présence d'une nouvelle version est signalée discrètement dans l'onglet Paramètres.",
-            "Le téléchargement et l'installation ne démarrent qu'après une action volontaire de l'utilisateur."
-        )
-    ),
-    UpdateHistoryEntry(
-        version = "1.0.28",
-        date = "7 septembre 2026",
-        changes = listOf(
-            "Ajout du contrôle de recherche de mise à jour directement dans la carte CyberQuiz des Paramètres.",
-            "La ligne de version est devenue interactive pour consulter les nouveautés de l'application.",
-            "Le numéro technique de build affiché auparavant dans la carte a été supprimé."
-        )
-    ),
-    UpdateHistoryEntry(
-        version = "1.0.27",
-        date = "7 septembre 2026",
-        changes = listOf(
-            "Fiabilisation de la chaîne de publication des APK Android.",
-            "La signature de l'application est isolée du processus de compilation et vérifiée avant publication.",
-            "Amélioration de la sécurité et de la continuité des futures mises à jour."
-        )
-    ),
-    UpdateHistoryEntry(
-        version = "1.0.24",
-        date = "7 septembre 2026",
-        changes = listOf(
-            "Renforcement de la vérification de la signature Android des APK distribués.",
-            "Ajout d'analyses de sécurité automatiques sur le code Android, Python et JavaScript.",
-            "Durcissement de plusieurs contrôles liés au téléchargement et à l'installation des mises à jour."
-        )
-    ),
-    UpdateHistoryEntry(
-        version = "1.0.21",
-        date = "7 septembre 2026",
-        changes = listOf(
-            "Amélioration du système de mise à jour intégré à l'application.",
-            "Contrôle du fichier téléchargé avec vérification SHA-256, package Android, version et certificat de signature.",
-            "Renforcement général des protections de l'application et de sa configuration Android."
-        )
-    )
-)
+internal fun updateVersionNumber(version: String): Int =
+    version.substringAfterLast('.').toIntOrNull() ?: -1
+
+internal fun sortUpdateHistory(entries: List<UpdateHistoryEntry>): List<UpdateHistoryEntry> =
+    entries.distinctBy { it.version }.sortedByDescending { updateVersionNumber(it.version) }
+
+private fun loadBundledUpdateHistory(context: Context): List<UpdateHistoryEntry> = runCatching {
+    val json = context.assets.open("update_history.json").bufferedReader().use { it.readText() }
+    val array = JSONArray(json)
+    buildList {
+        for (index in 0 until array.length()) {
+            val item = array.getJSONObject(index)
+            val changesArray = item.optJSONArray("changes") ?: JSONArray()
+            val changes = buildList {
+                for (changeIndex in 0 until changesArray.length()) {
+                    changesArray.optString(changeIndex)
+                        .takeIf { it.isNotBlank() }
+                        ?.let(::add)
+                }
+            }
+            add(
+                UpdateHistoryEntry(
+                    version = item.optString("version"),
+                    date = item.optString("date"),
+                    changes = changes.ifEmpty { listOf("Mise à jour technique de CyberQuiz.") }
+                )
+            )
+        }
+    }
+}.getOrDefault(emptyList())
 
 @Composable
 fun UpdateHistoryScreen(onBack: () -> Unit) {
-    val currentChanges = listOf(
-        "La carte Soutenir CyberQuiz ouvre désormais directement la page PayPal.Me officielle du projet.",
-        "Le lien paypal.me/EliktoCyber est visible dans les Paramètres pour permettre un soutien volontaire."
-    )
+    val context = LocalContext.current
+    val bundledUpdates = remember(context) { sortUpdateHistory(loadBundledUpdateHistory(context)) }
+    val currentVersion = BuildConfig.VERSION_NAME
+    val currentEntry = bundledUpdates.firstOrNull { it.version == currentVersion }
+        ?: UpdateHistoryEntry(
+            version = currentVersion,
+            date = "Version actuelle",
+            changes = listOf("Cette version de CyberQuiz utilise le nouvel historique automatique des mises à jour.")
+        )
+    val previousUpdates = bundledUpdates.filterNot { it.version == currentVersion }
 
     Column(
         modifier = Modifier
@@ -165,9 +122,9 @@ fun UpdateHistoryScreen(onBack: () -> Unit) {
         )
 
         CurrentVersionCard(
-            version = BuildConfig.VERSION_NAME,
-            date = "8 septembre 2026",
-            changes = currentChanges
+            version = currentEntry.version,
+            date = currentEntry.date,
+            changes = currentEntry.changes
         )
 
         Text(
