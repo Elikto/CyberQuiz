@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app import progress_sync
-from app.entry import app
+from app.main import app
 
 
 class ProgressSyncTests(unittest.TestCase):
@@ -20,7 +20,7 @@ class ProgressSyncTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             progress_sync.ProgressSnapshotWrite(
                 baseRevision=0,
-                snapshot={"version": 1, "padding": "x" * (513 * 1024)},
+                snapshot={"version": 1, "padding": "x" * (2 * 1024 * 1024 + 1)},
             )
 
     def test_revision_conflict_fails_closed(self):
@@ -29,7 +29,7 @@ class ProgressSyncTests(unittest.TestCase):
             progress_sync._next_revision(4, 3)
         self.assertEqual(ctx.exception.status_code, 409)
 
-    def test_progress_router_is_mounted_on_render_entrypoint(self):
+    def test_progress_router_is_mounted_on_main_app(self):
         paths = {route.path for route in app.routes}
         self.assertIn("/api/social/progress", paths)
 
