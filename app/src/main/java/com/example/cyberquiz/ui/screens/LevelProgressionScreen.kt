@@ -2,6 +2,8 @@ package com.example.cyberquiz.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -11,6 +13,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,7 +30,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -43,8 +45,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -54,6 +55,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
@@ -133,7 +135,10 @@ private val roadmapFrames: List<PlayerFrameStyle>
     }
 
 internal fun playerRoleForLevel(level: Int): String =
-    playerLevelRoles[(level.coerceIn(1, MAX_PLAYER_LEVEL) - 1)]
+    playerLevelRoles[level.coerceIn(1, MAX_PLAYER_LEVEL) - 1]
+
+internal fun roadmapIndexForLevel(level: Int): Int =
+    MAX_PLAYER_LEVEL - level.coerceIn(1, MAX_PLAYER_LEVEL)
 
 internal fun roadmapAvatarForLevel(level: Int): PlayerAvatarStyle {
     val safeLevel = level.coerceIn(1, MAX_PLAYER_LEVEL)
@@ -228,33 +233,37 @@ internal fun CompactGameLevelBar(
     val displayLevel = level.coerceIn(1, MAX_PLAYER_LEVEL)
     val safeProgress = if (level >= MAX_PLAYER_LEVEL) 1f else progress.coerceIn(0f, 1f)
     val displayXp = if (level >= MAX_PLAYER_LEVEL) 100 else xpIntoLevel.coerceIn(0, 100)
-    val barShape = RoundedCornerShape(4.dp)
+    val barShape = RoundedCornerShape(5.dp)
 
     Box(modifier = modifier.clickable(onClick = onClick)) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     "NIV. $displayLevel",
                     color = Color(0xFF63EFFF),
-                    fontSize = 8.5.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Black
                 )
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(8.dp))
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        "$displayXp/100 XP",
-                        color = Color(0xFF91A5CE),
-                        fontSize = 6.5.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.height(1.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "$displayXp/100",
+                            color = Color(0xFF9FB3DC),
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Spacer(Modifier.width(3.dp))
+                        XpBoltIcon()
+                    }
+                    Spacer(Modifier.height(2.dp))
                     Box(
                         Modifier
-                            .width(106.dp)
-                            .height(8.dp)
+                            .width(124.dp)
+                            .height(11.dp)
                             .clip(barShape)
                             .background(Brush.verticalGradient(listOf(Color(0xFF17223B), Color(0xFF070B14))))
-                            .border(1.dp, Color(0xFF536E9C), barShape)
+                            .border(1.dp, Color(0xFF637EAD), barShape)
                             .padding(1.dp)
                     ) {
                         if (safeProgress > 0f) {
@@ -266,7 +275,7 @@ internal fun CompactGameLevelBar(
                                         Brush.horizontalGradient(
                                             listOf(Color(0xFF6647FF), Color(0xFFD74CFF), Color(0xFF2FE8FF))
                                         ),
-                                        RoundedCornerShape(3.dp)
+                                        RoundedCornerShape(4.dp)
                                     )
                             )
                         }
@@ -288,7 +297,7 @@ internal fun CompactGameLevelBar(
                             Modifier
                                 .fillMaxWidth()
                                 .height(1.dp)
-                                .background(Color.White.copy(alpha = .16f))
+                                .background(Color.White.copy(alpha = .17f))
                         )
                     }
                 }
@@ -296,7 +305,7 @@ internal fun CompactGameLevelBar(
             Text(
                 playerRoleForLevel(displayLevel),
                 color = Color(0xFFDCE6FF),
-                fontSize = 8.sp,
+                fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1
             )
@@ -306,11 +315,30 @@ internal fun CompactGameLevelBar(
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
-                    .size(9.dp)
+                    .size(10.dp)
                     .background(Color(0xFFFF4F6D), CircleShape)
                     .border(1.2.dp, Color(0xFF07101F), CircleShape)
             )
         }
+    }
+}
+
+@Composable
+private fun XpBoltIcon() {
+    Canvas(Modifier.size(10.dp)) {
+        val bolt = Path().apply {
+            moveTo(size.width * .57f, 0f)
+            lineTo(size.width * .18f, size.height * .56f)
+            lineTo(size.width * .47f, size.height * .56f)
+            lineTo(size.width * .35f, size.height)
+            lineTo(size.width * .84f, size.height * .39f)
+            lineTo(size.width * .55f, size.height * .39f)
+            close()
+        }
+        drawPath(
+            bolt,
+            Brush.verticalGradient(listOf(Color(0xFFFFF08A), Color(0xFFFFB84A)))
+        )
     }
 }
 
@@ -327,7 +355,7 @@ fun LevelProgressionScreen(
     val displayLevel = currentLevel.coerceIn(1, MAX_PLAYER_LEVEL)
     val focusedLevel = focusLevel.coerceIn(1, displayLevel)
     val roadmap = levelRoadmap()
-    val currentIndex = (MAX_PLAYER_LEVEL - focusedLevel).coerceIn(0, roadmap.lastIndex)
+    val currentIndex = roadmapIndexForLevel(focusedLevel).coerceIn(0, roadmap.lastIndex)
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = currentIndex)
     var rewardState by remember(displayLevel) {
         mutableStateOf(LevelRewardStore.sync(context, displayLevel))
@@ -337,6 +365,15 @@ fun LevelProgressionScreen(
 
     LaunchedEffect(focusedLevel) {
         listState.scrollToItem(currentIndex)
+        withFrameNanos { }
+        val item = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == currentIndex }
+        if (item != null) {
+            val viewportCenter = (
+                listState.layoutInfo.viewportStartOffset + listState.layoutInfo.viewportEndOffset
+                ) / 2
+            val itemCenter = item.offset + item.size / 2
+            listState.scrollBy((itemCenter - viewportCenter).toFloat())
+        }
     }
 
     Column(
@@ -366,7 +403,8 @@ fun LevelProgressionScreen(
 
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(vertical = 190.dp)
         ) {
             items(roadmap, key = { it.level }) { entry ->
                 LevelRoadmapNode(
@@ -438,13 +476,13 @@ private fun LevelRoadmapNode(
             onClick = if (reached && pending) onOpenChest else null
         )
 
-        Spacer(Modifier.height(8.dp))
-        LazyRow(
+        Spacer(Modifier.height(10.dp))
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally)
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            items(entry.rewards, key = { "${it.kind}:${it.name}" }) { reward ->
+            entry.rewards.forEach { reward ->
                 LevelRewardPreviewCard(
                     reward = reward,
                     fallbackAvatar = entry.avatar,
@@ -457,21 +495,25 @@ private fun LevelRoadmapNode(
         }
 
         if (showConnector) {
-            Spacer(Modifier.height(7.dp))
+            Spacer(Modifier.height(10.dp))
             Box(
                 Modifier
-                    .width(2.dp)
-                    .height(28.dp)
+                    .width(3.dp)
+                    .height(64.dp)
                     .background(
                         Brush.verticalGradient(
-                            listOf(accent.copy(alpha = .62f), Color(0xFF314563).copy(alpha = .35f))
+                            listOf(
+                                accent.copy(alpha = .72f),
+                                Color(0xFF3C5578).copy(alpha = .42f),
+                                Color(0xFF263A58).copy(alpha = .28f)
+                            )
                         ),
                         RoundedCornerShape(50.dp)
                     )
             )
-            Spacer(Modifier.height(7.dp))
+            Spacer(Modifier.height(10.dp))
         } else {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(18.dp))
         }
     }
 }
@@ -508,7 +550,7 @@ private fun LevelIdentityCard(
         verticalArrangement = Arrangement.Center
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Box(if (blurAvatar) Modifier.blur(6.dp) else Modifier) {
+            Box(if (blurAvatar) Modifier.clip(RoundedCornerShape(18.dp)).blur(4.dp) else Modifier) {
                 CyberAvatarView(
                     style = entry.avatar,
                     banner = entry.banner,
@@ -520,10 +562,10 @@ private fun LevelIdentityCard(
                 )
             }
             when {
-                blurAvatar -> Text("🔒", fontSize = 18.sp)
+                blurAvatar -> Text("🔒", fontSize = 24.sp)
                 pending -> Text(
                     "🎁",
-                    fontSize = 17.sp,
+                    fontSize = 18.sp,
                     modifier = Modifier.align(Alignment.BottomEnd)
                 )
             }
@@ -563,75 +605,43 @@ private fun LevelRewardPreviewCard(
     revealed: Boolean,
     accent: Color
 ) {
-    val shape = RoundedCornerShape(13.dp)
+    val shape = RoundedCornerShape(15.dp)
+    val previewShape = RoundedCornerShape(11.dp)
 
     Column(
         modifier = Modifier
-            .width(104.dp)
-            .height(98.dp)
+            .width(72.dp)
+            .height(92.dp)
             .background(Color(0xFF081226), shape)
-            .border(1.dp, accent.copy(alpha = .28f), shape)
-            .padding(horizontal = 6.dp, vertical = 6.dp),
+            .border(1.dp, accent.copy(alpha = .34f), shape)
+            .padding(horizontal = 5.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         Box(
-            modifier = if (revealed) Modifier else Modifier.blur(7.dp),
+            modifier = if (revealed) {
+                Modifier.clip(previewShape)
+            } else {
+                Modifier.clip(previewShape).blur(2.5.dp)
+            },
             contentAlignment = Alignment.Center
         ) {
-            when (reward.kind) {
-                LevelRewardKind.AVATAR -> CyberAvatarView(
-                    style = reward.avatar ?: fallbackAvatar,
-                    banner = fallbackBanner,
-                    frame = PlayerFrameStyle.CYAN_PULSE,
-                    onClick = {},
-                    size = 49.dp,
-                    showEditBadge = false,
-                    syncShopSelection = false
-                )
-
-                LevelRewardKind.BANNER -> Box(
-                    modifier = Modifier
-                        .width(88.dp)
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF050914))
-                        .border(1.dp, accent.copy(alpha = .32f), RoundedCornerShape(10.dp))
-                ) {
-                    PlayerBannerBackdrop(
-                        style = reward.banner ?: fallbackBanner,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-
-                LevelRewardKind.FRAME -> CyberAvatarView(
-                    style = fallbackAvatar,
-                    banner = fallbackBanner,
-                    frame = reward.frame ?: fallbackFrame,
-                    onClick = {},
-                    size = 49.dp,
-                    showEditBadge = false,
-                    syncShopSelection = false
-                )
-
-                LevelRewardKind.COINS -> Box(
-                    Modifier
-                        .size(48.dp)
-                        .background(Color(0xFF2A1E12), CircleShape)
-                        .border(1.dp, Color(0xFFFFC857), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("◈", color = Color(0xFFFFC857), fontSize = 22.sp, fontWeight = FontWeight.Black)
-                }
-            }
+            RewardVisual(
+                reward = reward,
+                fallbackAvatar = fallbackAvatar,
+                fallbackBanner = fallbackBanner,
+                fallbackFrame = fallbackFrame,
+                accent = accent,
+                compact = true
+            )
         }
 
         if (revealed) {
             Text(
                 reward.name,
                 color = Color(0xFFE4EBFF),
-                fontSize = 7.4.sp,
-                lineHeight = 9.sp,
+                fontSize = 6.4.sp,
+                lineHeight = 8.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 maxLines = 2
@@ -639,10 +649,76 @@ private fun LevelRewardPreviewCard(
         } else {
             Box(
                 Modifier
-                    .width(52.dp)
-                    .height(5.dp)
-                    .blur(5.dp)
-                    .background(Color(0xFF8795B2), RoundedCornerShape(50.dp))
+                    .width(34.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(50.dp))
+                    .background(Color(0xFF6F7F9E).copy(alpha = .45f))
+            )
+        }
+    }
+}
+
+@Composable
+private fun RewardVisual(
+    reward: LevelRewardItem,
+    fallbackAvatar: PlayerAvatarStyle,
+    fallbackBanner: PlayerBannerStyle,
+    fallbackFrame: PlayerFrameStyle,
+    accent: Color,
+    compact: Boolean
+) {
+    val avatarSize = if (compact) 43.dp else 52.dp
+    val bannerWidth = if (compact) 60.dp else 92.dp
+    val bannerHeight = if (compact) 42.dp else 48.dp
+    val coinSize = if (compact) 42.dp else 48.dp
+
+    when (reward.kind) {
+        LevelRewardKind.AVATAR -> CyberAvatarView(
+            style = reward.avatar ?: fallbackAvatar,
+            banner = fallbackBanner,
+            frame = PlayerFrameStyle.CYAN_PULSE,
+            onClick = {},
+            size = avatarSize,
+            showEditBadge = false,
+            syncShopSelection = false
+        )
+
+        LevelRewardKind.BANNER -> Box(
+            modifier = Modifier
+                .width(bannerWidth)
+                .height(bannerHeight)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFF050914))
+                .border(1.dp, accent.copy(alpha = .42f), RoundedCornerShape(10.dp))
+        ) {
+            PlayerBannerBackdrop(
+                style = reward.banner ?: fallbackBanner,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        LevelRewardKind.FRAME -> CyberAvatarView(
+            style = fallbackAvatar,
+            banner = fallbackBanner,
+            frame = reward.frame ?: fallbackFrame,
+            onClick = {},
+            size = avatarSize,
+            showEditBadge = false,
+            syncShopSelection = false
+        )
+
+        LevelRewardKind.COINS -> Box(
+            Modifier
+                .size(coinSize)
+                .background(Color(0xFF2A1E12), CircleShape)
+                .border(1.dp, Color(0xFFFFC857), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "◈",
+                color = Color(0xFFFFC857),
+                fontSize = if (compact) 19.sp else 22.sp,
+                fontWeight = FontWeight.Black
             )
         }
     }
@@ -669,7 +745,13 @@ private fun LevelChestDialog(
                     letterSpacing = 1.4.sp
                 )
                 Spacer(Modifier.height(4.dp))
-                Text(entry.role, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
+                Text(
+                    entry.role,
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center
+                )
             }
         },
         text = {
@@ -680,21 +762,44 @@ private fun LevelChestDialog(
             ) {
                 AnimatedLevelChest(opened = opened)
 
+                if (opened) {
+                    Text(
+                        "TES RÉCOMPENSES",
+                        color = Color(0xFF63EFFF),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.2.sp
+                    )
+                }
+
+                AnimatedChestRewards(entry = entry, opened = opened)
+
                 AnimatedVisibility(
                     visible = opened,
-                    enter = fadeIn(animationSpec = tween(260, delayMillis = 430)) +
-                        scaleIn(animationSpec = tween(420, delayMillis = 430), initialScale = .45f) +
-                        slideInVertically(animationSpec = tween(420, delayMillis = 430), initialOffsetY = { it / 2 }),
+                    enter = fadeIn(animationSpec = tween(260, delayMillis = 780)) +
+                        scaleIn(animationSpec = tween(420, delayMillis = 780), initialScale = .45f) +
+                        slideInVertically(animationSpec = tween(420, delayMillis = 780), initialOffsetY = { it / 2 }),
                     exit = fadeOut() + scaleOut(targetScale = .8f)
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("◈  +$openedCoins", color = Color(0xFFFFD36F), fontSize = 25.sp, fontWeight = FontWeight.Black)
-                        Text("CYBERCOINS GAGNÉS", color = Color(0xFF38E69A), fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
+                        Text(
+                            "CYBERCOINS AJOUTÉS AU SOLDE",
+                            color = Color(0xFF38E69A),
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.1.sp,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
 
                 Text(
-                    if (opened) "Récompenses débloquées. Les CyberCoins ont été ajoutés à ton solde." else "Ouvre ce coffre pour révéler l’avatar du niveau et ses éventuels cosmétiques.",
+                    if (opened) {
+                        "Tous les objets de ce niveau sont révélés. Tes CyberCoins ont été ajoutés à ton solde."
+                    } else {
+                        "Ouvre ce coffre pour révéler l’avatar du niveau, les CyberCoins et ses éventuels cosmétiques."
+                    },
                     color = if (opened) Color(0xFF38E69A) else Color(0xFF9FAED3),
                     fontSize = 10.sp,
                     lineHeight = 14.sp,
@@ -705,13 +810,98 @@ private fun LevelChestDialog(
         },
         confirmButton = {
             TextButton(onClick = if (opened) onDismiss else onOpen) {
-                Text(if (opened) "FERMER" else "OUVRIR LE COFFRE", color = Color(0xFF19F2E5), fontWeight = FontWeight.Black)
+                Text(
+                    if (opened) "FERMER" else "OUVRIR LE COFFRE",
+                    color = Color(0xFF19F2E5),
+                    fontWeight = FontWeight.Black
+                )
             }
         },
         dismissButton = if (opened) null else {
             { TextButton(onClick = onDismiss) { Text("PLUS TARD", color = Color(0xFF9FAED3)) } }
         }
     )
+}
+
+@Composable
+private fun AnimatedChestRewards(entry: LevelRoadmapEntry, opened: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        entry.rewards.chunked(2).forEachIndexed { rowIndex, rowRewards ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+            ) {
+                rowRewards.forEachIndexed { columnIndex, reward ->
+                    val index = rowIndex * 2 + columnIndex
+                    AnimatedVisibility(
+                        visible = opened,
+                        enter = fadeIn(animationSpec = tween(240, delayMillis = 350 + index * 110)) +
+                            scaleIn(
+                                animationSpec = tween(360, delayMillis = 350 + index * 110),
+                                initialScale = .42f
+                            ) +
+                            slideInVertically(
+                                animationSpec = tween(360, delayMillis = 350 + index * 110),
+                                initialOffsetY = { it / 2 }
+                            ),
+                        exit = fadeOut() + scaleOut(targetScale = .8f)
+                    ) {
+                        LevelChestRewardCard(
+                            reward = reward,
+                            fallbackAvatar = entry.avatar,
+                            fallbackBanner = entry.banner,
+                            fallbackFrame = entry.frame
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LevelChestRewardCard(
+    reward: LevelRewardItem,
+    fallbackAvatar: PlayerAvatarStyle,
+    fallbackBanner: PlayerBannerStyle,
+    fallbackFrame: PlayerFrameStyle
+) {
+    val shape = RoundedCornerShape(15.dp)
+    Column(
+        modifier = Modifier
+            .width(116.dp)
+            .height(94.dp)
+            .background(
+                Brush.verticalGradient(listOf(Color(0xFF111D38), Color(0xFF081226))),
+                shape
+            )
+            .border(1.dp, Color(0xFFFFC857).copy(alpha = .42f), shape)
+            .padding(horizontal = 7.dp, vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        RewardVisual(
+            reward = reward,
+            fallbackAvatar = fallbackAvatar,
+            fallbackBanner = fallbackBanner,
+            fallbackFrame = fallbackFrame,
+            accent = Color(0xFFFFC857),
+            compact = false
+        )
+        Text(
+            reward.name,
+            color = Color(0xFFF2F5FF),
+            fontSize = 7.5.sp,
+            lineHeight = 9.sp,
+            fontWeight = FontWeight.Black,
+            textAlign = TextAlign.Center,
+            maxLines = 2
+        )
+    }
 }
 
 @Composable
