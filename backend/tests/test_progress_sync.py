@@ -30,7 +30,7 @@ class ProgressSyncTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 409)
 
     def test_progress_router_is_mounted_on_main_app(self):
-        paths = {route.path for route in app.routes}
+        paths = {getattr(route, "path", None) for route in app.routes}
         self.assertIn("/api/social/progress", paths)
 
     def test_progress_requires_authentication(self):
