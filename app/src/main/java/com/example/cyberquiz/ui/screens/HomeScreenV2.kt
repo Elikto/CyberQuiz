@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.example.cyberquiz.engagement.EngagementStore
 import com.example.cyberquiz.engagement.LevelRewardStore
 import com.example.cyberquiz.model.EngagementMetrics
+import com.example.cyberquiz.model.claimableMissionIds
 import com.example.cyberquiz.ui.theme.CyberBackground
 import com.example.cyberquiz.update.CyberQuizUpdateManager
 import com.example.cyberquiz.viewmodel.QuizViewModel
@@ -70,6 +71,7 @@ fun HomeScreenV2(
     var selectedFrame by remember { mutableStateOf(storedPlayerFrame(context)) }
     var showPicker by rememberSaveable { mutableStateOf(false) }
     var showShop by rememberSaveable { mutableStateOf(false) }
+    var showDailyQuests by rememberSaveable { mutableStateOf(false) }
     var showLevels by rememberSaveable { mutableStateOf(false) }
     var levelFocus by rememberSaveable { mutableStateOf(1) }
     var updateAvailable by remember { mutableStateOf(false) }
@@ -78,6 +80,7 @@ fun HomeScreenV2(
     val xpIntoLevel = p.xp % 100
     val levelProgress = if (p.level >= MAX_PLAYER_LEVEL) 1f else (xpIntoLevel / 100f).coerceIn(0f, 1f)
     val accuracy = if (p.answered == 0) 0 else p.correct * 100 / p.answered
+    val hasClaimableQuest = claimableMissionIds(engagement.missions, engagement.claimedMissionIds).isNotEmpty()
 
     fun reload() {
         selectedAvatar = storedPlayerAvatar(context)
@@ -105,6 +108,20 @@ fun HomeScreenV2(
             metrics = metrics,
             onBack = {
                 showShop = false
+                reload()
+            }
+        )
+        return
+    }
+
+    if (showDailyQuests) {
+        DailyQuestsScreen(
+            metrics = metrics,
+            onCoinsChanged = {
+                engagement = EngagementStore.snapshot(context, metrics)
+            },
+            onBack = {
+                showDailyQuests = false
                 reload()
             }
         )
@@ -157,11 +174,13 @@ fun HomeScreenV2(
             banner = selectedBanner,
             frame = selectedFrame,
             hasRewardNotification = levelRewardState.hasPendingReward,
+            hasQuestNotification = hasClaimableQuest,
             onLevelClick = {
                 levelFocus = p.level.coerceIn(1, MAX_PLAYER_LEVEL)
                 showLevels = true
             },
             onCoinsClick = { showShop = true },
+            onQuestClick = { showDailyQuests = true },
             onAvatarClick = { showPicker = true }
         )
 
@@ -304,8 +323,10 @@ private fun HomePlayerHeader(
     banner: PlayerBannerStyle,
     frame: PlayerFrameStyle,
     hasRewardNotification: Boolean,
+    hasQuestNotification: Boolean,
     onLevelClick: () -> Unit,
     onCoinsClick: () -> Unit,
+    onQuestClick: () -> Unit,
     onAvatarClick: () -> Unit
 ) {
     Row(
@@ -325,7 +346,7 @@ private fun HomePlayerHeader(
             level = level,
             xpIntoLevel = xpIntoLevel,
             progress = progress,
-            modifier = Modifier.width(154.dp),
+            modifier = Modifier.width(140.dp),
             hasRewardNotification = hasRewardNotification,
             onClick = onLevelClick
         )
@@ -338,6 +359,45 @@ private fun HomePlayerHeader(
                 .padding(horizontal = 8.dp, vertical = 5.dp)
         ) {
             Text("◈ $coins", color = Color(0xFFFFC86A), fontSize = 8.5.sp, fontWeight = FontWeight.Black)
+        }
+        Spacer(Modifier.width(5.dp))
+        HomeQuestButton(showBadge = hasQuestNotification, onClick = onQuestClick)
+    }
+}
+
+@Composable
+private fun HomeQuestButton(showBadge: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(30.dp)
+            .background(Brush.radialGradient(listOf(Color(0xFF203A54), Color(0xFF081522))), CircleShape)
+            .border(1.dp, Color(0xFF19F2E5).copy(alpha = .72f), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(Modifier.size(16.dp)) {
+            val ink = Color(0xFFDAFFFB)
+            drawRoundRect(
+                color = ink,
+                topLeft = Offset(size.width * .20f, size.height * .14f),
+                size = Size(size.width * .62f, size.height * .72f),
+                cornerRadius = CornerRadius(2.5f, 2.5f),
+                style = Stroke(1.5f)
+            )
+            drawLine(ink, Offset(size.width * .34f, size.height * .35f), Offset(size.width * .68f, size.height * .35f), 1.35f, StrokeCap.Round)
+            drawLine(ink, Offset(size.width * .34f, size.height * .52f), Offset(size.width * .68f, size.height * .52f), 1.35f, StrokeCap.Round)
+            drawLine(ink, Offset(size.width * .34f, size.height * .69f), Offset(size.width * .56f, size.height * .69f), 1.35f, StrokeCap.Round)
+            drawLine(Color(0xFF19F2E5), Offset(size.width * .63f, size.height * .66f), Offset(size.width * .69f, size.height * .73f), 1.5f, StrokeCap.Round)
+            drawLine(Color(0xFF19F2E5), Offset(size.width * .69f, size.height * .73f), Offset(size.width * .82f, size.height * .59f), 1.5f, StrokeCap.Round)
+        }
+        if (showBadge) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .size(9.dp)
+                    .background(Color(0xFFFF4F6D), CircleShape)
+                    .border(1.2.dp, Color(0xFF081123), CircleShape)
+            )
         }
     }
 }
