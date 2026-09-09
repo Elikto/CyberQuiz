@@ -24,4 +24,34 @@ class UpdateHistoryTest {
         assertEquals(57, updateVersionNumber("1.0.57"))
         assertEquals(-1, updateVersionNumber("dev"))
     }
+
+    @Test
+    fun `existing French update note stays unchanged`() {
+        val note = "Ajout des récompenses de quêtes et des coffres de niveau."
+        assertEquals(note, frenchUpdateChange(note))
+    }
+
+    @Test
+    fun `English update history title is converted to French`() {
+        assertEquals(
+            "Amélioration de l’historique des mises à jour et de sa génération automatique.",
+            frenchUpdateChange("Keep update history complete on every release (#56)")
+        )
+    }
+
+    @Test
+    fun `English quest reward title is converted to French`() {
+        assertEquals(
+            "Ajout et amélioration des quêtes, récompenses et coffres de niveau.",
+            frenchUpdateChange("Add quest rewards and animated level chests (#57)")
+        )
+    }
+
+    @Test
+    fun `unknown English release note never leaks into the French history`() {
+        assertEquals(
+            "Améliorations et corrections diverses de CyberQuiz.",
+            frenchUpdateChange("Refactor internal architecture for cleaner components")
+        )
+    }
 }
