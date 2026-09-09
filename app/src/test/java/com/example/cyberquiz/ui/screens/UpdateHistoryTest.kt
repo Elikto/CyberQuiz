@@ -54,4 +54,12 @@ class UpdateHistoryTest {
             frenchUpdateChange("Refactor internal architecture for cleaner components")
         )
     }
+
+    @Test
+    fun `English note containing the shared word version is still translated`() {
+        assertEquals(
+            "Améliorations et corrections diverses de CyberQuiz.",
+            frenchUpdateChange("New application version with cleaner components")
+        )
+    }
 }
