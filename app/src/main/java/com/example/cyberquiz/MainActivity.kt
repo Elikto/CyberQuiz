@@ -27,7 +27,7 @@ import com.example.cyberquiz.social.SharedQuizViewModel
 import com.example.cyberquiz.ui.screens.CategoriesScreenV3
 import com.example.cyberquiz.ui.screens.CyberMiniQuizCategoriesScreen
 import com.example.cyberquiz.ui.screens.HomeScreenV2
-import com.example.cyberquiz.ui.screens.ProfileScreenV5
+import com.example.cyberquiz.ui.screens.ProfileScreenEntry
 import com.example.cyberquiz.ui.screens.QuizHistoryScreen
 import com.example.cyberquiz.ui.screens.QuizSetupScreenUx
 import com.example.cyberquiz.ui.screens.QuizType
@@ -353,7 +353,7 @@ private fun CyberQuizApp(
                 }
             )
 
-            AppScreen.PROFILE -> ProfileScreenV5(
+            AppScreen.PROFILE -> ProfileScreenEntry(
                 selectedQuizType = selectedQuizType,
                 onQuizTypeSelected = { type ->
                     selectedQuizTypeName = type.name
