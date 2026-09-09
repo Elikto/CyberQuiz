@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,9 +28,10 @@ import com.example.cyberquiz.model.EngagementMetrics
 import com.example.cyberquiz.viewmodel.QuizViewModel
 
 @Composable
-fun ProfileScreenV5(
+fun ProfileScreenEntry(
     selectedQuizType: QuizType,
     onQuizTypeSelected: (QuizType) -> Unit,
+    onFriends: () -> Unit,
     onBack: () -> Unit
 ) {
     val vm: QuizViewModel = viewModel()
@@ -75,23 +77,45 @@ fun ProfileScreenV5(
                     onBack = onBack
                 )
 
-                Box(
+                Column(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .statusBarsPadding()
-                        .padding(top = 14.dp, end = 18.dp)
-                        .background(Color(0xFF20153B), RoundedCornerShape(50.dp))
-                        .border(1.dp, Color(0xFFFFB84A).copy(alpha = .65f), RoundedCornerShape(50.dp))
-                        .clickable { showShop = true }
-                        .padding(horizontal = 11.dp, vertical = 7.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(top = 14.dp, end = 18.dp),
+                    horizontalAlignment = Alignment.End
                 ) {
-                    Text(
-                        "◈ ${engagement.coins}",
-                        color = Color(0xFFFFC86A),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black
-                    )
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFF20153B), RoundedCornerShape(50.dp))
+                            .border(1.dp, Color(0xFFFFB84A).copy(alpha = .65f), RoundedCornerShape(50.dp))
+                            .clickable { showShop = true }
+                            .padding(horizontal = 11.dp, vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "◈ ${engagement.coins}",
+                            color = Color(0xFFFFC86A),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 8.dp)
+                            .background(Color(0xFF0B2542), RoundedCornerShape(50.dp))
+                            .border(1.dp, Color(0xFF20E7F2).copy(alpha = .72f), RoundedCornerShape(50.dp))
+                            .clickable(onClick = onFriends)
+                            .padding(horizontal = 11.dp, vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "👥 CYBERSQUAD",
+                            color = Color(0xFF7BF5FF),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
                 }
             }
         }

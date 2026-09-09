@@ -4,7 +4,7 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: pip install --disable-pip-version-check -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn app.entry:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: CYBERQUIZ_CONTACT_ENABLED
@@ -25,3 +25,9 @@ services:
         sync: false
       - key: CYBERQUIZ_ENABLE_GENERATION
         value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: CYBERQUIZ_AUTH_JWT_SECRET
+        sync: false
+      - key: CYBERQUIZ_GOOGLE_CLIENT_ID
+        sync: false
