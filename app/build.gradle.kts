@@ -11,6 +11,10 @@ val cyberContactApiUrl = providers.gradleProperty("cyberContactApiUrl")
     .orElse(providers.environmentVariable("CYBERQUIZ_CONTACT_API_URL"))
     .orElse("https://cyberquiz-api.onrender.com/api/contact")
     .get()
+val cyberSocialApiUrl = providers.gradleProperty("cyberSocialApiUrl")
+    .orElse(providers.environmentVariable("CYBERQUIZ_SOCIAL_API_URL"))
+    .orElse("https://cyberquiz-api.onrender.com/api/social")
+    .get()
 val updateKeystorePath = System.getenv("CYBERQUIZ_KEYSTORE_PATH")
 val updateKeystorePassword = System.getenv("CYBERQUIZ_KEYSTORE_PASSWORD")
 val updateKeyAlias = System.getenv("CYBERQUIZ_KEY_ALIAS")
@@ -33,6 +37,7 @@ android {
         versionName = cyberVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "CONTACT_API_URL", quotedBuildConfigValue(cyberContactApiUrl))
+        buildConfigField("String", "SOCIAL_API_URL", quotedBuildConfigValue(cyberSocialApiUrl))
     }
 
     val updateSigningConfig = if (
@@ -100,6 +105,9 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.google.identity.googleid)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
