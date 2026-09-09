@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +35,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -510,91 +513,149 @@ private fun HomeTopButton(icon: HomeTopIcon, onClick: () -> Unit, showBadge: Boo
 @Composable
 private fun HomeHeroLogo() {
     Box(
-        Modifier.fillMaxWidth().height(136.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val cx = w / 2f
-            val cy = h / 2f
-            val cyan = Color(0xFF23DFFF)
-            val purple = Color(0xFFAA47FF)
-            drawCircle(
-                Brush.radialGradient(
-                    listOf(purple.copy(alpha = .18f), cyan.copy(alpha = .07f), Color.Transparent),
-                    Offset(cx, cy),
-                    116f
-                ),
-                116f,
-                Offset(cx, cy)
-            )
-            repeat(5) { i ->
-                val y = h * (.17f + i * .16f)
-                val accent = if (i % 2 == 0) cyan else purple
-                val left = Path().apply {
-                    moveTo(w * .08f, y)
-                    lineTo(w * .30f, y)
-                    lineTo(w * .36f, cy)
+        Modifier
+            .widthIn(max = 480.dp)
+            .fillMaxWidth()
+            .height(224.dp)
+            .clip(RoundedCornerShape(26.dp))
+            .drawWithCache {
+                val cx = size.width / 2f
+                val cy = size.height / 2f
+                val center = Offset(cx, cy)
+                // Density-aware 168 dp shield, scaled down only for unusually narrow windows.
+                val unit = minOf(1.dp.toPx(), size.width / 280f)
+                val radius = 98f * unit
+                val cyan = Color(0xFF35DCFF)
+                val purple = Color(0xFFB56CFF)
+                val board = Brush.verticalGradient(
+                    listOf(Color(0xFF030915), Color(0xFF08172B), Color(0xFF040B18))
+                )
+                val halo = Brush.radialGradient(
+                    listOf(purple.copy(alpha = .22f), cyan.copy(alpha = .09f), Color.Transparent),
+                    center, 134f * unit
+                )
+                val shieldInk = Brush.linearGradient(
+                    listOf(Color(0xFFEF9CFF), purple, cyan, Color(0xFF4994FF)),
+                    Offset(cx - 72f * unit, cy - 84f * unit),
+                    Offset(cx + 72f * unit, cy + 84f * unit)
+                )
+                val shieldFill = Brush.verticalGradient(
+                    listOf(Color(0xFF18284C), Color(0xFF0A1530), Color(0xFF0D2340)),
+                    cy - 84f * unit, cy + 84f * unit
+                )
+                val lockFill = Brush.linearGradient(
+                    listOf(Color(0xFFD18CFF), Color(0xFF9B66F0), Color(0xFF428FEF)),
+                    Offset(cx - 46f * unit, cy - 23f * unit),
+                    Offset(cx + 46f * unit, cy + 39f * unit)
+                )
+                fun shieldPath(scale: Float) = Path().apply {
+                    val u = unit * scale
+                    moveTo(cx, cy - 84f * u)
+                    lineTo(cx + 72f * u, cy - 52f * u)
+                    lineTo(cx + 64f * u, cy + 22f * u)
+                    quadraticTo(cx + 48f * u, cy + 60f * u, cx, cy + 84f * u)
+                    quadraticTo(cx - 48f * u, cy + 60f * u, cx - 64f * u, cy + 22f * u)
+                    lineTo(cx - 72f * u, cy - 52f * u)
+                    close()
                 }
-                val right = Path().apply {
-                    moveTo(w * .92f, y)
-                    lineTo(w * .70f, y)
-                    lineTo(w * .64f, cy)
+                val shield = shieldPath(1f)
+                val innerShield = shieldPath(.88f)
+                val grid = Path().apply {
+                    val step = 24f * unit
+                    for (i in 0..(size.width / step).toInt()) {
+                        val x = cx + (i - (size.width / step).toInt() / 2) * step
+                        moveTo(x, 12f * unit)
+                        lineTo(x, size.height - 12f * unit)
+                    }
+                    for (i in -4..4) {
+                        moveTo(12f * unit, cy + i * step)
+                        lineTo(size.width - 12f * unit, cy + i * step)
+                    }
                 }
-                drawPath(left, accent.copy(alpha = .38f), style = Stroke(1.4f, cap = StrokeCap.Round))
-                drawPath(right, accent.copy(alpha = .38f), style = Stroke(1.4f, cap = StrokeCap.Round))
-                drawCircle(accent.copy(alpha = .7f), 2.4f, Offset(w * .08f, y))
-                drawCircle(accent.copy(alpha = .7f), 2.4f, Offset(w * .92f, y))
-            }
-            val shield = Path().apply {
-                moveTo(cx, cy - 47f)
-                lineTo(cx + 49f, cy - 28f)
-                lineTo(cx + 43f, cy + 25f)
-                quadraticBezierTo(cx + 29f, cy + 53f, cx, cy + 64f)
-                quadraticBezierTo(cx - 29f, cy + 53f, cx - 43f, cy + 25f)
-                lineTo(cx - 49f, cy - 28f)
-                close()
-            }
-            drawPath(
-                shield,
-                Brush.linearGradient(listOf(Color(0xFFE75DFF), Color(0xFF45DBFF))),
-                style = Stroke(5.5f, cap = StrokeCap.Round)
-            )
+                val traces = buildList {
+                    for (side in listOf(-1f, 1f)) {
+                        for (vertical in listOf(-1f, 1f)) {
+                            repeat(3) { lane ->
+                                val y = cy + vertical * (30f + lane * 24f) * unit
+                                val innerY = cy + vertical * (14f + lane * 21f) * unit
+                                val start = Offset(cx + side * (cx - 16f * unit), y)
+                                val end = Offset(cx + side * radius * .94f, innerY)
+                                val bendX = cx + side * (radius + (cx - radius) * .48f)
+                                val path = Path().apply {
+                                    moveTo(start.x, start.y)
+                                    lineTo(bendX, y)
+                                    lineTo(bendX - side * kotlin.math.abs(y - innerY), innerY)
+                                    lineTo(end.x, end.y)
+                                }
+                                add(HomeHeroTrace(path, start, end, if (lane == 1) purple else cyan))
+                            }
+                        }
+                    }
+                }
+                val corners = Path().apply {
+                    for (side in listOf(-1f, 1f)) {
+                        for (vertical in listOf(-1f, 1f)) {
+                            val x = cx + side * (cx - 17f * unit)
+                            val y = cy + vertical * (cy - 17f * unit)
+                            moveTo(x - side * 18f * unit, y)
+                            lineTo(x, y)
+                            lineTo(x, y - vertical * 12f * unit)
+                        }
+                    }
+                }
+                val fineStroke = Stroke(.8f * unit, cap = StrokeCap.Round)
+                val ringTop = center - Offset(radius, radius)
+                val ringSize = Size(radius * 2f, radius * 2f)
+                val lockTop = Offset(cx - 46f * unit, cy - 23f * unit)
+                val lockSize = Size(92f * unit, 62f * unit)
+                val lockCorners = CornerRadius(12f * unit)
 
-            drawArc(
-                Color(0xFFEE83FF),
-                180f,
-                180f,
-                false,
-                Offset(cx - 29f, cy - 42f),
-                Size(58f, 56f),
-                style = Stroke(7f, cap = StrokeCap.Round)
-            )
-            drawRoundRect(
-                Brush.verticalGradient(listOf(Color(0xFFC065FF), Color(0xFF3D94FF))),
-                Offset(cx - 38f, cy - 8f),
-                Size(76f, 56f),
-                CornerRadius(14f, 14f)
-            )
-            drawRoundRect(
-                Color(0xFFEEF3FF).copy(alpha = .20f),
-                Offset(cx - 38f, cy - 8f),
-                Size(76f, 56f),
-                CornerRadius(14f, 14f),
-                style = Stroke(2f)
-            )
-            drawCircle(Color(0xFF08162F), 8.5f, Offset(cx, cy + 13f))
-            drawLine(
-                Color(0xFF08162F),
-                Offset(cx, cy + 21f),
-                Offset(cx, cy + 34f),
-                5f,
-                StrokeCap.Round
-            )
-        }
-    }
+                // Paths and brushes are cached; no animation, blur, bitmap or offscreen layer.
+                onDrawBehind {
+                    drawRect(board)
+                    drawPath(grid, cyan.copy(alpha = .055f), style = Stroke(.5f * unit))
+                    drawCircle(halo, 134f * unit, center)
+                    traces.forEach { trace ->
+                        drawPath(trace.path, trace.accent.copy(alpha = .30f), style = fineStroke)
+                        drawCircle(trace.accent.copy(alpha = .08f), 5f * unit, trace.start)
+                        drawCircle(trace.accent.copy(alpha = .8f), 1.7f * unit, trace.start)
+                        drawCircle(trace.accent.copy(alpha = .45f), 2f * unit, trace.end, style = fineStroke)
+                    }
+                    drawPath(corners, cyan.copy(alpha = .35f), style = fineStroke)
+                    drawCircle(Color(0xFF071226).copy(alpha = .8f), radius * .94f, center)
+                    drawCircle(cyan.copy(alpha = .15f), radius, center, style = fineStroke)
+                    repeat(4) { segment ->
+                        drawArc(
+                            if (segment % 2 == 0) cyan.copy(alpha = .62f) else purple.copy(alpha = .55f),
+                            20f + segment * 90f, 50f, false, ringTop, ringSize,
+                            style = Stroke(1.5f * unit, cap = StrokeCap.Round)
+                        )
+                    }
+                    drawPath(shield, cyan.copy(alpha = .055f), style = Stroke(14f * unit))
+                    drawPath(shield, shieldFill)
+                    drawPath(shield, shieldInk, style = Stroke(2.6f * unit, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                    drawPath(innerShield, cyan.copy(alpha = .24f), style = fineStroke)
+                    drawArc(
+                        Color(0xFFDDB0FF), 180f, 180f, false,
+                        Offset(cx - 29f * unit, cy - 64f * unit), Size(58f * unit, 60f * unit),
+                        style = Stroke(6f * unit, cap = StrokeCap.Round)
+                    )
+                    for (side in listOf(-1f, 1f)) {
+                        drawLine(
+                            Color(0xFFDDB0FF), Offset(cx + side * 29f * unit, cy - 34f * unit),
+                            Offset(cx + side * 29f * unit, cy - 20f * unit), 6f * unit, StrokeCap.Round
+                        )
+                    }
+                    drawRoundRect(lockFill, lockTop, lockSize, lockCorners)
+                    drawRoundRect(Color(0xFFE8D6FF).copy(alpha = .38f), lockTop, lockSize, lockCorners, style = fineStroke)
+                    drawCircle(Color(0xFF0A1630), 7f * unit, Offset(cx, cy + 1f * unit))
+                    drawLine(Color(0xFF0A1630), Offset(cx, cy + 7f * unit), Offset(cx, cy + 19f * unit), 4.5f * unit, StrokeCap.Round)
+                }
+            }
+    )
 }
+
+private data class HomeHeroTrace(val path: Path, val start: Offset, val end: Offset, val accent: Color)
 
 @Composable
 private fun HomeMenuCard(title: String, subtitle: String, accent: Color, onClick: () -> Unit) {
