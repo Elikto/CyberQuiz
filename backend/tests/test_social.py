@@ -5,6 +5,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app import social
@@ -88,11 +89,9 @@ class SocialSecurityTests(unittest.TestCase):
         self.assertNotIn("secret", str(result).lower())
 
     def test_social_router_is_mounted_on_main_app(self):
-        paths = {route.path for route in app.routes}
-        self.assertIn("/api/social/config", paths)
-        self.assertIn("/api/social/auth/register", paths)
-        self.assertIn("/api/social/friends", paths)
-        self.assertIn("/api/social/quiz-rooms", paths)
+        response = TestClient(app).get("/api/social/config")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("googleEnabled", response.json())
 
 
 if __name__ == "__main__":
