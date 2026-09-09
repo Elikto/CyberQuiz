@@ -1,6 +1,7 @@
 package com.example.cyberquiz.ui.screens
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -47,6 +48,19 @@ class LevelProgressionTest {
         assertEquals(1, rewards.count { it.kind == LevelRewardKind.COINS })
         assertEquals(0, rewards.count { it.kind == LevelRewardKind.BANNER })
         assertEquals(0, rewards.count { it.kind == LevelRewardKind.FRAME })
+    }
+
+    @Test
+    fun `level avatar stays visible before level twenty`() {
+        assertFalse(shouldBlurLevelAvatar(level = 1, claimed = false))
+        assertFalse(shouldBlurLevelAvatar(level = 19, claimed = false))
+    }
+
+    @Test
+    fun `level avatar is hidden from level twenty until claimed`() {
+        assertTrue(shouldBlurLevelAvatar(level = 20, claimed = false))
+        assertTrue(shouldBlurLevelAvatar(level = 30, claimed = false))
+        assertFalse(shouldBlurLevelAvatar(level = 20, claimed = true))
     }
 
     @Test
