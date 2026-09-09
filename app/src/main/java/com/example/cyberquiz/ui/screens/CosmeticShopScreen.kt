@@ -21,13 +21,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cyberquiz.engagement.EngagementSnapshot
 import com.example.cyberquiz.engagement.EngagementStore
 import com.example.cyberquiz.model.EngagementMetrics
 import com.example.cyberquiz.model.achievementDefinitions
 import com.example.cyberquiz.ui.theme.CyberBackground
 
-private enum class ShopMainTab { SHOP, DAILY, ACHIEVEMENTS }
+private enum class ShopMainTab { SHOP, ACHIEVEMENTS }
 private enum class ShopCosmeticTab { AVATARS, BANNERS, FRAMES }
 
 private val ShopText = Color(0xFFF5F7FF)
@@ -87,7 +86,6 @@ fun CosmeticShopScreen(
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             MainTabButton("BOUTIQUE", mainTab == ShopMainTab.SHOP, Modifier.weight(1f)) { mainTab = ShopMainTab.SHOP }
-            MainTabButton("QUÊTE DU JOUR", mainTab == ShopMainTab.DAILY, Modifier.weight(1f)) { mainTab = ShopMainTab.DAILY }
             MainTabButton("SUCCÈS", mainTab == ShopMainTab.ACHIEVEMENTS, Modifier.weight(1f)) { mainTab = ShopMainTab.ACHIEVEMENTS }
         }
 
@@ -215,24 +213,6 @@ fun CosmeticShopScreen(
                 }
             }
 
-            ShopMainTab.DAILY -> {
-                DailyRewardCard(snapshot)
-                snapshot.missions.forEach { mission ->
-                    val progress = CosmeticProgress(
-                        mission.current,
-                        mission.definition.target,
-                        "${mission.current} / ${mission.definition.target}"
-                    )
-                    ProgressRewardCard(
-                        title = mission.definition.title,
-                        subtitle = mission.definition.description,
-                        reward = mission.definition.rewardCoins,
-                        progress = progress,
-                        completed = mission.definition.id in snapshot.claimedMissionIds
-                    )
-                }
-            }
-
             ShopMainTab.ACHIEVEMENTS -> achievementDefinitions.forEach { achievement ->
                 val unlocked = achievement.id in snapshot.unlockedAchievementIds
                 ProgressRewardCard(
@@ -263,7 +243,7 @@ private fun ShopHeader(coins: Int, onBack: () -> Unit) {
         Spacer(Modifier.width(11.dp))
         Column(Modifier.weight(1f)) {
             Text("Boutique", color = ShopText, fontSize = 23.sp, fontWeight = FontWeight.Black)
-            Text("COSMÉTIQUES · QUÊTES · SUCCÈS", color = ShopMuted, fontSize = 8.sp, letterSpacing = 1.1.sp)
+            Text("COSMÉTIQUES · SUCCÈS", color = ShopMuted, fontSize = 8.sp, letterSpacing = 1.1.sp)
         }
         Box(
             Modifier
@@ -339,26 +319,6 @@ private fun ShopItemCard(
             fontSize = 8.sp,
             fontWeight = FontWeight.Black
         )
-    }
-}
-
-@Composable
-private fun DailyRewardCard(snapshot: EngagementSnapshot) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(ShopOrange.copy(alpha=.08f), RoundedCornerShape(17.dp))
-            .border(1.dp, ShopOrange.copy(alpha=.35f), RoundedCornerShape(17.dp))
-            .padding(13.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text("🔥", fontSize = 23.sp)
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text("Série quotidienne : ${snapshot.loginStreak}", color = ShopText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            Text("Récompense de connexion déjà ajoutée aujourd'hui", color = ShopMuted, fontSize = 9.sp)
-        }
-        Text("+${snapshot.loginRewardToday} ◈", color = ShopOrange, fontSize = 10.sp, fontWeight = FontWeight.Black)
     }
 }
 
