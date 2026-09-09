@@ -25,6 +25,7 @@ internal object SocialTokenStore {
             .edit()
             .putString(TOKEN_KEY, Base64.encodeToString(payload, Base64.NO_WRAP))
             .apply()
+        ProgressSyncManager.request(context)
     }
 
     fun load(context: Context): String? {
