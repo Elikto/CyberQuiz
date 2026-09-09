@@ -9,7 +9,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -28,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cyberquiz.engagement.EngagementStore
+import com.example.cyberquiz.engagement.LevelRewardStore
 import com.example.cyberquiz.model.EngagementMetrics
 import com.example.cyberquiz.ui.theme.CyberBackground
 import com.example.cyberquiz.update.CyberQuizUpdateManager
@@ -61,12 +64,14 @@ fun HomeScreenV2(
         quizCount = history.size
     )
     var engagement by remember(metrics) { mutableStateOf(EngagementStore.sync(context, metrics)) }
+    var levelRewardState by remember { mutableStateOf(LevelRewardStore.snapshot(context)) }
     var selectedAvatar by remember { mutableStateOf(storedPlayerAvatar(context)) }
     var selectedBanner by remember { mutableStateOf(storedPlayerBanner(context)) }
     var selectedFrame by remember { mutableStateOf(storedPlayerFrame(context)) }
     var showPicker by rememberSaveable { mutableStateOf(false) }
     var showShop by rememberSaveable { mutableStateOf(false) }
     var showLevels by rememberSaveable { mutableStateOf(false) }
+    var levelFocus by rememberSaveable { mutableStateOf(1) }
     var updateAvailable by remember { mutableStateOf(false) }
 
     val activeReviewCount = reviewItems.count { !it.mastered }
@@ -79,10 +84,20 @@ fun HomeScreenV2(
         selectedBanner = storedPlayerBanner(context)
         selectedFrame = storedPlayerFrame(context)
         engagement = EngagementStore.sync(context, metrics)
+        levelRewardState = LevelRewardStore.snapshot(context)
     }
 
     LaunchedEffect(Unit) {
         updateAvailable = CyberQuizUpdateManager.checkForUpdate() != null
+    }
+
+    LaunchedEffect(p.level, p.xp, p.answered) {
+        val saved = LevelRewardStore.snapshot(context)
+        // Progress starts with an empty placeholder while Room loads. Avoid treating that
+        // temporary level 1 as a real baseline for existing players.
+        if (p.xp > 0 || p.answered > 0 || saved.pendingLevels.isNotEmpty() || saved.claimedLevels.isNotEmpty()) {
+            levelRewardState = LevelRewardStore.sync(context, p.level)
+        }
     }
 
     if (showShop) {
@@ -99,7 +114,12 @@ fun HomeScreenV2(
     if (showLevels) {
         LevelProgressionScreen(
             currentLevel = p.level,
-            onBack = { showLevels = false }
+            focusLevel = levelFocus,
+            onRewardClaimed = { reload() },
+            onBack = {
+                showLevels = false
+                reload()
+            }
         )
         return
     }
@@ -136,7 +156,11 @@ fun HomeScreenV2(
             avatar = selectedAvatar,
             banner = selectedBanner,
             frame = selectedFrame,
-            onLevelClick = { showLevels = true },
+            hasRewardNotification = levelRewardState.hasPendingReward,
+            onLevelClick = {
+                levelFocus = p.level.coerceIn(1, MAX_PLAYER_LEVEL)
+                showLevels = true
+            },
             onCoinsClick = { showShop = true },
             onAvatarClick = { showPicker = true }
         )
@@ -197,6 +221,77 @@ fun HomeScreenV2(
             }
         )
     }
+
+    if (!showPicker) {
+        levelRewardState.nextPopupLevel?.let { reachedLevel ->
+            LevelReachedDialog(
+                level = reachedLevel,
+                onViewLevel = {
+                    levelRewardState = LevelRewardStore.acknowledgePopup(context, reachedLevel)
+                    levelFocus = reachedLevel
+                    showLevels = true
+                },
+                onDismiss = {
+                    levelRewardState = LevelRewardStore.acknowledgePopup(context, reachedLevel)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun LevelReachedDialog(
+    level: Int,
+    onViewLevel: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF071225),
+        title = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("NOUVEAU NIVEAU", color = Color(0xFFFFC857), fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.6.sp)
+                Spacer(Modifier.height(5.dp))
+                Text("NIVEAU $level", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black)
+                Text(
+                    playerRoleForLevel(level),
+                    color = Color(0xFF63EFFF),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("✨", fontSize = 36.sp)
+                Text(
+                    "Un coffre de niveau t’attend dans ta progression. Son contenu reste secret tant que tu ne l’as pas ouvert.",
+                    color = Color(0xFFAAB7D4),
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onViewLevel) {
+                Text("VOIR MON NIVEAU", color = Color(0xFF19F2E5), fontWeight = FontWeight.Black)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("PLUS TARD", color = Color(0xFF9FAED3))
+            }
+        }
+    )
 }
 
 @Composable
@@ -208,6 +303,7 @@ private fun HomePlayerHeader(
     avatar: PlayerAvatarStyle,
     banner: PlayerBannerStyle,
     frame: PlayerFrameStyle,
+    hasRewardNotification: Boolean,
     onLevelClick: () -> Unit,
     onCoinsClick: () -> Unit,
     onAvatarClick: () -> Unit
@@ -230,6 +326,7 @@ private fun HomePlayerHeader(
             xpIntoLevel = xpIntoLevel,
             progress = progress,
             modifier = Modifier.width(154.dp),
+            hasRewardNotification = hasRewardNotification,
             onClick = onLevelClick
         )
         Spacer(Modifier.weight(1f))
