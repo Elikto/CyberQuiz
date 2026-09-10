@@ -27,6 +27,7 @@ internal object SocialTokenStore {
             .apply()
         ProgressSyncManager.request(context)
         AccountEconomyManager.request(context)
+        QuestionReportManager.requestFlush(context)
     }
 
     fun load(context: Context): String? {
