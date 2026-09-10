@@ -21,5 +21,10 @@ data class ReviewItemEntity(
     val wrongCount: Int = 1,
     val correctAfterWrongCount: Int = 0,
     val mastered: Boolean = false,
-    val lastWrongAt: Long = 0L
+    val lastWrongAt: Long = 0L,
+    val reviewStage: Int = 0,
+    val nextReviewAt: Long = 0L,
+    val lastReviewedAt: Long = 0L,
+    val reviewAttempts: Int = 0,
+    val totalReviewResponseMs: Long = 0L
 )
