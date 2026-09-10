@@ -134,6 +134,7 @@ internal object ProgressSyncJson {
         put("mode", entry.mode)
         put("categories", JSONArray(entry.categories))
         put("questionCount", entry.questionCount)
+        put("timeLimitMinutes", entry.timeLimitMinutes)
         put("startedAt", entry.startedAt)
         put("endedAt", entry.endedAt)
         put("answered", entry.answered)
@@ -147,6 +148,7 @@ internal object ProgressSyncJson {
         mode = json.optString("mode", "RANDOM"),
         categories = json.strings("categories"),
         questionCount = json.optInt("questionCount", 10).coerceAtLeast(0),
+        timeLimitMinutes = json.optInt("timeLimitMinutes", 0).coerceAtLeast(0),
         startedAt = json.optLong("startedAt", 0L).coerceAtLeast(0L),
         endedAt = json.optLong("endedAt", 0L).coerceAtLeast(0L),
         answered = json.optInt("answered", 0).coerceAtLeast(0),

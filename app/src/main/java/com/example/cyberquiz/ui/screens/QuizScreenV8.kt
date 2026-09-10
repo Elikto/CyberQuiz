@@ -32,6 +32,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.cyberquiz.model.QuizSessionConfig
+import com.example.cyberquiz.model.examRemainingMillis
+import com.example.cyberquiz.model.formatExamRemainingTime
 import com.example.cyberquiz.ui.theme.CyberBackground
 import com.example.cyberquiz.viewmodel.QuizUiState
 import com.example.cyberquiz.viewmodel.QuizViewModel
@@ -52,6 +55,9 @@ fun QuizScreenV8(
     vm: QuizViewModel,
     configuredSession: Boolean = false,
     questionTotal: Int? = null,
+    sessionConfig: QuizSessionConfig? = null,
+    examDeadlineEpochMs: Long? = null,
+    onExamTimeout: () -> Unit = {},
     onBack: () -> Unit,
     onOtherQuiz: () -> Unit = onBack,
     onHome: () -> Unit = onBack
@@ -65,6 +71,12 @@ fun QuizScreenV8(
     val scrollState = rememberScrollState()
     var selected by remember { mutableStateOf<Int?>(null) }
     var showLearnMore by remember { mutableStateOf(false) }
+    val examMode = sessionConfig?.exam == true
+
+    LaunchedEffect((state as? QuizUiState.Ready)?.question?.id) {
+        if (result == null) selected = null
+        showLearnMore = false
+    }
 
     LaunchedEffect(restoredSelection, result) {
         if (result != null && restoredSelection != null) {
@@ -95,6 +107,10 @@ fun QuizScreenV8(
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        if (examMode && state !is QuizUiState.Finished) {
+            ExamTimerV8(examDeadlineEpochMs, onExamTimeout)
+        }
+
         when (val s = state) {
             QuizUiState.Loading -> Box(
                 Modifier.fillMaxWidth().height(360.dp),
@@ -145,7 +161,14 @@ fun QuizScreenV8(
                 val answers = listOf(q.answerA, q.answerB, q.answerC, q.answerD)
 
                 QuizTopBarV8(q.category, onBack)
-                QuizStatsRowV8(s.number, questionTotal, progress.xp, progress.streak, q.difficulty)
+                QuizStatsRowV8(
+                    number = s.number,
+                    total = questionTotal,
+                    xp = progress.xp,
+                    streak = progress.streak,
+                    difficulty = q.difficulty,
+                    examMode = examMode
+                )
                 QuestionCardV8(q.question)
 
                 Text(
@@ -220,6 +243,33 @@ fun QuizScreenV8(
 }
 
 @Composable
+private fun ExamTimerV8(deadlineEpochMs: Long?, onTimeout: () -> Unit) {
+    var remainingMs by remember(deadlineEpochMs) { mutableStateOf(examRemainingMillis(deadlineEpochMs)) }
+    LaunchedEffect(deadlineEpochMs) {
+        if (deadlineEpochMs == null) return@LaunchedEffect
+        while (true) {
+            val next = examRemainingMillis(deadlineEpochMs)
+            remainingMs = next
+            if (next <= 0L) {
+                onTimeout()
+                delay(250)
+                continue
+            }
+            delay(250)
+        }
+    }
+    val urgent = remainingMs <= 5 * 60_000L
+    Row(
+        Modifier.fillMaxWidth().background(Q8Panel, RoundedCornerShape(14.dp)).border(1.dp, if (urgent) Q8Red else Q8Orange, RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("TEMPS RESTANT", color = Q8Muted, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+        Spacer(Modifier.weight(1f))
+        Text(formatExamRemainingTime(remainingMs), color = if (urgent) Q8Red else Q8Orange, fontSize = 18.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
+    }
+}
+
+@Composable
 private fun QuizTopBarV8(category: String, onQuit: () -> Unit) {
     Row(
         Modifier
@@ -271,7 +321,14 @@ private fun QuizTopBarV8(category: String, onQuit: () -> Unit) {
 }
 
 @Composable
-private fun QuizStatsRowV8(number: Int, total: Int?, xp: Int, streak: Int, difficulty: String) {
+private fun QuizStatsRowV8(
+    number: Int,
+    total: Int?,
+    xp: Int,
+    streak: Int,
+    difficulty: String,
+    examMode: Boolean = false
+) {
     val questionLabel = if (total != null && total > 0) {
         "QUESTION $number / $total"
     } else {
@@ -302,10 +359,15 @@ private fun QuizStatsRowV8(number: Int, total: Int?, xp: Int, streak: Int, diffi
                 )
             }
             Spacer(Modifier.weight(1f))
-            CompactMetricV8("$xp XP", Q8Cyan)
-            Spacer(Modifier.width(5.dp))
-            CompactMetricV8("🔥 $streak", Q8Orange)
-            Spacer(Modifier.width(5.dp))
+            if (examMode) {
+                CompactMetricV8("EXAMEN", Q8Orange)
+                Spacer(Modifier.width(5.dp))
+            } else {
+                CompactMetricV8("$xp XP", Q8Cyan)
+                Spacer(Modifier.width(5.dp))
+                CompactMetricV8("🔥 $streak", Q8Orange)
+                Spacer(Modifier.width(5.dp))
+            }
             DifficultyChipV8(difficulty)
         }
 

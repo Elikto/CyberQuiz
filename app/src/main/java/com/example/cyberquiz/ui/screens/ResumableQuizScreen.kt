@@ -49,6 +49,8 @@ fun ResumableQuizScreen(
     val context = LocalContext.current
     val library = remember(context) { QuestionLibraryStore(context) }
     val currentState by vm.state.collectAsState()
+    val sessionConfig by vm.currentSessionConfig.collectAsState()
+    val examDeadline by vm.examDeadline.collectAsState()
     val currentQuestion = (currentState as? QuizUiState.Ready)?.question
     var favorite by remember { mutableStateOf(false) }
     var showExitConfirmation by remember { mutableStateOf(false) }
@@ -74,6 +76,9 @@ fun ResumableQuizScreen(
             vm = vm,
             configuredSession = configuredSession,
             questionTotal = questionTotal,
+            sessionConfig = sessionConfig,
+            examDeadlineEpochMs = examDeadline,
+            onExamTimeout = { vm.finishExamOnTimeout() },
             onBack = { requestExit() },
             onOtherQuiz = onOtherQuiz,
             onHome = onHome

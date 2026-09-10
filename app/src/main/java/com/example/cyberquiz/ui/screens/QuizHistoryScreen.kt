@@ -530,6 +530,7 @@ private fun modeName(mode: QuizSessionMode): String = when (mode) {
     QuizSessionMode.HARD -> "Difficile"
     QuizSessionMode.RANDOM -> "Aléatoire"
     QuizSessionMode.DIFFICULTIES -> "Mes difficultés"
+        QuizSessionMode.EXAM -> "Examen"
 }
 
 private fun categorySummary(entry: QuizHistoryEntry): String = when {

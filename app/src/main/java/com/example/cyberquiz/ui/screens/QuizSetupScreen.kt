@@ -730,6 +730,7 @@ private fun sessionDescription(config: QuizSessionConfig): String {
         QuizSessionMode.HARD -> "Difficile"
         QuizSessionMode.RANDOM -> "Aléatoire"
         QuizSessionMode.DIFFICULTIES -> "Mes difficultés"
+        QuizSessionMode.EXAM -> "Examen"
     }
     val allCount = Category.entries.size
     val categories = when {
