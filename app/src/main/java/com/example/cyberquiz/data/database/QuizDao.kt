@@ -92,6 +92,9 @@ interface QuizDao {
     @Query("SELECT * FROM review_items WHERE quizType = :quizType ORDER BY mastered ASC, wrongCount DESC, lastWrongAt DESC")
     fun reviewItems(quizType: String): Flow<List<ReviewItemEntity>>
 
+    @Query("SELECT * FROM review_items WHERE quizType = :quizType ORDER BY wrongCount DESC, lastWrongAt DESC")
+    suspend fun reviewItemsSnapshot(quizType: String): List<ReviewItemEntity>
+
     @Transaction
     @Query("SELECT * FROM review_items WHERE quizType = :quizType ORDER BY mastered ASC, wrongCount DESC, lastWrongAt DESC")
     fun reviewItemsWithQuestions(quizType: String): Flow<List<ReviewItemWithQuestion>>
@@ -120,6 +123,19 @@ interface QuizDao {
         "UPDATE review_items SET correctAfterWrongCount=correctAfterWrongCount+1, mastered=1 WHERE quizType=:quizType AND concept=:concept"
     )
     suspend fun recordReviewCorrect(quizType: String, concept: String)
+
+    @Query(
+        "UPDATE review_items SET reviewStage=:reviewStage, nextReviewAt=:nextReviewAt, lastReviewedAt=:lastReviewedAt, reviewAttempts=:reviewAttempts, totalReviewResponseMs=:totalReviewResponseMs WHERE quizType=:quizType AND concept=:concept"
+    )
+    suspend fun updateReviewSchedule(
+        quizType: String,
+        concept: String,
+        reviewStage: Int,
+        nextReviewAt: Long,
+        lastReviewedAt: Long,
+        reviewAttempts: Int,
+        totalReviewResponseMs: Long
+    )
 
     @Query("SELECT * FROM category_progress WHERE quizType = :quizType ORDER BY answered DESC, category ASC")
     fun categoryProgress(quizType: String): Flow<List<CategoryProgressEntity>>
