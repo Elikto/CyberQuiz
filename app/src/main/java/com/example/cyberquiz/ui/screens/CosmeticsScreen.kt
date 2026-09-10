@@ -92,15 +92,15 @@ fun CosmeticsScreen(
             }
             CosmeticsTab.BANNERS -> {
                 SectionTitle("DISPONIBLES","Arrière-plans utilisables immédiatement")
-                BannerGrid(starterPlayerBannerStyles,playerLevel,banner,avatar,frame,shopBanner!=null) { style ->
+                BannerGrid(starterPlayerBannerStyles,playerLevel,banner,avatar,frame,shopBanner!=null,achievements) { style ->
                     clearShopBanner(context); shopBanner=null; storePlayerBanner(context,style); banner=style
                 }
                 SectionTitle("PAR NIVEAU","Suis ta progression jusqu'au prochain arrière-plan")
-                BannerGrid(levelPlayerBannerStyles,playerLevel,banner,avatar,frame,shopBanner!=null) { style ->
+                BannerGrid(levelPlayerBannerStyles,playerLevel,banner,avatar,frame,shopBanner!=null,achievements) { style ->
                     clearShopBanner(context); shopBanner=null; storePlayerBanner(context,style); banner=style
                 }
-                SectionTitle("SECRÈTES","Ces bannières seront liées à de futurs défis")
-                BannerGrid(mysteryPlayerBannerStyles,playerLevel,banner,avatar,frame,shopBanner!=null) { style ->
+                SectionTitle("SECRÈTES","Débloque ces bannières en accomplissant des succès")
+                BannerGrid(mysteryPlayerBannerStyles,playerLevel,banner,avatar,frame,shopBanner!=null,achievements) { style ->
                     clearShopBanner(context); shopBanner=null; storePlayerBanner(context,style); banner=style
                 }
             }
@@ -220,12 +220,12 @@ private fun AvatarCard(
 @Composable
 private fun BannerGrid(
     styles:List<PlayerBannerStyle>,level:Int,selected:PlayerBannerStyle,avatar:PlayerAvatarStyle,frame:PlayerFrameStyle,
-    shopBannerActive:Boolean,onSelect:(PlayerBannerStyle)->Unit
+    shopBannerActive:Boolean,achievements:Set<String>,onSelect:(PlayerBannerStyle)->Unit
 ) {
     styles.chunked(2).forEach { row ->
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(9.dp)) {
             row.forEach { style ->
-                val unlocked=isBannerUnlocked(style,level)
+                val unlocked=isBannerUnlocked(style,level,achievements)
                 val isSelected=selected==style&&!shopBannerActive
                 val progress=if(!unlocked&&!style.mystery) levelCosmeticProgress(level,style.unlockLevel) else null
                 BannerCard(style,isSelected,avatar,frame,unlocked,progress,Modifier.weight(1f)){onSelect(style)}
@@ -243,8 +243,9 @@ private fun BannerCard(
 ) {
     Column(modifier.background(Color(0xFF081329),RoundedCornerShape(17.dp)).border(if(selected)1.6.dp else 1.dp,if(selected)CGreen else CBorder,RoundedCornerShape(17.dp)).clickable(enabled=unlocked,onClick=onClick).padding(10.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)) {
         Box(if(!unlocked&&style.mystery)Modifier.blur(6.dp) else Modifier){CyberAvatarView(avatar,style,frame,{if(unlocked)onClick()},60.dp,showEditBadge=false,syncShopSelection=false)}
-        Text(if(!unlocked&&style.mystery)"???" else style.displayName,color=CText,fontSize=10.5.sp,fontWeight=FontWeight.Black,textAlign=TextAlign.Center)
-        Text(when{selected->"ÉQUIPÉE";unlocked->"ÉQUIPER";style.mystery->"Défi à venir";else->"Niveau ${style.unlockLevel}"},color=if(unlocked)CCyan else COrange,fontSize=7.5.sp,fontWeight=FontWeight.Black,textAlign=TextAlign.Center)
+        val title=if(!unlocked&&style.mystery) lockedBannerTitle(style) else style.displayName
+        Text(title,color=CText,fontSize=10.5.sp,fontWeight=FontWeight.Black,textAlign=TextAlign.Center)
+        Text(when{selected->"ÉQUIPÉE";unlocked->"ÉQUIPER";style.mystery->lockedBannerCondition(style);else->"Niveau ${style.unlockLevel}"},color=if(unlocked)CCyan else COrange,fontSize=7.5.sp,lineHeight=10.sp,fontWeight=FontWeight.Black,textAlign=TextAlign.Center,maxLines=3)
         if(progress!=null)CosmeticProgressBar(progress)
     }
 }

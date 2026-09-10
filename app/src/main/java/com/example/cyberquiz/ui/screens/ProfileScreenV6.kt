@@ -64,6 +64,8 @@ internal fun ProfileScreenV6(
     selectedQuizType: QuizType,
     onQuizTypeSelected: (QuizType) -> Unit,
     onCosmetics: () -> Unit,
+    profileTitle: String?,
+    onCollection: () -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -138,6 +140,14 @@ internal fun ProfileScreenV6(
                 Column(Modifier.weight(1f)) {
                     Text("Mon profil", color = ProfileV6Text, fontSize = 21.sp, fontWeight = FontWeight.Bold)
                     Text(nickname, color = ProfileV6Cyan, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    if (!profileTitle.isNullOrBlank()) {
+                        Text(
+                            "⌁ $profileTitle",
+                            color = Color(0xFFFFC86A),
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                     Text(
                         "${avatar.displayName} · ${banner.displayName}",
                         color = ProfileV6Muted,
@@ -159,6 +169,18 @@ internal fun ProfileScreenV6(
                 )
             ) {
                 Text("AVATARS · BANNIÈRES · CONTOURS", fontSize = 9.5.sp, fontWeight = FontWeight.Black)
+            }
+
+            Button(
+                onClick = onCollection,
+                modifier = Modifier.fillMaxWidth().height(44.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF123D70),
+                    contentColor = Color(0xFF7BF5FF)
+                )
+            ) {
+                Text("COLLECTION · SUCCÈS · TITRES", fontSize = 9.sp, fontWeight = FontWeight.Black)
             }
         }
 

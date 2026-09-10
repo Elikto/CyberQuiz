@@ -49,8 +49,8 @@ internal fun PlayerAvatarPickerDialog(
     val availableAvatars = remember(playerLevel, achievements) {
         PlayerAvatarStyle.entries.filter { isAvatarUnlocked(it, playerLevel, achievements) }
     }
-    val availableBanners = remember(playerLevel) {
-        PlayerBannerStyle.entries.filter { isBannerUnlocked(it, playerLevel) }
+    val availableBanners = remember(playerLevel, achievements) {
+        PlayerBannerStyle.entries.filter { isBannerUnlocked(it, playerLevel, achievements) }
     }
     val availableFrames = remember(playerLevel, purchasedFrames, achievements) {
         PlayerFrameStyle.entries.filter { isFrameUnlocked(it, playerLevel, purchasedFrames, achievements) }

@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cyberquiz.engagement.EngagementStore
+import com.example.cyberquiz.engagement.ProfileTitleStore
 import com.example.cyberquiz.model.EngagementMetrics
 import com.example.cyberquiz.viewmodel.QuizViewModel
 
@@ -49,6 +50,7 @@ fun ProfileScreenEntry(
     )
     var showCosmetics by rememberSaveable { mutableStateOf(false) }
     var showShop by rememberSaveable { mutableStateOf(false) }
+    var showCollection by rememberSaveable { mutableStateOf(false) }
 
     when {
         showCosmetics -> {
@@ -67,13 +69,26 @@ fun ProfileScreenEntry(
             )
         }
 
+        showCollection -> {
+            CollectionScreen(
+                playerLevel = progress.level,
+                metrics = metrics,
+                onBack = { showCollection = false }
+            )
+        }
+
         else -> {
             val engagement = EngagementStore.sync(context, metrics)
+            val profileTitle = ProfileTitleStore
+                .effectiveTitle(context, engagement.unlockedAchievementIds)
+                ?.label
             Box {
                 ProfileScreenV6(
                     selectedQuizType = selectedQuizType,
                     onQuizTypeSelected = onQuizTypeSelected,
                     onCosmetics = { showCosmetics = true },
+                    profileTitle = profileTitle,
+                    onCollection = { showCollection = true },
                     onBack = onBack
                 )
 
