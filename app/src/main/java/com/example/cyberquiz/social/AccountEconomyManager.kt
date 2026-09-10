@@ -10,18 +10,22 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Bridges the legacy offline economy with the authenticated server economy.
  *
  * Guests keep the current fully-local behavior. Signed-in players use the server
- * as the authority for every spend/claim operation, which prevents two devices
- * from claiming or spending the same balance twice. Local SharedPreferences are
- * then refreshed from the committed server state so existing UI keeps working.
+ * as the authority for every spend/claim operation. Local taps may be reflected
+ * immediately by the legacy stores, but the matching operation is persisted and
+ * replayed idempotently on the server so two devices cannot double claim/spend.
  */
 internal object AccountEconomyManager {
     private const val ENGAGEMENT_PREFS = "cyberquiz_engagement"
     private const val LEVEL_PREFS = "cyberquiz_level_rewards"
+    private const val PENDING_PREFS = "cyberquiz_economy_pending"
+    private const val KEY_PENDING_OPERATIONS = "operations"
 
     private const val KEY_COINS = "coins"
     private const val KEY_LOGIN_DAY = "login_day"
@@ -42,19 +46,39 @@ internal object AccountEconomyManager {
     private const val KEY_UNSEEN_POPUPS = "unseen_popups"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mutex = Mutex()
 
     fun request(context: Context) {
         val appContext = context.applicationContext
         scope.launch { runCatching { syncCurrentSession(appContext) } }
     }
 
+    fun queueMissionClaim(context: Context, missionId: String) {
+        if (SocialTokenStore.load(context).isNullOrBlank()) return
+        enqueue(context, "mission:$missionId")
+    }
+
+    fun queueLevelClaim(context: Context, level: Int) {
+        if (SocialTokenStore.load(context).isNullOrBlank()) return
+        enqueue(context, "level:${level.coerceIn(1, 30)}")
+    }
+
+    fun queuePurchase(context: Context, kind: String, storageKey: String) {
+        if (SocialTokenStore.load(context).isNullOrBlank()) return
+        if (kind !in setOf("frame", "avatar", "banner")) return
+        enqueue(context, "purchase:$kind:$storageKey")
+    }
+
     suspend fun syncCurrentSession(context: Context): EconomyState? {
         val appContext = context.applicationContext
         val token = SocialTokenStore.load(appContext) ?: return null
-        val metrics = metrics(appContext)
-        val state = EconomyApiClient.sync(token, metrics, seed(appContext))
-        apply(appContext, state)
-        return state
+        return mutex.withLock {
+            val metrics = metrics(appContext)
+            var state = EconomyApiClient.sync(token, metrics, seed(appContext))
+            apply(appContext, state)
+            state = drainPending(appContext, token, state)
+            state
+        }
     }
 
     suspend fun claimMission(context: Context, missionId: String): Int {
@@ -65,8 +89,14 @@ internal object AccountEconomyManager {
             return EngagementStore.claimMission(appContext, missionId, metrics)
         }
         val before = EngagementStore.currentCoins(appContext)
-        val state = EconomyApiClient.claimMission(token, missionId, metrics, seed(appContext))
-        apply(appContext, state)
+        val state = mutex.withLock {
+            val synced = EconomyApiClient.sync(token, metrics, seed(appContext))
+            apply(appContext, synced)
+            val claimed = EconomyApiClient.claimMission(token, missionId, metrics, seed(appContext))
+            apply(appContext, claimed)
+            removePending(appContext, "mission:$missionId")
+            claimed
+        }
         return (state.coins - before).coerceAtLeast(0)
     }
 
@@ -78,8 +108,14 @@ internal object AccountEconomyManager {
             return LevelRewardStore.claimLevel(appContext, level, metrics.level)
         }
         val before = EngagementStore.currentCoins(appContext)
-        val state = EconomyApiClient.claimLevel(token, level, metrics, seed(appContext))
-        apply(appContext, state)
+        val state = mutex.withLock {
+            val synced = EconomyApiClient.sync(token, metrics, seed(appContext))
+            apply(appContext, synced)
+            val claimed = EconomyApiClient.claimLevel(token, level, metrics, seed(appContext))
+            apply(appContext, claimed)
+            removePending(appContext, "level:$level")
+            claimed
+        }
         return (state.coins - before).coerceAtLeast(0)
     }
 
@@ -100,8 +136,14 @@ internal object AccountEconomyManager {
             }
         }
         val metrics = metrics(appContext)
-        val state = EconomyApiClient.purchase(token, kind, storageKey, metrics, seed(appContext))
-        apply(appContext, state)
+        val state = mutex.withLock {
+            val synced = EconomyApiClient.sync(token, metrics, seed(appContext))
+            apply(appContext, synced)
+            val purchased = EconomyApiClient.purchase(token, kind, storageKey, metrics, seed(appContext))
+            apply(appContext, purchased)
+            removePending(appContext, "purchase:$kind:$storageKey")
+            purchased
+        }
         return when (kind) {
             "frame" -> storageKey in state.purchasedFrameKeys
             "avatar" -> storageKey in state.purchasedAvatarKeys
@@ -175,6 +217,72 @@ internal object AccountEconomyManager {
             .putStringSet(KEY_PENDING_LEVELS, encodeLevels(pending))
             .putStringSet(KEY_UNSEEN_POPUPS, encodeLevels(unseen))
             .commit()
+    }
+
+    private suspend fun drainPending(
+        context: Context,
+        token: String,
+        initial: EconomyState
+    ): EconomyState {
+        var state = initial
+        val operations = pending(context).sorted()
+        for (operation in operations) {
+            val metrics = metrics(context)
+            try {
+                state = when {
+                    operation.startsWith("mission:") -> EconomyApiClient.claimMission(
+                        token,
+                        operation.removePrefix("mission:"),
+                        metrics,
+                        seed(context)
+                    )
+                    operation.startsWith("level:") -> EconomyApiClient.claimLevel(
+                        token,
+                        operation.removePrefix("level:").toIntOrNull() ?: continue,
+                        metrics,
+                        seed(context)
+                    )
+                    operation.startsWith("purchase:") -> {
+                        val parts = operation.split(':', limit = 3)
+                        if (parts.size != 3) continue
+                        EconomyApiClient.purchase(token, parts[1], parts[2], metrics, seed(context))
+                    }
+                    else -> {
+                        removePending(context, operation)
+                        continue
+                    }
+                }
+                apply(context, state)
+                removePending(context, operation)
+            } catch (error: SocialApiException) {
+                if (error.statusCode == 401) throw error
+                if (operation.startsWith("purchase:") && error.statusCode in setOf(404, 409)) {
+                    removePending(context, operation)
+                    state = EconomyApiClient.sync(token, metrics, seed(context))
+                    apply(context, state)
+                }
+            }
+        }
+        return state
+    }
+
+    private fun enqueue(context: Context, operation: String) {
+        val prefs = context.applicationContext.getSharedPreferences(PENDING_PREFS, Context.MODE_PRIVATE)
+        val current = prefs.getStringSet(KEY_PENDING_OPERATIONS, emptySet())?.toSet().orEmpty()
+        prefs.edit().putStringSet(KEY_PENDING_OPERATIONS, current + operation).commit()
+        request(context)
+    }
+
+    private fun pending(context: Context): Set<String> =
+        context.applicationContext.getSharedPreferences(PENDING_PREFS, Context.MODE_PRIVATE)
+            .getStringSet(KEY_PENDING_OPERATIONS, emptySet())?.toSet().orEmpty()
+
+    private fun removePending(context: Context, operation: String) {
+        val prefs = context.applicationContext.getSharedPreferences(PENDING_PREFS, Context.MODE_PRIVATE)
+        val current = prefs.getStringSet(KEY_PENDING_OPERATIONS, emptySet())?.toSet().orEmpty()
+        if (operation in current) {
+            prefs.edit().putStringSet(KEY_PENDING_OPERATIONS, current - operation).commit()
+        }
     }
 
     private fun android.content.SharedPreferences.Editor.putNullableString(
