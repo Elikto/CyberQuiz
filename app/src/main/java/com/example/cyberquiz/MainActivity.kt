@@ -36,7 +36,7 @@ import com.example.cyberquiz.ui.screens.ResumableQuizScreen
 import com.example.cyberquiz.ui.screens.ReviewScreen
 import com.example.cyberquiz.ui.screens.SettingsScreenV4
 import com.example.cyberquiz.ui.screens.SharedFriendQuizScreen
-import com.example.cyberquiz.ui.screens.SocialHubScreen
+import com.example.cyberquiz.ui.screens.SocialHubScreenV2
 import com.example.cyberquiz.ui.screens.StatisticsScreenUx
 import com.example.cyberquiz.ui.screens.StatisticsScreenV2
 import com.example.cyberquiz.ui.screens.UniverseHomeScreen
@@ -365,7 +365,7 @@ private fun CyberQuizApp(
                 onBack = { goBack() }
             )
 
-            AppScreen.SOCIAL -> SocialHubScreen(
+            AppScreen.SOCIAL -> SocialHubScreenV2(
                 playerLevel = vm.progress.value.level.coerceAtLeast(1),
                 sharedQuizViewModel = sharedQuizVm,
                 onSharedQuizStart = { navigateTo(AppScreen.SHARED_QUIZ) },
