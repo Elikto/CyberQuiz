@@ -44,7 +44,12 @@ internal data class CloudReviewItem(
     val wrongCount: Int,
     val correctAfterWrongCount: Int,
     val mastered: Boolean,
-    val lastWrongAt: Long
+    val lastWrongAt: Long,
+    val reviewStage: Int = 0,
+    val nextReviewAt: Long = 0L,
+    val lastReviewedAt: Long = 0L,
+    val reviewAttempts: Int = 0,
+    val totalReviewResponseMs: Long = 0L
 )
 
 internal data class CloudHistoryQuestion(
@@ -169,11 +174,21 @@ internal object ProgressSnapshotMerger {
             a.correctAfterWrongCount > b.correctAfterWrongCount -> a
             else -> latestWrong
         }
+        val latestReview = when {
+            b.lastReviewedAt > a.lastReviewedAt -> b
+            a.lastReviewedAt > b.lastReviewedAt -> a
+            else -> bestRecovery
+        }
         return latestWrong.copy(
             wrongCount = maxOf(a.wrongCount, b.wrongCount).coerceAtLeast(0),
             correctAfterWrongCount = maxOf(a.correctAfterWrongCount, b.correctAfterWrongCount).coerceAtLeast(0),
-            mastered = bestRecovery.mastered,
-            lastWrongAt = maxOf(a.lastWrongAt, b.lastWrongAt)
+            mastered = latestReview.mastered,
+            lastWrongAt = maxOf(a.lastWrongAt, b.lastWrongAt),
+            reviewStage = latestReview.reviewStage.coerceAtLeast(0),
+            nextReviewAt = latestReview.nextReviewAt.coerceAtLeast(0L),
+            lastReviewedAt = maxOf(a.lastReviewedAt, b.lastReviewedAt).coerceAtLeast(0L),
+            reviewAttempts = maxOf(a.reviewAttempts, b.reviewAttempts).coerceAtLeast(0),
+            totalReviewResponseMs = maxOf(a.totalReviewResponseMs, b.totalReviewResponseMs).coerceAtLeast(0L)
         )
     }
 
