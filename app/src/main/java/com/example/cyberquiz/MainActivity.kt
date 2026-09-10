@@ -24,12 +24,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cyberquiz.data.repository.QuestionBankQuizSessionFactory
 import com.example.cyberquiz.engagement.DAILY_CHALLENGE_SIZE
 import com.example.cyberquiz.model.Category
+import com.example.cyberquiz.model.LEARNING_PATH_STEP_QUESTIONS
 import com.example.cyberquiz.model.QuizSessionConfig
 import com.example.cyberquiz.model.QuizSessionMode
 import com.example.cyberquiz.social.SharedQuizViewModel
 import com.example.cyberquiz.ui.screens.CategoriesScreenV3
 import com.example.cyberquiz.ui.screens.CyberMiniQuizCategoriesScreen
 import com.example.cyberquiz.ui.screens.HomeScreenWithQuestionBank
+import com.example.cyberquiz.ui.screens.LearningPathsScreen
 import com.example.cyberquiz.ui.screens.ProfileScreenEntry
 import com.example.cyberquiz.ui.screens.QuestionBankScreen
 import com.example.cyberquiz.ui.screens.QuizHistoryScreen
@@ -62,6 +64,7 @@ enum class AppScreen {
     REVIEW,
     HISTORY,
     QUESTION_BANK,
+    LEARNING_PATHS,
     PROFILE,
     SOCIAL,
     SHARED_QUIZ,
@@ -197,6 +200,7 @@ private fun CyberQuizApp(
                         },
                         onHistory = { navigateTo(AppScreen.HISTORY) },
                         onQuestionBank = { navigateTo(AppScreen.QUESTION_BANK) },
+                        onLearningPaths = { navigateTo(AppScreen.LEARNING_PATHS) },
                         onProfile = { navigateTo(AppScreen.PROFILE) },
                         onSettings = { navigateTo(AppScreen.SETTINGS) }
                     )
@@ -388,6 +392,20 @@ private fun CyberQuizApp(
                         vm.resumeConfiguredQuiz(sessionId)
                         navigateTo(AppScreen.QUIZ)
                     }
+                },
+                onBack = { goBack() }
+            )
+
+            AppScreen.LEARNING_PATHS -> LearningPathsScreen(
+                vm = vm,
+                onLaunchCategory = { category ->
+                    startConfigured(
+                        QuizSessionConfig(
+                            mode = QuizSessionMode.RANDOM,
+                            categories = setOf(category),
+                            questionCount = LEARNING_PATH_STEP_QUESTIONS
+                        )
+                    )
                 },
                 onBack = { goBack() }
             )
