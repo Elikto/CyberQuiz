@@ -1,5 +1,6 @@
 package com.example.cyberquiz.data.database
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -22,9 +23,14 @@ data class ReviewItemEntity(
     val correctAfterWrongCount: Int = 0,
     val mastered: Boolean = false,
     val lastWrongAt: Long = 0L,
+    @ColumnInfo(defaultValue = "0")
     val reviewStage: Int = 0,
+    @ColumnInfo(defaultValue = "0")
     val nextReviewAt: Long = 0L,
+    @ColumnInfo(defaultValue = "0")
     val lastReviewedAt: Long = 0L,
+    @ColumnInfo(defaultValue = "0")
     val reviewAttempts: Int = 0,
+    @ColumnInfo(defaultValue = "0")
     val totalReviewResponseMs: Long = 0L
 )
