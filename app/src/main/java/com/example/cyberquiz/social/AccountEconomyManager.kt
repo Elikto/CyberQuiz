@@ -6,6 +6,10 @@ import com.example.cyberquiz.data.repository.QuizHistoryStore
 import com.example.cyberquiz.engagement.EngagementStore
 import com.example.cyberquiz.engagement.LevelRewardStore
 import com.example.cyberquiz.model.EngagementMetrics
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Bridges the legacy offline economy with the authenticated server economy.
@@ -36,6 +40,13 @@ internal object AccountEconomyManager {
     private const val KEY_PENDING_LEVELS = "pending_levels"
     private const val KEY_CLAIMED_LEVELS = "claimed_levels"
     private const val KEY_UNSEEN_POPUPS = "unseen_popups"
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    fun request(context: Context) {
+        val appContext = context.applicationContext
+        scope.launch { runCatching { syncCurrentSession(appContext) } }
+    }
 
     suspend fun syncCurrentSession(context: Context): EconomyState? {
         val appContext = context.applicationContext
