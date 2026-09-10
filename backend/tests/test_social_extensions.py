@@ -27,28 +27,21 @@ class SocialLifecycleTests(unittest.TestCase):
             social_extensions._parse_uuid("not-a-uuid", "Introuvable")
         self.assertEqual(ctx.exception.status_code, 404)
 
-    def test_extension_routes_are_mounted(self):
-        paths = {getattr(route, "path", None) for route in app.routes}
-        expected = {
-            "/api/social/friends/requests/sent",
-            "/api/social/me/password",
-            "/api/social/me/friend-code/rotate",
-            "/api/social/active-room",
-        }
-        self.assertTrue(expected.issubset(paths))
-
-    def test_extension_routes_require_authentication(self):
+    def test_extension_routes_are_mounted_and_require_authentication(self):
         client = TestClient(app)
-        self.assertEqual(client.get("/api/social/friends/requests/sent").status_code, 401)
-        self.assertEqual(client.get("/api/social/active-room").status_code, 401)
-        self.assertEqual(client.post("/api/social/me/friend-code/rotate").status_code, 401)
-        self.assertEqual(
-            client.post(
+        probes = [
+            ("GET", "/api/social/friends/requests/sent", None),
+            ("GET", "/api/social/active-room", None),
+            ("POST", "/api/social/me/friend-code/rotate", None),
+            (
+                "POST",
                 "/api/social/me/password",
-                json={"currentPassword": "old-password", "newPassword": "new-password-123"},
-            ).status_code,
-            401,
-        )
+                {"currentPassword": "old-password", "newPassword": "new-password-123"},
+            ),
+        ]
+        for method, path, payload in probes:
+            response = client.request(method, path, json=payload)
+            self.assertEqual(response.status_code, 401, msg=f"{method} {path}")
 
 
 if __name__ == "__main__":
