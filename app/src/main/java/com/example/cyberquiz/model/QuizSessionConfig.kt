@@ -11,8 +11,7 @@ enum class QuizSessionMode {
 data class QuizSessionConfig(
     val mode: QuizSessionMode = QuizSessionMode.RANDOM,
     val categories: Set<String> = Category.entries.map { it.label }.toSet(),
-    val questionCount: Int = 10,
-    val dailyChallenge: Boolean = false
+    val questionCount: Int = 10
 ) {
     val infinite: Boolean
         get() = questionCount == 0
