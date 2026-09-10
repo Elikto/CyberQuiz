@@ -8,7 +8,7 @@
 
 **Une application Android de quiz moderne pour apprendre la cybersécurité, la nutrition et bientôt bien plus encore.**
 
-Des quiz rapides, des catégories ciblées, des statistiques, des révisions intelligentes et une progression qui reste sur ton téléphone.
+Quiz rapides, parcours guidés, révisions adaptatives, mode examen, collections et défis CyberSquad : la progression reste disponible hors ligne et peut aussi être synchronisée avec un compte CyberQuiz.
 
 [![Télécharger CyberQuiz](https://img.shields.io/badge/⬇️_TÉLÉCHARGER-CyberQuiz.apk-7c3aed?style=for-the-badge)](https://github.com/Elikto/CyberQuiz/releases/download/apk-latest/CyberQuiz.apk)
 
@@ -49,15 +49,16 @@ Réseaux, Linux, Windows, cryptographie, Web, malware, ingénierie sociale, OSIN
 
 CyberQuiz propose notamment :
 
-- un écran d'accueil adapté à l'univers sélectionné ;
-- des quiz classiques ou ciblés par catégorie ;
-- des sessions configurables ;
-- un système de niveau et d'XP ;
-- des statistiques détaillées ;
-- une liste **À revoir** pour retravailler les difficultés ;
-- un historique des quiz terminés ;
-- un profil permettant de changer d'univers ;
-- un historique des mises à jour directement dans l'application.
+- des quiz classiques, ciblés par catégorie ou configurés sur plusieurs catégories ;
+- des révisions adaptatives qui tiennent compte des erreurs, de la maîtrise et du temps de réponse ;
+- un défi quotidien, des séries, des succès, des badges, des titres et une page Collection ;
+- des corrections pédagogiques détaillées, des favoris, une banque de questions et le signalement des questions ambiguës ou incorrectes ;
+- des parcours guidés par étapes, avec mini-quiz et progression de maîtrise ;
+- un mode examen chronométré sans correction immédiate, avec résultat uniquement à la fin ;
+- CyberSquad : parties synchronisées, revanche, défis asynchrones, classement entre amis et historique H2H ;
+- une progression locale avec synchronisation cloud optionnelle pour les comptes connectés ;
+- des options d'accessibilité : taille du texte, contraste renforcé, vibrations optionnelles et réduction des animations ;
+- un onboarding de premier lancement et une reprise des quiz interrompus.
 
 Les questions principales sont stockées localement dans l'application : **tu peux jouer sans dépendre d'un serveur de quiz distant**.
 
@@ -107,11 +108,13 @@ Avant installation, l'application vérifie notamment :
 
 ## Vie privée et fonctionnement
 
-CyberQuiz fonctionne principalement avec des données locales : progression, historique, révisions et sessions sont conservés sur l'appareil.
+Les quiz et les questions principales restent disponibles localement : l'application peut fonctionner hors ligne pour l'apprentissage individuel.
 
-L'application Android n'a pas besoin du backend FastAPI pour lancer les quiz présents dans sa banque locale.
+La progression, l'historique, les révisions et les sessions sont conservés sur l'appareil. Lorsqu'un joueur choisit de se connecter à un compte CyberQuiz, les données prévues par la synchronisation de progression peuvent aussi être sauvegardées sur le backend afin de retrouver son avancement sur plusieurs appareils.
 
-Le trafic HTTP en clair est désactivé dans l'application Android.
+Les fonctions sociales — compte, amis, CyberSquad, défis et synchronisation cloud — utilisent le backend FastAPI. Les fonctions de quiz locales n'en dépendent pas.
+
+Le trafic HTTP en clair est désactivé dans l'application Android et les appels réseau applicatifs utilisent HTTPS.
 
 ---
 
