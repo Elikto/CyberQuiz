@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cyberquiz.data.repository.QuestionBankQuizSessionFactory
 import com.example.cyberquiz.engagement.DAILY_CHALLENGE_SIZE
 import com.example.cyberquiz.model.Category
 import com.example.cyberquiz.model.QuizSessionConfig
@@ -28,8 +29,9 @@ import com.example.cyberquiz.model.QuizSessionMode
 import com.example.cyberquiz.social.SharedQuizViewModel
 import com.example.cyberquiz.ui.screens.CategoriesScreenV3
 import com.example.cyberquiz.ui.screens.CyberMiniQuizCategoriesScreen
-import com.example.cyberquiz.ui.screens.HomeScreenV2
+import com.example.cyberquiz.ui.screens.HomeScreenWithQuestionBank
 import com.example.cyberquiz.ui.screens.ProfileScreenEntry
+import com.example.cyberquiz.ui.screens.QuestionBankScreen
 import com.example.cyberquiz.ui.screens.QuizHistoryScreen
 import com.example.cyberquiz.ui.screens.QuizSetupScreenUx
 import com.example.cyberquiz.ui.screens.QuizType
@@ -59,6 +61,7 @@ enum class AppScreen {
     CATEGORIES,
     REVIEW,
     HISTORY,
+    QUESTION_BANK,
     PROFILE,
     SOCIAL,
     SHARED_QUIZ,
@@ -182,7 +185,7 @@ private fun CyberQuizApp(
         when (screen) {
             AppScreen.HOME -> {
                 if (selectedQuizType == QuizType.CYBERSECURITY) {
-                    HomeScreenV2(
+                    HomeScreenWithQuestionBank(
                         vm = vm,
                         selectedQuizType = selectedQuizType,
                         onQuiz = { navigateTo(AppScreen.QUIZ_SETUP) },
@@ -193,6 +196,7 @@ private fun CyberQuizApp(
                             navigateTo(AppScreen.REVIEW)
                         },
                         onHistory = { navigateTo(AppScreen.HISTORY) },
+                        onQuestionBank = { navigateTo(AppScreen.QUESTION_BANK) },
                         onProfile = { navigateTo(AppScreen.PROFILE) },
                         onSettings = { navigateTo(AppScreen.SETTINGS) }
                     )
@@ -371,6 +375,21 @@ private fun CyberQuizApp(
                         navigateTo(AppScreen.QUIZ)
                     }
                 }
+            )
+
+            AppScreen.QUESTION_BANK -> QuestionBankScreen(
+                vm = vm,
+                onStartFavoriteQuiz = { questions ->
+                    val selected = QuestionBankQuizSessionFactory.selectQuestions(questions)
+                    val sessionId = QuestionBankQuizSessionFactory.create(context, selected)
+                    if (sessionId != null) {
+                        configuredQuizUi = true
+                        quizQuestionTotal = selected.size
+                        vm.resumeConfiguredQuiz(sessionId)
+                        navigateTo(AppScreen.QUIZ)
+                    }
+                },
+                onBack = { goBack() }
             )
 
             AppScreen.PROFILE -> ProfileScreenEntry(
