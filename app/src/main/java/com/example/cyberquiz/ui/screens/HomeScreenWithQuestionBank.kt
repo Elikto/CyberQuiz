@@ -3,6 +3,7 @@ package com.example.cyberquiz.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,11 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cyberquiz.viewmodel.QuizViewModel
 
-/**
- * Keeps the existing home screen stable while exposing the question bank as a
- * first-class home action. The compact floating pill avoids reshuffling the
- * established home menu and stays reachable regardless of scroll position.
- */
+/** Keeps the established home layout stable while exposing advanced learning tools. */
 @Composable
 fun HomeScreenWithQuestionBank(
     vm: QuizViewModel,
@@ -35,6 +32,7 @@ fun HomeScreenWithQuestionBank(
     onReview: () -> Unit,
     onHistory: () -> Unit,
     onQuestionBank: () -> Unit,
+    onLearningPaths: () -> Unit,
     onProfile: () -> Unit,
     onSettings: () -> Unit
 ) {
@@ -53,28 +51,59 @@ fun HomeScreenWithQuestionBank(
 
         Row(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
+                .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(end = 18.dp, bottom = 14.dp)
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(Color(0xFF3D1769), Color(0xFF123D70))
-                    ),
-                    RoundedCornerShape(50.dp)
-                )
-                .border(1.2.dp, Color(0xFF19F2E5).copy(alpha = .75f), RoundedCornerShape(50.dp))
-                .clickable(onClick = onQuestionBank)
-                .padding(horizontal = 13.dp, vertical = 9.dp),
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("⌕", color = Color(0xFF19F2E5), fontSize = 17.sp, fontWeight = FontWeight.Black)
-            Text(
-                "  BANQUE",
-                color = Color(0xFFF5F7FF),
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = .8.sp
+            HomeLearningPill(
+                icon = "◎",
+                label = "PARCOURS",
+                accent = Color(0xFFD652FF),
+                modifier = Modifier.weight(1f),
+                onClick = onLearningPaths
+            )
+            HomeLearningPill(
+                icon = "⌕",
+                label = "BANQUE",
+                accent = Color(0xFF19F2E5),
+                modifier = Modifier.weight(1f),
+                onClick = onQuestionBank
             )
         }
+    }
+}
+
+@Composable
+private fun HomeLearningPill(
+    icon: String,
+    label: String,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = modifier
+            .background(
+                Brush.horizontalGradient(
+                    listOf(accent.copy(alpha = .22f), Color(0xFF123D70).copy(alpha = .88f))
+                ),
+                RoundedCornerShape(50.dp)
+            )
+            .border(1.2.dp, accent.copy(alpha = .75f), RoundedCornerShape(50.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Text(icon, color = accent, fontSize = 15.sp, fontWeight = FontWeight.Black)
+        Text(
+            "  $label",
+            color = Color(0xFFF5F7FF),
+            fontSize = 8.5.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = .7.sp
+        )
     }
 }
