@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cyberquiz.data.repository.QuizHistoryStore
+import com.example.cyberquiz.ui.preferences.LocalUxPreferences
 import com.example.cyberquiz.viewmodel.QuizFinishSummary
 import kotlin.math.PI
 import kotlin.math.cos
@@ -72,6 +73,7 @@ fun QuizFinishCelebrationV8(
     val perfect = answered > 0 && correct == answered
     val tier = finishTier(percent, perfect)
     val context = LocalContext.current
+    val reducedMotion = LocalUxPreferences.current.reducedMotion
 
     val latestHistory = remember(context, answered, correct, summary.xpGained) {
         val now = System.currentTimeMillis()
@@ -89,7 +91,12 @@ fun QuizFinishCelebrationV8(
     val entrance = remember(percent, answered) { Animatable(0.82f) }
     val burst = remember(percent, answered) { Animatable(0f) }
 
-    LaunchedEffect(percent, answered) {
+    LaunchedEffect(percent, answered, reducedMotion) {
+        if (reducedMotion) {
+            entrance.snapTo(1f)
+            burst.snapTo(1f)
+            return@LaunchedEffect
+        }
         entrance.snapTo(0.82f)
         entrance.animateTo(1f, tween(430, easing = FastOutSlowInEasing))
         if (tier.level > 0) {
@@ -114,7 +121,7 @@ fun QuizFinishCelebrationV8(
             .padding(top = 18.dp),
         contentAlignment = Alignment.TopCenter
     ) {
-        if (tier.level > 0) {
+        if (tier.level > 0 && !reducedMotion) {
             CelebrationParticlesV8(
                 level = tier.level,
                 progress = burst.value,
