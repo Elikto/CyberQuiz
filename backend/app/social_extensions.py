@@ -11,6 +11,7 @@ from .social import (
     _ensure_schema,
     _fetch_user,
     _new_unique_friend_code,
+    _is_async_mode,
     _public_user,
     _room_payload,
     hash_password,
@@ -215,12 +216,23 @@ def decline_room_invite(
                 """
                 DELETE FROM cq_quiz_room_invites
                 WHERE id = %s AND to_user_id = %s AND accepted = FALSE
-                RETURNING id
+                RETURNING room_id
                 """,
                 (invite_uuid, user_id),
             )
-            if cur.fetchone() is None:
+            declined = cur.fetchone()
+            if declined is None:
                 raise HTTPException(status_code=404, detail="Invitation de partie introuvable")
+            room_id = str(declined["room_id"])
+            cur.execute("SELECT mode FROM cq_quiz_rooms WHERE id = %s", (room_id,))
+            room = cur.fetchone() or {}
+            if _is_async_mode(room.get("mode")):
+                cur.execute("SELECT COUNT(*)::INTEGER AS pending FROM cq_quiz_room_invites WHERE room_id = %s AND accepted = FALSE", (room_id,))
+                pending = int((cur.fetchone() or {}).get("pending") or 0)
+                cur.execute("SELECT BOOL_AND(finished) AS everybody_finished FROM cq_quiz_room_members WHERE room_id = %s", (room_id,))
+                done = cur.fetchone() or {}
+                if pending == 0 and bool(done.get("everybody_finished")):
+                    cur.execute("UPDATE cq_quiz_rooms SET status = 'finished' WHERE id = %s", (room_id,))
         conn.commit()
     return {"status": "declined"}
 
@@ -326,7 +338,11 @@ def leave_room(
                     (room_uuid,),
                 )
                 done = cur.fetchone()
-                if done and done["everybody_finished"]:
+                pending_invites = 0
+                if _is_async_mode(room.get("mode")):
+                    cur.execute("SELECT COUNT(*)::INTEGER AS pending FROM cq_quiz_room_invites WHERE room_id = %s AND accepted = FALSE", (room_uuid,))
+                    pending_invites = int((cur.fetchone() or {}).get("pending") or 0)
+                if done and done["everybody_finished"] and pending_invites == 0:
                     cur.execute("UPDATE cq_quiz_rooms SET status = 'finished' WHERE id = %s", (room_uuid,))
             else:
                 return {"status": "already-finished"}

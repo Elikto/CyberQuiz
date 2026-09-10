@@ -243,13 +243,18 @@ internal fun SharedFriendQuizScreen(
                         )
                     }
                 }
-                Button(
-                    onClick = ::leave,
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = SharedPurple),
-                    shape = RoundedCornerShape(15.dp)
-                ) {
-                    Text("RETOUR AUX AMIS", fontWeight = FontWeight.Black)
+                if ((current.room?.members?.size ?: 0) >= 2) {
+                    Button(
+                        onClick = { viewModel.rematch { onBackToFriends() } },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = SharedPurple),
+                        shape = RoundedCornerShape(15.dp)
+                    ) {
+                        Text("REVANCHE", fontWeight = FontWeight.Black)
+                    }
+                }
+                TextButton(onClick = ::leave, modifier = Modifier.fillMaxWidth()) {
+                    Text("RETOUR AUX AMIS", color = SharedCyan, fontWeight = FontWeight.Bold)
                 }
             }
         }

@@ -49,6 +49,7 @@ import com.example.cyberquiz.social.SocialTokenStore
 import com.example.cyberquiz.social.SocialUser
 import com.example.cyberquiz.social.SquadDashboard
 import com.example.cyberquiz.social.SquadDashboardApiClient
+import com.example.cyberquiz.social.SquadHeadToHead
 import com.example.cyberquiz.social.toggleSquadFriend
 import kotlinx.coroutines.launch
 
@@ -74,6 +75,8 @@ internal fun SquadDashboardScreen(
     val scope = rememberCoroutineScope()
     val token = remember(context) { SocialTokenStore.load(context) }
     var dashboard by remember { mutableStateOf<SquadDashboard?>(null) }
+    var headToHead by remember { mutableStateOf<SquadHeadToHead?>(null) }
+    var loadingH2H by remember { mutableStateOf(false) }
     var friends by remember { mutableStateOf<List<SocialUser>>(emptyList()) }
     var selectedFriendIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var questionCount by remember { mutableStateOf(10) }
@@ -255,6 +258,17 @@ internal fun SquadDashboardScreen(
                             .fillMaxWidth()
                             .background(Squad2Card, RoundedCornerShape(16.dp))
                             .border(1.dp, Squad2Blue.copy(alpha = .30f), RoundedCornerShape(16.dp))
+                            .clickable(enabled = token != null && !loadingH2H) {
+                                val activeToken = token ?: return@clickable
+                                scope.launch {
+                                    loadingH2H = true
+                                    error = null
+                                    runCatching { SquadDashboardApiClient.headToHead(activeToken, entry.user.id) }
+                                        .onSuccess { headToHead = it }
+                                        .onFailure { error = it.message ?: "Impossible de charger le duel H2H." }
+                                    loadingH2H = false
+                                }
+                            }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -273,9 +287,16 @@ internal fun SquadDashboardScreen(
                             Text(entry.user.nickname, color = Squad2Text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             Text("${entry.played} parties · ${entry.accuracy}%", color = Squad2Muted, fontSize = 9.sp)
                         }
-                        Text("${entry.wins} V", color = Squad2Green, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("${entry.wins} V", color = Squad2Green, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                            Text("H2H ›", color = Squad2Cyan, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
+            }
+
+            headToHead?.let { duel ->
+                SquadHeadToHeadCard(duel)
             }
 
             Squad2Section("20 DERNIÈRES PARTIES")
@@ -433,4 +454,23 @@ private fun Squad2Notice(message: String, accent: Color) {
 private fun shortDate(value: String?): String {
     if (value.isNullOrBlank()) return "date inconnue"
     return value.take(10)
+}
+
+
+@Composable
+private fun SquadHeadToHeadCard(duel: SquadHeadToHead) {
+    Column(
+        modifier = Modifier.fillMaxWidth().background(Squad2Card, RoundedCornerShape(18.dp))
+            .border(1.dp, Squad2Purple.copy(alpha = .55f), RoundedCornerShape(18.dp)).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp)
+    ) {
+        Text("FACE-À-FACE · ${duel.friend.nickname}", color = Squad2Purple, fontSize = 10.sp, fontWeight = FontWeight.Black)
+        Text("${duel.wins} V · ${duel.losses} D · ${duel.draws} N · ${duel.played} parties", color = Squad2Text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Text("Précision : toi ${duel.myAccuracy}% · ${duel.friend.nickname} ${duel.friendAccuracy}%", color = Squad2Muted, fontSize = 9.5.sp)
+        duel.recentMatches.take(5).forEach { match ->
+            val accent = when (match.outcome) { "win" -> Squad2Green; "loss" -> Squad2Red; else -> Squad2Gold }
+            val label = when (match.outcome) { "win" -> "VICTOIRE"; "loss" -> "DÉFAITE"; else -> "NUL" }
+            Text("$label · ${match.myCorrect}-${match.friendCorrect} · ${match.questionCount} Q · ${shortDate(match.playedAt)}", color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        }
+    }
 }

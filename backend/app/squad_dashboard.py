@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
-from .social import _connect, _current_user_id, _ensure_schema, _public_user
+from .social import _are_friends, _connect, _current_user_id, _ensure_schema, _public_user
 
 # Included under social.router, whose prefix is already /api/social.
 router = APIRouter(prefix="/squad", tags=["social-squad"])
@@ -15,6 +16,14 @@ def _ratio_percent(correct: int, answered: int) -> int:
     if answered <= 0:
         return 0
     return max(0, min(100, round(correct * 100 / answered)))
+
+
+def _head_to_head_outcome(my_correct: int, friend_correct: int) -> str:
+    if my_correct > friend_correct:
+        return "win"
+    if my_correct < friend_correct:
+        return "loss"
+    return "draw"
 
 
 @router.get("/dashboard")
@@ -164,4 +173,66 @@ def squad_dashboard(
         "accuracy": _ratio_percent(correct, answered),
         "friendLeaderboard": leaderboard,
         "recentMatches": recent_matches,
+    }
+
+
+@router.get("/h2h/{friend_id}")
+def squad_head_to_head(friend_id: str, user_id: str = Depends(_current_user_id)) -> dict[str, Any]:
+    _ensure_schema()
+    try:
+        friend_uuid = str(UUID(friend_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Ami introuvable") from exc
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            if not _are_friends(cur, user_id, friend_uuid):
+                raise HTTPException(status_code=404, detail="Ami introuvable")
+            cur.execute("SELECT id, nickname, avatar_key, level FROM cq_users WHERE id = %s", (friend_uuid,))
+            friend = cur.fetchone()
+            if friend is None:
+                raise HTTPException(status_code=404, detail="Ami introuvable")
+            cur.execute(
+                """
+                SELECT r.id, r.created_at, r.mode,
+                       COALESCE(array_length(r.question_ids, 1), 0)::INTEGER AS question_count,
+                       me.correct::INTEGER AS my_correct, me.answered::INTEGER AS my_answered,
+                       them.correct::INTEGER AS friend_correct, them.answered::INTEGER AS friend_answered
+                FROM cq_quiz_rooms r
+                JOIN cq_quiz_room_members me ON me.room_id = r.id AND me.user_id = %s AND me.finished = TRUE
+                JOIN cq_quiz_room_members them ON them.room_id = r.id AND them.user_id = %s AND them.finished = TRUE
+                WHERE r.status = 'finished'
+                  AND (SELECT COUNT(*) FROM cq_quiz_room_members all_members WHERE all_members.room_id = r.id) = 2
+                ORDER BY r.created_at DESC
+                LIMIT 50
+                """,
+                (user_id, friend_uuid),
+            )
+            rows = cur.fetchall()
+    wins = losses = draws = 0
+    my_correct = my_answered = friend_correct = friend_answered = 0
+    matches: list[dict[str, Any]] = []
+    for row in rows:
+        outcome = _head_to_head_outcome(int(row["my_correct"]), int(row["friend_correct"]))
+        wins += outcome == "win"
+        losses += outcome == "loss"
+        draws += outcome == "draw"
+        my_correct += int(row["my_correct"] or 0)
+        my_answered += int(row["my_answered"] or 0)
+        friend_correct += int(row["friend_correct"] or 0)
+        friend_answered += int(row["friend_answered"] or 0)
+        played_at = row.get("created_at")
+        matches.append({
+            "roomId": str(row["id"]),
+            "playedAt": played_at.isoformat() if isinstance(played_at, datetime) else None,
+            "questionCount": int(row.get("question_count") or 0),
+            "myCorrect": int(row["my_correct"] or 0),
+            "friendCorrect": int(row["friend_correct"] or 0),
+            "outcome": outcome,
+            "mode": row.get("mode") or "RANDOM",
+        })
+    return {
+        "friend": _public_user(friend), "played": len(rows), "wins": wins, "losses": losses, "draws": draws,
+        "myAccuracy": _ratio_percent(my_correct, my_answered),
+        "friendAccuracy": _ratio_percent(friend_correct, friend_answered),
+        "recentMatches": matches,
     }

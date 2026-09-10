@@ -185,13 +185,14 @@ internal fun SocialHubScreen(
     LaunchedEffect(currentRoom?.status, currentRoom?.startsAt, currentRoom?.serverNow) {
         val room = currentRoom ?: return@LaunchedEffect
         val activeToken = token ?: return@LaunchedEffect
+        val currentUserId = me?.id ?: return@LaunchedEffect
         if (room.id == launchedRoomId) return@LaunchedEffect
         if (room.status != "countdown" && room.status != "active") return@LaunchedEffect
         val waitMs = synchronizedStartDelayMs(room)
         launchedRoomId = room.id
         if (waitMs > 0) delay(waitMs)
         val latest = runCatching { SocialApiClient.room(activeToken, room.id) }.getOrDefault(room)
-        sharedQuizViewModel.begin(latest, activeToken)
+        sharedQuizViewModel.begin(latest, activeToken, currentUserId)
         onSharedQuizStart()
     }
 

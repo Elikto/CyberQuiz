@@ -199,13 +199,14 @@ internal fun SocialHubScreenV2(
     LaunchedEffect(room?.status, room?.startsAt, room?.serverNow) {
         val current = room ?: return@LaunchedEffect
         val activeToken = token ?: return@LaunchedEffect
+        val currentUserId = me?.id ?: return@LaunchedEffect
         if (current.id == launchedRoomId) return@LaunchedEffect
         if (current.status !in setOf("countdown", "active")) return@LaunchedEffect
         val wait = synchronizedStartDelayMs(current)
         launchedRoomId = current.id
         if (wait > 0L) delay(wait)
         val latest = runCatching { SocialApiClient.room(activeToken, current.id) }.getOrDefault(current)
-        sharedQuizViewModel.begin(latest, activeToken)
+        sharedQuizViewModel.begin(latest, activeToken, currentUserId)
         onSharedQuizStart()
     }
 
@@ -425,7 +426,7 @@ internal fun SocialHubScreenV2(
             invites.forEach { invite ->
                 SquadPlayerCard(
                     user = invite.from,
-                    subtitle = "t'invite à jouer",
+                    subtitle = if (invite.mode.equals("ASYNC", ignoreCase = true)) "te lance un défi asynchrone" else "t'invite à jouer",
                     primary = "REJOINDRE",
                     secondary = "REFUSER",
                     enabled = !busy && room == null,
@@ -436,7 +437,7 @@ internal fun SocialHubScreenV2(
                                 .onSuccess { joined ->
                                     room = joined
                                     invites = invites.filterNot { it.id == invite.id }
-                                    info = "Salon rejoint · indique quand tu es prêt"
+                                    info = if (joined.isAsyncChallenge()) "Défi accepté · tu peux jouer maintenant" else "Salon rejoint · indique quand tu es prêt"
                                 }.onFailure(::handleFailure)
                             busy = false
                         }
@@ -462,7 +463,8 @@ internal fun SocialHubScreenV2(
                 SquadPlayerCard(
                     user = friend,
                     primary = "JOUER",
-                    secondary = "RETIRER",
+                    secondary = "DÉFIER",
+                    tertiary = "RETIRER",
                     enabled = !busy && room == null,
                     onPrimary = {
                         scope.launch {
@@ -470,13 +472,7 @@ internal fun SocialHubScreenV2(
                             runCatching {
                                 val questionIds = sharedQuizViewModel.prepareQuestionIds(10)
                                 if (questionIds.isEmpty()) error("Aucune question disponible")
-                                SocialApiClient.createRoom(
-                                    activeToken,
-                                    listOf(friend.id),
-                                    questionIds,
-                                    "RANDOM",
-                                    emptyList()
-                                )
+                                SocialApiClient.createRoom(activeToken, listOf(friend.id), questionIds, "RANDOM", emptyList())
                             }.onSuccess { created ->
                                 room = created
                                 info = "Invitation envoyée à ${friend.nickname}"
@@ -484,7 +480,22 @@ internal fun SocialHubScreenV2(
                             busy = false
                         }
                     },
-                    onSecondary = { removeFriend = friend }
+                    onSecondary = {
+                        scope.launch {
+                            busy = true
+                            runCatching {
+                                val questionIds = sharedQuizViewModel.prepareQuestionIds(10)
+                                if (questionIds.isEmpty()) error("Aucune question disponible")
+                                val created = SocialApiClient.createRoom(activeToken, listOf(friend.id), questionIds, "ASYNC", emptyList())
+                                SocialApiClient.startRoom(activeToken, created.id)
+                            }.onSuccess { created ->
+                                room = created
+                                info = "Défi asynchrone envoyé à ${friend.nickname} · tu peux jouer maintenant"
+                            }.onFailure(::handleFailure)
+                            busy = false
+                        }
+                    },
+                    onTertiary = { removeFriend = friend }
                 )
             }
         }
@@ -745,9 +756,11 @@ private fun SquadPlayerCard(
     subtitle: String? = null,
     primary: String,
     secondary: String? = null,
+    tertiary: String? = null,
     enabled: Boolean,
     onPrimary: () -> Unit,
-    onSecondary: (() -> Unit)? = null
+    onSecondary: (() -> Unit)? = null,
+    onTertiary: (() -> Unit)? = null
 ) {
     Column(modifier = Modifier.fillMaxWidth().background(SquadCard, RoundedCornerShape(17.dp)).border(1.dp, SquadBorder, RoundedCornerShape(17.dp)).padding(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -761,9 +774,18 @@ private fun SquadPlayerCard(
                 Text(primary, fontSize = 8.sp, fontWeight = FontWeight.Black)
             }
         }
-        if (secondary != null && onSecondary != null) {
-            TextButton(onClick = onSecondary, enabled = enabled, modifier = Modifier.align(Alignment.End)) {
-                Text(secondary, color = SquadRed, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
+        if ((secondary != null && onSecondary != null) || (tertiary != null && onTertiary != null)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                if (secondary != null && onSecondary != null) {
+                    TextButton(onClick = onSecondary, enabled = enabled) {
+                        Text(secondary, color = if (tertiary != null) SquadCyan else SquadRed, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                if (tertiary != null && onTertiary != null) {
+                    TextButton(onClick = onTertiary, enabled = enabled) {
+                        Text(tertiary, color = SquadRed, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
     }
