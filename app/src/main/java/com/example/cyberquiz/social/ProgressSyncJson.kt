@@ -103,6 +103,11 @@ internal object ProgressSyncJson {
         put("correctAfterWrongCount", item.correctAfterWrongCount)
         put("mastered", item.mastered)
         put("lastWrongAt", item.lastWrongAt)
+        put("reviewStage", item.reviewStage)
+        put("nextReviewAt", item.nextReviewAt)
+        put("lastReviewedAt", item.lastReviewedAt)
+        put("reviewAttempts", item.reviewAttempts)
+        put("totalReviewResponseMs", item.totalReviewResponseMs)
     }
 
     private fun decodeReview(json: JSONObject) = CloudReviewItem(
@@ -116,7 +121,12 @@ internal object ProgressSyncJson {
         wrongCount = json.optInt("wrongCount", 0).coerceAtLeast(0),
         correctAfterWrongCount = json.optInt("correctAfterWrongCount", 0).coerceAtLeast(0),
         mastered = json.optBoolean("mastered", false),
-        lastWrongAt = json.optLong("lastWrongAt", 0L).coerceAtLeast(0L)
+        lastWrongAt = json.optLong("lastWrongAt", 0L).coerceAtLeast(0L),
+        reviewStage = json.optInt("reviewStage", 0).coerceAtLeast(0),
+        nextReviewAt = json.optLong("nextReviewAt", 0L).coerceAtLeast(0L),
+        lastReviewedAt = json.optLong("lastReviewedAt", 0L).coerceAtLeast(0L),
+        reviewAttempts = json.optInt("reviewAttempts", 0).coerceAtLeast(0),
+        totalReviewResponseMs = json.optLong("totalReviewResponseMs", 0L).coerceAtLeast(0L)
     )
 
     private fun encodeHistory(entry: CloudHistoryEntry) = JSONObject().apply {
