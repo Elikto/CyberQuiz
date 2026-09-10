@@ -33,6 +33,7 @@ import com.example.cyberquiz.ui.screens.CyberMiniQuizCategoriesScreen
 import com.example.cyberquiz.ui.screens.HomeScreenWithQuestionBank
 import com.example.cyberquiz.ui.screens.LearningPathsScreen
 import com.example.cyberquiz.ui.screens.ProfileScreenEntry
+import com.example.cyberquiz.ui.screens.OnboardingScreen
 import com.example.cyberquiz.ui.screens.QuestionBankScreen
 import com.example.cyberquiz.ui.screens.QuizHistoryScreen
 import com.example.cyberquiz.ui.screens.QuizSetupScreenUx
@@ -49,6 +50,8 @@ import com.example.cyberquiz.ui.screens.UniverseHomeScreen
 import com.example.cyberquiz.ui.screens.UpdateHistoryScreen
 import com.example.cyberquiz.ui.screens.isPlayableNow
 import com.example.cyberquiz.ui.theme.CyberQuizTheme
+import com.example.cyberquiz.ui.preferences.UxPreferences
+import com.example.cyberquiz.ui.preferences.UxPreferencesStore
 import com.example.cyberquiz.viewmodel.QuizViewModel
 
 private const val CYBERQUIZ_PREFERENCES = "cyberquiz_preferences"
@@ -82,8 +85,21 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            CyberQuizTheme {
-                CyberQuizApp()
+            val context = LocalContext.current
+            val uxStore = remember(context) { UxPreferencesStore(context) }
+            val existingInstall = remember(context) {
+                context.getSharedPreferences(CYBERQUIZ_PREFERENCES, Context.MODE_PRIVATE).all.isNotEmpty()
+            }
+            var uxPreferences by remember { mutableStateOf(uxStore.load(existingInstall = existingInstall)) }
+            val updateUxPreferences: (UxPreferences) -> Unit = { next ->
+                uxStore.save(next)
+                uxPreferences = next
+            }
+            CyberQuizTheme(preferences = uxPreferences) {
+                CyberQuizApp(
+                    uxPreferences = uxPreferences,
+                    onUxPreferencesChange = updateUxPreferences
+                )
             }
         }
 
@@ -113,6 +129,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun CyberQuizApp(
+    uxPreferences: UxPreferences,
+    onUxPreferencesChange: (UxPreferences) -> Unit,
     vm: QuizViewModel = viewModel(),
     sharedQuizVm: SharedQuizViewModel = viewModel()
 ) {
@@ -120,6 +138,17 @@ private fun CyberQuizApp(
     val preferences = remember(context) {
         context.getSharedPreferences(CYBERQUIZ_PREFERENCES, Context.MODE_PRIVATE)
     }
+    if (!uxPreferences.onboardingCompleted) {
+        OnboardingScreen(
+            preferences = uxPreferences,
+            onPreferencesChange = onUxPreferencesChange,
+            onComplete = {
+                onUxPreferencesChange(uxPreferences.copy(onboardingCompleted = true))
+            }
+        )
+        return
+    }
+
     val storedQuizTypeName = remember {
         preferences.getString("selected_quiz_type", QuizType.CYBERSECURITY.name)
             ?: QuizType.CYBERSECURITY.name
@@ -438,6 +467,8 @@ private fun CyberQuizApp(
             )
 
             AppScreen.SETTINGS -> SettingsScreenV4(
+                preferences = uxPreferences,
+                onPreferencesChange = onUxPreferencesChange,
                 onBack = { goBack() },
                 onVersionClick = { navigateTo(AppScreen.UPDATE_HISTORY) }
             )

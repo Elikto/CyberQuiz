@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import com.example.cyberquiz.BuildConfig
 import com.example.cyberquiz.R
 import com.example.cyberquiz.ui.theme.CyberBackground
+import com.example.cyberquiz.ui.preferences.UxPreferences
 import com.example.cyberquiz.update.CyberQuizUpdateInfo
 import com.example.cyberquiz.update.CyberQuizUpdateManager
 import kotlinx.coroutines.launch
@@ -63,6 +64,8 @@ private val SettingsV4Border = Color(0xFF244777)
 
 @Composable
 fun SettingsScreenV4(
+    preferences: UxPreferences,
+    onPreferencesChange: (UxPreferences) -> Unit,
     onBack: () -> Unit,
     onVersionClick: () -> Unit
 ) {
@@ -150,6 +153,23 @@ fun SettingsScreenV4(
         SettingsV4SectionLabel("APPLICATION")
         SettingsV4Item("⌘", "Projet GitHub", "Elikto / CyberQuiz", "›", SettingsV4Blue) {
             uriHandler.openUri("https://github.com/Elikto/CyberQuiz")
+        }
+
+        SettingsV4SectionLabel("ACCESSIBILITÉ & CONFORT")
+        SettingsV4Item("Aa", "Taille du texte", preferences.textScale.label, "${preferences.textScale.percent}%", SettingsV4Blue) {
+            onPreferencesChange(preferences.copy(textScale = preferences.textScale.next()))
+        }
+        SettingsV4Item("◐", "Contraste renforcé", "Améliore la lisibilité des couleurs", if (preferences.highContrast) "ON" else "OFF", SettingsV4Cyan) {
+            onPreferencesChange(preferences.copy(highContrast = !preferences.highContrast))
+        }
+        SettingsV4Item("≈", "Vibrations", "Retour tactile lors des validations", if (preferences.hapticsEnabled) "ON" else "OFF", SettingsV4Purple) {
+            onPreferencesChange(preferences.copy(hapticsEnabled = !preferences.hapticsEnabled))
+        }
+        SettingsV4Item("◌", "Réduire les animations", "Limite les effets de mouvement", if (preferences.reducedMotion) "ON" else "OFF", SettingsV4Green) {
+            onPreferencesChange(preferences.copy(reducedMotion = !preferences.reducedMotion))
+        }
+        SettingsV4Item("?", "Revoir l'introduction", "Relance le guide de prise en main", "›", SettingsV4Orange) {
+            onPreferencesChange(preferences.copy(onboardingCompleted = false))
         }
 
         SettingsV4SectionLabel("AIDE & SOUTIEN")

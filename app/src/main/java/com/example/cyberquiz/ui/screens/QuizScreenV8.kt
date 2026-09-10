@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -36,6 +38,7 @@ import com.example.cyberquiz.model.QuizSessionConfig
 import com.example.cyberquiz.model.examRemainingMillis
 import com.example.cyberquiz.model.formatExamRemainingTime
 import com.example.cyberquiz.ui.theme.CyberBackground
+import com.example.cyberquiz.ui.preferences.LocalUxPreferences
 import com.example.cyberquiz.viewmodel.QuizUiState
 import com.example.cyberquiz.viewmodel.QuizViewModel
 import kotlinx.coroutines.delay
@@ -72,6 +75,8 @@ fun QuizScreenV8(
     var selected by remember { mutableStateOf<Int?>(null) }
     var showLearnMore by remember { mutableStateOf(false) }
     val examMode = sessionConfig?.exam == true
+    val uxPreferences = LocalUxPreferences.current
+    val hapticFeedback = LocalHapticFeedback.current
 
     LaunchedEffect((state as? QuizUiState.Ready)?.question?.id) {
         if (result == null) selected = null
@@ -199,7 +204,14 @@ fun QuizScreenV8(
                     PrimaryButtonV8(
                         text = if (selected == null) "Sélectionne une réponse" else "Valider ma réponse",
                         enabled = selected != null,
-                        onClick = { selected?.let(vm::answer) }
+                        onClick = {
+                            selected?.let { answer ->
+                                if (uxPreferences.hapticsEnabled) {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                }
+                                vm.answer(answer)
+                            }
+                        }
                     )
                 } else {
                     ExplanationCardV8(
