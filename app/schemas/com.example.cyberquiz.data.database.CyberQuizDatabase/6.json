@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 6,
-    "identityHash": "PENDING_CI_GENERATED_HASH",
+    "identityHash": "e9e46346a84da52488c88bc29d2d4d07",
     "entities": [
       {
         "tableName": "questions",
@@ -103,7 +103,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'PENDING_CI_GENERATED_HASH')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e9e46346a84da52488c88bc29d2d4d07')"
     ]
   }
 }
