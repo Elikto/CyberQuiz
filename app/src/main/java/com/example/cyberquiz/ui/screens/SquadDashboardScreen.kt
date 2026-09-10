@@ -41,12 +41,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cyberquiz.social.MAX_SQUAD_FRIENDS
+import com.example.cyberquiz.social.SQUAD_QUESTION_COUNTS
 import com.example.cyberquiz.social.SharedQuizViewModel
 import com.example.cyberquiz.social.SocialApiClient
 import com.example.cyberquiz.social.SocialTokenStore
 import com.example.cyberquiz.social.SocialUser
 import com.example.cyberquiz.social.SquadDashboard
 import com.example.cyberquiz.social.SquadDashboardApiClient
+import com.example.cyberquiz.social.toggleSquadFriend
 import kotlinx.coroutines.launch
 
 private val Squad2Bg = Color(0xFF030712)
@@ -59,9 +62,6 @@ private val Squad2Purple = Color(0xFFB64EFF)
 private val Squad2Green = Color(0xFF39E79B)
 private val Squad2Gold = Color(0xFFFFC863)
 private val Squad2Red = Color(0xFFFF5F7D)
-
-private const val MAX_SQUAD_FRIENDS = 3
-private val SQUAD_QUESTION_COUNTS = listOf(5, 10, 20)
 
 @Composable
 internal fun SquadDashboardScreen(
@@ -178,11 +178,7 @@ internal fun SquadDashboardScreen(
                     selected = selected,
                     enabled = canSelect && !creatingRoom,
                     onClick = {
-                        selectedFriendIds = if (selected) {
-                            selectedFriendIds - friend.id
-                        } else {
-                            selectedFriendIds + friend.id
-                        }
+                        selectedFriendIds = toggleSquadFriend(selectedFriendIds, friend.id)
                     }
                 )
             }
