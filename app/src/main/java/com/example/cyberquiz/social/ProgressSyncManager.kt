@@ -43,7 +43,6 @@ internal object ProgressSyncManager {
     private var rerunRequested = false
     private var initialized = false
 
-    // These references are deliberately retained for the lifetime of the application process.
     private var roomObserver: InvalidationTracker.Observer? = null
     private var historyListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
     private var engagementListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
@@ -73,9 +72,6 @@ internal object ProgressSyncManager {
                     .registerOnSharedPreferenceChangeListener(listener)
             }
 
-            // Keep a legacy ownership backup in the progress snapshot for upgrades from
-            // older versions. AccountEconomyManager is the only authority that can apply
-            // ownership back to the device once the transactional economy is available.
             engagementListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
                 if (key in setOf(
                         KEY_UNLOCKED_ACHIEVEMENTS,
@@ -133,19 +129,13 @@ internal object ProgressSyncManager {
 
             val local = buildLocalSnapshot(appContext)
             val remote = ProgressSyncApiClient.get(token)
-
-            // Existing cloud data belongs to the account, so it is authoritative when a
-            // different account is selected on this device. For the same account, merge
-            // monotonically so an older phone cannot erase cumulative learning progress.
             val target = when {
                 remote.snapshot == null -> local
                 !sameAccount -> remote.snapshot
                 else -> ProgressSnapshotMerger.merge(local, remote.snapshot)
             }
 
-            if (target != local) {
-                applySnapshot(appContext, target)
-            }
+            if (target != local) applySnapshot(appContext, target)
 
             val savedEnvelope = if (remote.snapshot == null || target != remote.snapshot) {
                 putWithSingleConflictRetry(token, target, remote.revision)
@@ -236,7 +226,12 @@ internal object ProgressSyncManager {
                     wrongCount = item.wrongCount,
                     correctAfterWrongCount = item.correctAfterWrongCount,
                     mastered = item.mastered,
-                    lastWrongAt = item.lastWrongAt
+                    lastWrongAt = item.lastWrongAt,
+                    reviewStage = item.reviewStage,
+                    nextReviewAt = item.nextReviewAt,
+                    lastReviewedAt = item.lastReviewedAt,
+                    reviewAttempts = item.reviewAttempts,
+                    totalReviewResponseMs = item.totalReviewResponseMs
                 )
             }
         }
@@ -319,7 +314,12 @@ internal object ProgressSyncManager {
                     wrongCount = item.wrongCount.coerceAtLeast(0),
                     correctAfterWrongCount = item.correctAfterWrongCount.coerceAtLeast(0),
                     mastered = item.mastered,
-                    lastWrongAt = item.lastWrongAt.coerceAtLeast(0L)
+                    lastWrongAt = item.lastWrongAt.coerceAtLeast(0L),
+                    reviewStage = item.reviewStage.coerceIn(0, 6),
+                    nextReviewAt = item.nextReviewAt.coerceAtLeast(0L),
+                    lastReviewedAt = item.lastReviewedAt.coerceAtLeast(0L),
+                    reviewAttempts = item.reviewAttempts.coerceAtLeast(0),
+                    totalReviewResponseMs = item.totalReviewResponseMs.coerceAtLeast(0L)
                 )
             )
         }
@@ -329,11 +329,7 @@ internal object ProgressSyncManager {
             historyStore.add(toLocalHistory(entry))
         }
 
-        // Deliberately do not apply snapshot.engagement here. The progress snapshot may
-        // contain legacy ownership from an older client and merges by set union. Applying
-        // it after a rejected server purchase could otherwise resurrect that purchase.
-        // AccountEconomyManager migrates this legacy ownership once and then applies the
-        // transactional server state as the sole local authority.
+        // AccountEconomyManager, not the old progress envelope, owns purchases and coins.
     }
 
     private fun toCloudHistory(entry: QuizHistoryEntry) = CloudHistoryEntry(

@@ -25,6 +25,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,12 +36,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.cyberquiz.engagement.DAILY_CHALLENGE_SIZE
+import com.example.cyberquiz.engagement.DailyChallengeStore
 import com.example.cyberquiz.model.ActiveQuizSessionSummary
 import com.example.cyberquiz.model.Category
 import com.example.cyberquiz.model.QuizSessionConfig
@@ -83,9 +87,11 @@ fun QuizSetupScreenUx(
     vm: QuizViewModel,
     onBack: () -> Unit,
     onStart: (QuizSessionConfig) -> Unit,
+    onDailyChallenge: () -> Unit,
     onResume: (String) -> Unit,
     onAbandon: (String) -> Unit
 ) {
+    val context = LocalContext.current
     val lastConfig by vm.lastSessionConfig.collectAsState()
     val activeSessions by vm.activeSessions.collectAsState()
     val reviewItems by vm.reviewItems.collectAsState()
@@ -105,6 +111,14 @@ fun QuizSetupScreenUx(
     val activeReviewCount = reviewItems.count { !it.mastered && it.category in selectedCategories }
     val canStart = hasFreeSlot && selectedCategories.isNotEmpty() &&
         (selectedMode != QuizSessionMode.DIFFICULTIES || activeReviewCount > 0)
+    val dailySnapshot = DailyChallengeStore.snapshot(context)
+    val activeDailySessionId = DailyChallengeStore.activeSessionId(context)
+
+    LaunchedEffect(selectedMode, activeReviewCount) {
+        if (selectedMode == QuizSessionMode.DIFFICULTIES && activeReviewCount > 0) {
+            questionCount = minOf(5, activeReviewCount)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -124,10 +138,25 @@ fun QuizSetupScreenUx(
 
         Text("Choisis ton prochain quiz", color = SetupUxText, fontSize = 25.sp, fontWeight = FontWeight.Black)
         Text(
-            "Lance une nouvelle session ou reprends un quiz déjà commencé.",
+            "Lance une nouvelle session, révise tes priorités ou reprends un quiz déjà commencé.",
             color = SetupUxMuted,
             fontSize = 12.sp,
             lineHeight = 18.sp
+        )
+
+        DailyChallengeLaunchCard(
+            completed = dailySnapshot.completedToday,
+            streak = dailySnapshot.streak,
+            badgeCount = dailySnapshot.badges.size,
+            active = activeDailySessionId != null,
+            enabled = activeDailySessionId != null || hasFreeSlot,
+            onClick = {
+                if (activeDailySessionId != null) {
+                    onResume(activeDailySessionId)
+                } else if (!dailySnapshot.completedToday) {
+                    onDailyChallenge()
+                }
+            }
         )
 
         NewQuizLaunchCard(
@@ -151,6 +180,7 @@ fun QuizSetupScreenUx(
                 ActiveSessionCardUx(
                     number = index + 1,
                     session = session,
+                    dailyChallenge = session.id == activeDailySessionId,
                     onResume = { onResume(session.id) },
                     onAbandon = { abandonSession = session }
                 )
@@ -225,8 +255,13 @@ fun QuizSetupScreenUx(
                 }
 
                 if (selectedMode == QuizSessionMode.DIFFICULTIES) {
+                    val todayCount = minOf(5, activeReviewCount)
                     SetupUxInfo(
-                        "$activeReviewCount question${if (activeReviewCount > 1) "s" else ""} à revoir dans les catégories choisies.",
+                        if (activeReviewCount > 0) {
+                            "$activeReviewCount question${if (activeReviewCount > 1) "s" else ""} arrivée${if (activeReviewCount > 1) "s" else ""} à échéance. CyberQuiz te propose automatiquement $todayCount priorité${if (todayCount > 1) "s" else ""} aujourd'hui, classée${if (todayCount > 1) "s" else ""} selon tes erreurs, l'espacement et ton temps de réponse."
+                        } else {
+                            "Aucune révision n'est arrivée à échéance dans les catégories choisies."
+                        },
                         if (activeReviewCount > 0) SetupUxCyan else SetupUxOrange
                     )
                 }
@@ -366,6 +401,66 @@ fun QuizSetupScreenUx(
 }
 
 @Composable
+private fun DailyChallengeLaunchCard(
+    completed: Boolean,
+    streak: Int,
+    badgeCount: Int,
+    active: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val accent = when {
+        completed -> SetupUxGreen
+        active -> SetupUxOrange
+        else -> SetupUxCyan
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.horizontalGradient(
+                    listOf(accent.copy(alpha = .16f), SetupUxPurple.copy(alpha = .08f), SetupUxPanel)
+                ),
+                RoundedCornerShape(20.dp)
+            )
+            .border(1.5.dp, accent.copy(alpha = if (enabled || completed) .72f else .28f), RoundedCornerShape(20.dp))
+            .clickable(enabled = enabled && !completed, onClick = onClick)
+            .padding(15.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(44.dp)
+                .background(accent.copy(alpha = .14f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(if (completed) "✓" else "🔥", color = accent, fontSize = 20.sp, fontWeight = FontWeight.Black)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text("DÉFI DU JOUR · $DAILY_CHALLENGE_SIZE QUESTIONS", color = accent, fontSize = 10.sp, fontWeight = FontWeight.Black)
+            Text(
+                when {
+                    completed -> "Terminé aujourd'hui · série $streak jour${if (streak > 1) "s" else ""}"
+                    active -> "En cours · appuie pour reprendre exactement où tu étais"
+                    else -> "Un mini-défi différent chaque jour · bonus XP raisonnable"
+                },
+                color = SetupUxText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 17.sp
+            )
+            Text(
+                if (badgeCount > 0) "$badgeCount badge${if (badgeCount > 1) "s" else ""} de série débloqué${if (badgeCount > 1) "s" else ""}" else "Paliers : 2 · 3 · 7 · 30 jours · une journée manquée est protégée",
+                color = SetupUxMuted,
+                fontSize = 8.5.sp
+            )
+        }
+        if (!completed) Text("›", color = accent, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
 private fun NewQuizLaunchCard(enabled: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
@@ -488,6 +583,7 @@ private fun PreviousChoiceCardUx(config: QuizSessionConfig, enabled: Boolean, on
 private fun ActiveSessionCardUx(
     number: Int,
     session: ActiveQuizSessionSummary,
+    dailyChallenge: Boolean,
     onResume: () -> Unit,
     onAbandon: () -> Unit
 ) {
@@ -495,14 +591,14 @@ private fun ActiveSessionCardUx(
         modifier = Modifier
             .fillMaxWidth()
             .background(SetupUxPanel, RoundedCornerShape(18.dp))
-            .border(1.dp, SetupUxCyan.copy(alpha = .45f), RoundedCornerShape(18.dp))
+            .border(1.dp, (if (dailyChallenge) SetupUxOrange else SetupUxCyan).copy(alpha = .45f), RoundedCornerShape(18.dp))
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(9.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "QUIZ EN COURS $number",
-                color = SetupUxCyan,
+                if (dailyChallenge) "DÉFI DU JOUR EN COURS" else "QUIZ EN COURS $number",
+                color = if (dailyChallenge) SetupUxOrange else SetupUxCyan,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Black,
                 modifier = Modifier.weight(1f)
@@ -514,7 +610,12 @@ private fun ActiveSessionCardUx(
                 fontWeight = FontWeight.Black
             )
         }
-        Text(sessionDescriptionUx(session.config), color = SetupUxText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text(
+            if (dailyChallenge) "Défi quotidien · $DAILY_CHALLENGE_SIZE questions" else sessionDescriptionUx(session.config),
+            color = SetupUxText,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold
+        )
         if (session.pendingAnswer) {
             Text("Réponse et explication prêtes à être restaurées.", color = SetupUxGreen, fontSize = 9.sp)
         }

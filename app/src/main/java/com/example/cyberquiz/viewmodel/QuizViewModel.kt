@@ -2,6 +2,7 @@ package com.example.cyberquiz.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.cyberquiz.data.database.CategoryProgressEntity
@@ -13,7 +14,10 @@ import com.example.cyberquiz.data.database.ReviewItemEntity
 import com.example.cyberquiz.data.database.ReviewItemWithQuestion
 import com.example.cyberquiz.data.repository.QuizHistoryStore
 import com.example.cyberquiz.data.repository.QuizRepository
+import com.example.cyberquiz.engagement.DAILY_CHALLENGE_SIZE
+import com.example.cyberquiz.engagement.DailyChallengeStore
 import com.example.cyberquiz.model.ActiveQuizSessionSummary
+import com.example.cyberquiz.model.AdaptiveReviewEngine
 import com.example.cyberquiz.model.Category
 import com.example.cyberquiz.model.QuizHistoryEntry
 import com.example.cyberquiz.model.QuizHistoryQuestion
@@ -63,9 +67,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     private val _activeQuizType = MutableStateFlow(CYBERSECURITY)
     val progress: StateFlow<ProgressEntity> = _activeQuizType
         .flatMapLatest { quizType ->
-            repo.progress(quizType).map { stored ->
-                stored ?: emptyProgress(quizType)
-            }
+            repo.progress(quizType).map { stored -> stored ?: emptyProgress(quizType) }
         }
         .stateIn(
             scope = viewModelScope,
@@ -139,6 +141,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     private var questionNumber = 0
     private var reviewQuestionId: Long? = null
     private var singleReviewQuestion = false
+    private var questionPresentedAtElapsed = 0L
 
     private var runAnswered = 0
     private var runCorrect = 0
@@ -151,6 +154,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     private var configuredSessionRuntime = false
     private var configuredSessionId: String? = null
     private var configuredSessionConfig: QuizSessionConfig? = null
+    private var dailyChallengeDay: String? = null
     private var sessionQueue = mutableListOf<Long>()
     private var sessionIndex = 0
     private var sessionAnswered = 0
@@ -186,9 +190,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                         ?: Category.entries.map { it.label }.toSet(),
                     questionCount = 0
                 )
-            } else {
-                null
-            }
+            } else null
         )
         singleReviewQuestion = false
         selectQuizType(quizType)
@@ -214,9 +216,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                     categories = setOf(category),
                     questionCount = 0
                 )
-            } else {
-                null
-            }
+            } else null
         )
         singleReviewQuestion = false
         selectQuizType(quizType)
@@ -253,41 +253,19 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startConfiguredQuiz(config: QuizSessionConfig) {
         if (_activeSessions.value.size >= MAX_ACTIVE_SESSIONS) return
-
-        saveLastSessionConfig(config)
-        resetRunScore(config)
-        configuredSessionRuntime = true
-        configuredSessionId = nextSessionId()
-        configuredSessionConfig = config
-        singleReviewQuestion = false
-        selectQuizType(CYBERSECURITY)
-        currentCategory = null
-        questionNumber = 0
-        reviewQuestionId = null
-        sessionQueue.clear()
-        sessionIndex = 0
-        sessionAnswered = 0
-        sessionCurrentQuestionId = null
-        sessionPendingAnswer = false
-        sessionPendingCorrect = false
-        sessionPendingXp = 0
-        sessionPendingSelected = null
-        _reviewMode.value = config.mode == QuizSessionMode.DIFFICULTIES
-        _restoredSelection.value = null
-        _result.value = null
-        _state.value = QuizUiState.Loading
-        persistActiveSession()
+        prepareConfiguredSession(config, dailyDay = null)
 
         viewModelScope.launch {
             initialized.await()
             if (config.mode == QuizSessionMode.DIFFICULTIES) {
-                val question = chooseDifficultyQuestion(config, null)
+                val question = chooseDifficultyQuestion(config, emptySet())
                 if (question == null) {
                     finishConfiguredSession()
                 } else {
+                    sessionQueue = mutableListOf(question.id)
                     sessionCurrentQuestionId = question.id
                     persistActiveSession()
-                    _state.value = QuizUiState.Ready(question, 1)
+                    showQuestion(question, 1)
                 }
             } else {
                 val base = configuredQuestionPool(config)
@@ -307,10 +285,72 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     sessionCurrentQuestionId = question.id
                     persistActiveSession()
-                    _state.value = QuizUiState.Ready(question, 1)
+                    showQuestion(question, 1)
                 }
             }
         }
+    }
+
+    fun startDailyChallenge(): Boolean {
+        if (_activeSessions.value.size >= MAX_ACTIVE_SESSIONS) return false
+        val day = DailyChallengeStore.today()
+        if (DailyChallengeStore.snapshot(getApplication(), day).completedToday) return false
+        val config = QuizSessionConfig(
+            mode = QuizSessionMode.RANDOM,
+            categories = Category.entries.map { it.label }.toSet(),
+            questionCount = DAILY_CHALLENGE_SIZE
+        )
+        prepareConfiguredSession(config, dailyDay = day)
+        viewModelScope.launch {
+            initialized.await()
+            val ids = DailyChallengeStore.selectQuestionIds(
+                dao.questionsSnapshot(CYBERSECURITY),
+                day,
+                DAILY_CHALLENGE_SIZE
+            )
+            if (ids.isEmpty()) {
+                finishConfiguredSession()
+                return@launch
+            }
+            sessionQueue = ids.toMutableList()
+            sessionIndex = 0
+            val question = dao.questionById(ids.first())
+            if (question == null) {
+                finishConfiguredSession()
+            } else {
+                sessionCurrentQuestionId = question.id
+                persistActiveSession()
+                showQuestion(question, 1)
+            }
+        }
+        return true
+    }
+
+    private fun prepareConfiguredSession(config: QuizSessionConfig, dailyDay: String?) {
+        saveLastSessionConfig(config)
+        resetRunScore(config)
+        configuredSessionRuntime = true
+        configuredSessionId = nextSessionId()
+        configuredSessionConfig = config
+        dailyChallengeDay = dailyDay
+        singleReviewQuestion = false
+        selectQuizType(CYBERSECURITY)
+        currentCategory = null
+        questionNumber = 0
+        reviewQuestionId = null
+        sessionQueue.clear()
+        sessionIndex = 0
+        sessionAnswered = 0
+        sessionCurrentQuestionId = null
+        sessionPendingAnswer = false
+        sessionPendingCorrect = false
+        sessionPendingXp = 0
+        sessionPendingSelected = null
+        _reviewMode.value = config.mode == QuizSessionMode.DIFFICULTIES
+        _restoredSelection.value = null
+        _result.value = null
+        _state.value = QuizUiState.Loading
+        persistActiveSession()
     }
 
     fun resumeConfiguredQuiz(sessionId: String) {
@@ -319,6 +359,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         configuredSessionRuntime = true
         configuredSessionId = sessionId
         configuredSessionConfig = loadSessionConfig(sessionId)
+        dailyChallengeDay = sessionPrefs.getString(sessionKey(sessionId, FIELD_DAILY_DAY), null)
         singleReviewQuestion = false
         selectQuizType(CYBERSECURITY)
         currentCategory = null
@@ -362,12 +403,8 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                 advanceConfiguredSession()
                 return@launch
             }
-            val number = if (sessionPendingAnswer) {
-                sessionAnswered.coerceAtLeast(1)
-            } else {
-                sessionAnswered + 1
-            }
-            _state.value = QuizUiState.Ready(question, number)
+            val number = if (sessionPendingAnswer) sessionAnswered.coerceAtLeast(1) else sessionAnswered + 1
+            showQuestion(question, number)
             if (sessionPendingAnswer) {
                 _result.value = AnswerResult(
                     correct = sessionPendingCorrect,
@@ -381,7 +418,6 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
     fun abandonConfiguredQuiz(sessionId: String) {
         removeSessionStorage(sessionId)
-
         if (configuredSessionId == sessionId) {
             leaveConfiguredRuntime()
             resetRunScore(null)
@@ -406,23 +442,20 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     fun answer(index: Int) {
         val current = (_state.value as? QuizUiState.Ready)?.question ?: return
         if (_result.value != null) return
+        val responseMs = if (questionPresentedAtElapsed > 0L) {
+            (SystemClock.elapsedRealtime() - questionPresentedAtElapsed).coerceIn(0L, 120_000L)
+        } else 0L
 
         viewModelScope.launch {
             val p = repo.progressSnapshot(currentQuizType) ?: emptyProgress(currentQuizType)
             val ok = index == current.correctIndex
             val isReview = _reviewMode.value
             val concept = correctAnswer(current).trim()
-            val reviewItemBefore = if (
-                currentQuizType == CYBERSECURITY && concept.isNotBlank()
-            ) {
+            val reviewItemBefore = if (currentQuizType == CYBERSECURITY && concept.isNotBlank()) {
                 dao.reviewItemSnapshot(CYBERSECURITY, concept)
-            } else {
-                null
-            }
+            } else null
 
-            val firstReviewSuccess = isReview &&
-                ok &&
-                reviewItemBefore != null &&
+            val firstReviewSuccess = isReview && ok && reviewItemBefore != null &&
                 reviewItemBefore.correctAfterWrongCount == 0
 
             val gainedXp = when {
@@ -435,30 +468,19 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                 else -> 0
             }
 
-            val newStreak = if (isReview) {
-                p.streak
-            } else if (ok) {
-                p.streak + 1
-            } else {
-                0
-            }
+            val newStreak = if (isReview) p.streak else if (ok) p.streak + 1 else 0
             val best = if (isReview) p.bestStreak else maxOf(p.bestStreak, newStreak)
             val newXp = p.xp + gainedXp
             val newLevel = (newXp / 100) + 1
             val newAnswered = if (isReview) p.answered else p.answered + 1
             val newCorrect = if (isReview) p.correct else p.correct + if (ok) 1 else 0
+            val newTotalResponseMs = if (isReview) p.totalResponseMs else p.totalResponseMs + responseMs
 
-            if (!isReview) {
-                repo.markSeen(current.id)
-            }
+            if (!isReview) repo.markSeen(current.id)
 
             if (currentQuizType == CYBERSECURITY) {
-                if (isReview) {
-                    recordConceptReviewResult(current, ok)
-                } else {
-                    recordLearningProgress(current, ok)
-                }
-                recordReviewResult(current, ok)
+                if (isReview) recordConceptReviewResult(current, ok) else recordLearningProgress(current, ok)
+                recordReviewResult(current, ok, responseMs)
 
                 if (!isReview && ok && reviewItemBefore != null && !reviewItemBefore.mastered) {
                     dao.markConceptMasteredByReview(
@@ -477,7 +499,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                 correct = newCorrect,
                 streak = newStreak,
                 bestStreak = best,
-                totalResponseMs = p.totalResponseMs
+                totalResponseMs = newTotalResponseMs
             )
 
             runAnswered += 1
@@ -515,12 +537,10 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     fun nextQuestion() {
         _result.value = null
         _restoredSelection.value = null
-
         if (configuredSessionRuntime) {
             viewModelScope.launch { advanceConfiguredSession() }
             return
         }
-
         if (_reviewMode.value && singleReviewQuestion) {
             reviewQuestionId = null
             publishFinishSummary()
@@ -547,14 +567,24 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         if (config.mode == QuizSessionMode.DIFFICULTIES) {
-            val question = chooseDifficultyQuestion(config, sessionCurrentQuestionId)
+            val question = chooseDifficultyQuestion(config, sessionQueue.toSet())
             if (question == null) {
-                finishConfiguredSession()
+                if (config.infinite) sessionQueue.clear()
+                val retry = if (config.infinite) chooseDifficultyQuestion(config, emptySet()) else null
+                if (retry == null) {
+                    finishConfiguredSession()
+                    return
+                }
+                sessionQueue += retry.id
+                sessionCurrentQuestionId = retry.id
+                persistActiveSession()
+                showQuestion(retry, sessionAnswered + 1)
                 return
             }
+            sessionQueue += question.id
             sessionCurrentQuestionId = question.id
             persistActiveSession()
-            _state.value = QuizUiState.Ready(question, sessionAnswered + 1)
+            showQuestion(question, sessionAnswered + 1)
             return
         }
 
@@ -578,10 +608,9 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             finishConfiguredSession()
             return
         }
-
         sessionCurrentQuestionId = question.id
         persistActiveSession()
-        _state.value = QuizUiState.Ready(question, sessionAnswered + 1)
+        showQuestion(question, sessionAnswered + 1)
     }
 
     private suspend fun configuredQuestionPool(config: QuizSessionConfig): List<QuestionEntity> {
@@ -601,13 +630,16 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun chooseDifficultyQuestion(
         config: QuizSessionConfig,
-        previousQuestionId: Long?
+        excludedQuestionIds: Set<Long>
     ): QuestionEntity? {
-        val active = dao.activeReviewQuestionsSnapshot(CYBERSECURITY)
+        val reviewItems = dao.reviewItemsSnapshot(CYBERSECURITY)
             .filter { it.category in config.categories }
-        if (active.isEmpty()) return null
-        val alternatives = active.filterNot { it.id == previousQuestionId }
-        return (if (alternatives.isNotEmpty()) alternatives else active).random()
+        val ranked = AdaptiveReviewEngine.rankDue(
+            items = reviewItems,
+            now = System.currentTimeMillis(),
+            excludedQuestionIds = excludedQuestionIds
+        )
+        return ranked.firstOrNull()?.questionId?.let { dao.questionById(it) }
     }
 
     private fun buildFiniteQueue(baseIds: List<Long>, count: Int): List<Long> {
@@ -630,12 +662,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         val now = System.currentTimeMillis()
         val concept = correctAnswer(question).trim()
 
-        dao.insertCategoryProgress(
-            CategoryProgressEntity(
-                quizType = CYBERSECURITY,
-                category = question.category
-            )
-        )
+        dao.insertCategoryProgress(CategoryProgressEntity(quizType = CYBERSECURITY, category = question.category))
         dao.incrementCategoryProgress(
             quizType = CYBERSECURITY,
             category = question.category,
@@ -669,7 +696,6 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         val concept = correctAnswer(question).trim()
         if (concept.isBlank()) return
         val now = System.currentTimeMillis()
-
         dao.insertConceptProgress(
             ConceptProgressEntity(
                 quizType = CYBERSECURITY,
@@ -677,25 +703,49 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                 category = question.category
             )
         )
-
-        if (correct) {
-            dao.markConceptMasteredByReview(CYBERSECURITY, concept, now)
-        } else {
-            dao.markConceptNeedsReview(CYBERSECURITY, concept, now)
-        }
+        if (correct) dao.markConceptMasteredByReview(CYBERSECURITY, concept, now)
+        else dao.markConceptNeedsReview(CYBERSECURITY, concept, now)
     }
 
-    private suspend fun recordReviewResult(question: QuestionEntity, correct: Boolean) {
+    private suspend fun recordReviewResult(
+        question: QuestionEntity,
+        correct: Boolean,
+        responseMs: Long
+    ) {
         val concept = correctAnswer(question).trim()
         if (concept.isBlank()) return
+        val existing = dao.reviewItemSnapshot(CYBERSECURITY, concept)
+        val now = System.currentTimeMillis()
 
         if (correct) {
+            if (existing == null) return
             dao.recordReviewCorrect(CYBERSECURITY, concept)
+            val decision = AdaptiveReviewEngine.schedule(
+                previousStage = existing.reviewStage,
+                correct = true,
+                wrongCount = existing.wrongCount,
+                responseMs = responseMs,
+                now = now
+            )
+            dao.updateReviewSchedule(
+                quizType = CYBERSECURITY,
+                concept = concept,
+                reviewStage = decision.stage,
+                nextReviewAt = decision.nextReviewAt,
+                lastReviewedAt = now,
+                reviewAttempts = existing.reviewAttempts + 1,
+                totalReviewResponseMs = existing.totalReviewResponseMs + responseMs
+            )
             return
         }
 
-        val existing = dao.reviewItemSnapshot(CYBERSECURITY, concept)
-        val now = System.currentTimeMillis()
+        val decision = AdaptiveReviewEngine.schedule(
+            previousStage = existing?.reviewStage ?: 0,
+            correct = false,
+            wrongCount = (existing?.wrongCount ?: 0) + 1,
+            responseMs = responseMs,
+            now = now
+        )
         if (existing == null) {
             dao.insertReviewItem(
                 ReviewItemEntity(
@@ -709,7 +759,12 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                     wrongCount = 1,
                     correctAfterWrongCount = 0,
                     mastered = false,
-                    lastWrongAt = now
+                    lastWrongAt = now,
+                    reviewStage = decision.stage,
+                    nextReviewAt = decision.nextReviewAt,
+                    lastReviewedAt = now,
+                    reviewAttempts = 1,
+                    totalReviewResponseMs = responseMs
                 )
             )
         } else {
@@ -722,6 +777,15 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                 question = question.question,
                 correctAnswer = concept,
                 lastWrongAt = now
+            )
+            dao.updateReviewSchedule(
+                quizType = CYBERSECURITY,
+                concept = concept,
+                reviewStage = decision.stage,
+                nextReviewAt = decision.nextReviewAt,
+                lastReviewedAt = now,
+                reviewAttempts = existing.reviewAttempts + 1,
+                totalReviewResponseMs = existing.totalReviewResponseMs + responseMs
             )
         }
     }
@@ -743,7 +807,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                 _state.value = QuizUiState.Finished
             } else {
                 questionNumber = 1
-                _state.value = QuizUiState.Ready(question, questionNumber)
+                showQuestion(question, questionNumber)
             }
             return
         }
@@ -756,8 +820,13 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             _state.value = QuizUiState.Finished
         } else {
             questionNumber++
-            _state.value = QuizUiState.Ready(question, questionNumber)
+            showQuestion(question, questionNumber)
         }
+    }
+
+    private fun showQuestion(question: QuestionEntity, number: Int) {
+        questionPresentedAtElapsed = SystemClock.elapsedRealtime()
+        _state.value = QuizUiState.Ready(question, number)
     }
 
     private fun resetRunScore(config: QuizSessionConfig?) {
@@ -782,13 +851,10 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     private fun saveHistoryIfEligible() {
         if (runHistorySaved) return
         if (currentQuizType != CYBERSECURITY || singleReviewQuestion || runAnswered <= 0) return
-
         val originalConfig = configuredSessionConfig ?: runReplayConfig ?: return
         val replayConfig = if (!configuredSessionRuntime && originalConfig.questionCount == 0) {
             originalConfig.copy(questionCount = runAnswered)
-        } else {
-            originalConfig
-        }
+        } else originalConfig
         val endedAt = System.currentTimeMillis()
         val entry = QuizHistoryEntry(
             id = "history_${endedAt}_${runAnswered}",
@@ -873,20 +939,33 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             .putInt(sessionKey(id, FIELD_CORRECT_COUNT), runCorrect)
             .putInt(sessionKey(id, FIELD_XP_GAINED), runXpGained)
             .putLong(sessionKey(id, FIELD_STARTED_AT), runStartedAt)
-            .putString(
-                sessionKey(id, FIELD_ANSWER_HISTORY),
-                historyStore.encodeQuestions(runHistoryQuestions)
-            )
+            .putString(sessionKey(id, FIELD_ANSWER_HISTORY), historyStore.encodeQuestions(runHistoryQuestions))
             .putLong(sessionKey(id, FIELD_CURRENT_ID), sessionCurrentQuestionId ?: -1L)
             .putBoolean(sessionKey(id, FIELD_PENDING), sessionPendingAnswer)
             .putBoolean(sessionKey(id, FIELD_CORRECT), sessionPendingCorrect)
             .putInt(sessionKey(id, FIELD_XP), sessionPendingXp)
             .putInt(sessionKey(id, FIELD_SELECTED), sessionPendingSelected ?: -1)
+            .apply {
+                if (dailyChallengeDay == null) remove(sessionKey(id, FIELD_DAILY_DAY))
+                else putString(sessionKey(id, FIELD_DAILY_DAY), dailyChallengeDay)
+            }
             .apply()
         refreshActiveSessions()
     }
 
     private fun finishConfiguredSession() {
+        dailyChallengeDay?.let { day ->
+            val completion = DailyChallengeStore.complete(
+                getApplication(),
+                day = day,
+                score = runCorrect,
+                total = sessionAnswered.coerceAtLeast(1)
+            )
+            if (completion.newlyCompleted && completion.bonusXp > 0) {
+                runXpGained += completion.bonusXp
+                viewModelScope.launch { addBonusXp(completion.bonusXp) }
+            }
+        }
         publishFinishSummary()
         saveHistoryIfEligible()
         val id = configuredSessionId
@@ -898,10 +977,27 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = QuizUiState.Finished
     }
 
+    private suspend fun addBonusXp(amount: Int) {
+        if (amount <= 0) return
+        val p = repo.progressSnapshot(CYBERSECURITY) ?: emptyProgress(CYBERSECURITY)
+        val newXp = p.xp + amount
+        dao.updateProgress(
+            quizType = CYBERSECURITY,
+            xp = newXp,
+            level = (newXp / 100) + 1,
+            answered = p.answered,
+            correct = p.correct,
+            streak = p.streak,
+            bestStreak = p.bestStreak,
+            totalResponseMs = p.totalResponseMs
+        )
+    }
+
     private fun leaveConfiguredRuntime() {
         configuredSessionRuntime = false
         configuredSessionId = null
         configuredSessionConfig = null
+        dailyChallengeDay = null
         sessionQueue.clear()
         sessionIndex = 0
         sessionAnswered = 0
@@ -931,6 +1027,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             .remove(sessionKey(id, FIELD_CORRECT))
             .remove(sessionKey(id, FIELD_XP))
             .remove(sessionKey(id, FIELD_SELECTED))
+            .remove(sessionKey(id, FIELD_DAILY_DAY))
             .apply()
         refreshActiveSessions()
     }
@@ -974,10 +1071,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                     ?: encodeCategories(Category.entries.map { it.label }.toSet())
             )
             .putInt(sessionKey(id, FIELD_COUNT), sessionPrefs.getInt(KEY_LEGACY_COUNT, 10))
-            .putString(
-                sessionKey(id, FIELD_QUEUE),
-                sessionPrefs.getString(KEY_LEGACY_QUEUE, "") ?: ""
-            )
+            .putString(sessionKey(id, FIELD_QUEUE), sessionPrefs.getString(KEY_LEGACY_QUEUE, "") ?: "")
             .putInt(sessionKey(id, FIELD_INDEX), sessionPrefs.getInt(KEY_LEGACY_INDEX, 0))
             .putInt(sessionKey(id, FIELD_ANSWERED), sessionPrefs.getInt(KEY_LEGACY_ANSWERED, 0))
             .putInt(sessionKey(id, FIELD_CORRECT_COUNT), 0)
@@ -1056,6 +1150,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         private const val FIELD_CORRECT = "correct"
         private const val FIELD_XP = "xp"
         private const val FIELD_SELECTED = "selected"
+        private const val FIELD_DAILY_DAY = "daily_day"
 
         private const val KEY_LEGACY_ACTIVE = "active"
         private const val KEY_LEGACY_MODE = "active_mode"

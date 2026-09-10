@@ -89,11 +89,46 @@ interface QuizDao {
         totalResponseMs: Long
     )
 
-    @Query("SELECT * FROM review_items WHERE quizType = :quizType ORDER BY mastered ASC, wrongCount DESC, lastWrongAt DESC")
+    @Query(
+        """
+        SELECT id, quizType, concept, category, difficulty, questionId, question, correctAnswer,
+               wrongCount, correctAfterWrongCount,
+               CASE
+                   WHEN mastered = 1 AND (
+                       (nextReviewAt > 0 AND nextReviewAt <= CAST(strftime('%s','now') AS INTEGER) * 1000)
+                       OR (nextReviewAt = 0 AND (lastWrongAt = 0 OR lastWrongAt + 604800000 <= CAST(strftime('%s','now') AS INTEGER) * 1000))
+                   ) THEN 0
+                   ELSE mastered
+               END AS mastered,
+               lastWrongAt, reviewStage, nextReviewAt, lastReviewedAt, reviewAttempts, totalReviewResponseMs
+        FROM review_items
+        WHERE quizType = :quizType
+        ORDER BY mastered ASC, wrongCount DESC, lastWrongAt DESC
+        """
+    )
     fun reviewItems(quizType: String): Flow<List<ReviewItemEntity>>
 
+    @Query("SELECT * FROM review_items WHERE quizType = :quizType ORDER BY wrongCount DESC, lastWrongAt DESC")
+    suspend fun reviewItemsSnapshot(quizType: String): List<ReviewItemEntity>
+
     @Transaction
-    @Query("SELECT * FROM review_items WHERE quizType = :quizType ORDER BY mastered ASC, wrongCount DESC, lastWrongAt DESC")
+    @Query(
+        """
+        SELECT id, quizType, concept, category, difficulty, questionId, question, correctAnswer,
+               wrongCount, correctAfterWrongCount,
+               CASE
+                   WHEN mastered = 1 AND (
+                       (nextReviewAt > 0 AND nextReviewAt <= CAST(strftime('%s','now') AS INTEGER) * 1000)
+                       OR (nextReviewAt = 0 AND (lastWrongAt = 0 OR lastWrongAt + 604800000 <= CAST(strftime('%s','now') AS INTEGER) * 1000))
+                   ) THEN 0
+                   ELSE mastered
+               END AS mastered,
+               lastWrongAt, reviewStage, nextReviewAt, lastReviewedAt, reviewAttempts, totalReviewResponseMs
+        FROM review_items
+        WHERE quizType = :quizType
+        ORDER BY mastered ASC, wrongCount DESC, lastWrongAt DESC
+        """
+    )
     fun reviewItemsWithQuestions(quizType: String): Flow<List<ReviewItemWithQuestion>>
 
     @Query("SELECT * FROM review_items WHERE quizType = :quizType AND concept = :concept LIMIT 1")
@@ -120,6 +155,19 @@ interface QuizDao {
         "UPDATE review_items SET correctAfterWrongCount=correctAfterWrongCount+1, mastered=1 WHERE quizType=:quizType AND concept=:concept"
     )
     suspend fun recordReviewCorrect(quizType: String, concept: String)
+
+    @Query(
+        "UPDATE review_items SET reviewStage=:reviewStage, nextReviewAt=:nextReviewAt, lastReviewedAt=:lastReviewedAt, reviewAttempts=:reviewAttempts, totalReviewResponseMs=:totalReviewResponseMs WHERE quizType=:quizType AND concept=:concept"
+    )
+    suspend fun updateReviewSchedule(
+        quizType: String,
+        concept: String,
+        reviewStage: Int,
+        nextReviewAt: Long,
+        lastReviewedAt: Long,
+        reviewAttempts: Int,
+        totalReviewResponseMs: Long
+    )
 
     @Query("SELECT * FROM category_progress WHERE quizType = :quizType ORDER BY answered DESC, category ASC")
     fun categoryProgress(quizType: String): Flow<List<CategoryProgressEntity>>

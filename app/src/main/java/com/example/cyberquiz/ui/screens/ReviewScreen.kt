@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cyberquiz.data.database.ReviewItemEntity
 import com.example.cyberquiz.data.database.ReviewItemWithQuestion
+import com.example.cyberquiz.model.ADAPTIVE_REVIEW_DAILY_TARGET
 import com.example.cyberquiz.viewmodel.QuizViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
@@ -58,6 +59,7 @@ fun ReviewScreen(
     onBack: () -> Unit,
     onPractice: (ReviewItemEntity) -> Unit,
     onCategoryQuiz: (String, Int) -> Unit,
+    onReviewToday: (Int) -> Unit,
     highlightedConcept: String? = null
 ) {
     val items by vm.reviewItemsWithQuestions.collectAsState()
@@ -67,6 +69,8 @@ fun ReviewScreen(
     var courseCategory by remember { mutableStateOf("") }
     var expandedCategoriesState by rememberSaveable { mutableStateOf("") }
 
+    // The DAO presents a mastered item as due again once its spaced-repetition
+    // deadline is reached, so this list is the actual set to work on now.
     val activeRaw = items.filterNot { it.review.mastered }
     val highlightedItem = highlightedConcept?.let { concept ->
         activeRaw.firstOrNull { it.review.concept.equals(concept, ignoreCase = true) }
@@ -85,6 +89,7 @@ fun ReviewScreen(
         }.thenBy { it.lowercase() }
     )
     val categoryQuizEnabled = activeSessions.size < QuizViewModel.MAX_ACTIVE_SESSIONS
+    val todayTarget = minOf(ADAPTIVE_REVIEW_DAILY_TARGET, active.size)
     val expandedCategories = remember(expandedCategoriesState) {
         expandedCategoriesState
             .split(ReviewCategorySeparator)
@@ -148,13 +153,13 @@ fun ReviewScreen(
             fontWeight = FontWeight.Black
         )
         Text(
-            "CyberQuiz mémorise les questions que tu rates sans afficher leur réponse. Elles sont regroupées par catégorie : appuie sur une catégorie pour afficher ou masquer ses questions.",
+            "CyberQuiz adapte maintenant les révisions à tes erreurs, à ton temps de réponse et à l'espacement déjà réussi. Une notion fragile revient plus vite ; une notion maîtrisée s'espace progressivement puis revient seulement quand son échéance arrive.",
             color = ReviewMuted,
             fontSize = 13.sp,
             lineHeight = 19.sp
         )
         Text(
-            "Premier retest réussi : +5 XP une seule fois par notion. Les retests suivants ne donnent plus d'XP.",
+            "Premier retest réussi : +5 XP une seule fois par notion. Les retests suivants servent à consolider la mémoire sans farm d'XP.",
             color = ReviewGreen,
             fontSize = 10.sp,
             lineHeight = 15.sp,
@@ -164,15 +169,23 @@ fun ReviewScreen(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ReviewSummaryCard(
                 value = active.size.toString(),
-                label = "À retravailler",
+                label = "À réviser maintenant",
                 accent = ReviewOrange,
                 modifier = Modifier.weight(1f)
             )
             ReviewSummaryCard(
                 value = mastered.size.toString(),
-                label = "Maîtrisées",
+                label = "Espacées",
                 accent = ReviewGreen,
                 modifier = Modifier.weight(1f)
+            )
+        }
+
+        if (todayTarget > 0) {
+            AdaptiveReviewTodayCard(
+                count = todayTarget,
+                enabled = categoryQuizEnabled,
+                onClick = { onReviewToday(todayTarget) }
             )
         }
 
@@ -180,7 +193,7 @@ fun ReviewScreen(
             EmptyReviewCard()
         } else {
             if (active.isNotEmpty()) {
-                SectionTitleReview("PRIORITÉ · À RETRAVAILLER")
+                SectionTitleReview("PRIORITÉ · À RÉVISER MAINTENANT")
                 orderedActiveCategories.forEach { category ->
                     val categoryItems = activeByCategory[category].orEmpty()
                     val expanded = category in expandedCategories
@@ -225,7 +238,7 @@ fun ReviewScreen(
             }
 
             if (mastered.isNotEmpty()) {
-                SectionTitleReview("MAÎTRISÉES APRÈS RÉVISION")
+                SectionTitleReview("ESPACÉES · PAS ENCORE À REVOIR")
                 mastered.forEach { item ->
                     ReviewItemCard(
                         item = item,
@@ -254,6 +267,50 @@ fun ReviewScreen(
             category = courseCategory,
             onDismiss = { courseTerm = null }
         )
+    }
+}
+
+@Composable
+private fun AdaptiveReviewTodayCard(count: Int, enabled: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.horizontalGradient(
+                    listOf(ReviewPurple.copy(alpha = .18f), ReviewCyan.copy(alpha = .10f), Color(0xFF081226))
+                ),
+                RoundedCornerShape(20.dp)
+            )
+            .border(1.4.dp, ReviewCyan.copy(alpha = if (enabled) .72f else .28f), RoundedCornerShape(20.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(15.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(42.dp)
+                .background(ReviewPurple.copy(alpha = .16f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("🎯", fontSize = 18.sp)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text("RÉVISION DU JOUR", color = ReviewCyan, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
+            Text(
+                "$count question${if (count > 1) "s" else ""} prioritaire${if (count > 1) "s" else ""} sélectionnée${if (count > 1) "s" else ""} automatiquement",
+                color = ReviewText,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.Black
+            )
+            Text(
+                if (enabled) "Erreurs fréquentes + échéance + temps de réponse" else "Termine ou arrête un quiz en cours pour libérer une place",
+                color = ReviewMuted,
+                fontSize = 9.sp
+            )
+        }
+        Text("›", color = if (enabled) ReviewCyan else ReviewMuted, fontSize = 25.sp, fontWeight = FontWeight.Black)
     }
 }
 
@@ -342,7 +399,7 @@ private fun ReviewCategoryCard(
                     fontWeight = FontWeight.Black
                 )
                 Text(
-                    "$questionCount question${if (questionCount > 1) "s" else ""} à retravailler",
+                    "$questionCount question${if (questionCount > 1) "s" else ""} à réviser maintenant",
                     color = ReviewMuted,
                     fontSize = 10.sp
                 )
@@ -421,7 +478,7 @@ private fun EmptyReviewCard() {
         Text("✓", color = ReviewGreen, fontSize = 34.sp, fontWeight = FontWeight.Black)
         Text("Rien à revoir pour l'instant", color = ReviewText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Text(
-            "Les questions apparaîtront ici automatiquement dès qu'une question Cyber sera ratée.",
+            "CyberQuiz fera revenir automatiquement les notions au bon moment après une erreur ou une révision réussie.",
             color = ReviewMuted,
             fontSize = 12.sp,
             lineHeight = 18.sp,
@@ -584,7 +641,7 @@ private fun ReviewItemCard(
                 Spacer(Modifier.width(8.dp))
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        if (review.mastered) "MAÎTRISÉ" else "À REVOIR",
+                        if (review.mastered) "ESPACÉ" else "À REVOIR",
                         color = accent,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Black,
