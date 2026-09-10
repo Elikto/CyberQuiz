@@ -37,6 +37,10 @@ internal object DailyChallengeStore {
     private const val KEY_LAST_SCORE = "last_score"
     private const val KEY_LAST_BONUS_XP = "last_bonus_xp"
 
+    private const val SESSION_PREFS = "cyberquiz_quiz_session"
+    private const val KEY_ACTIVE_SESSION_IDS = "active_session_ids"
+    private const val FIELD_DAILY_DAY = "daily_day"
+
     private val milestones = linkedMapOf(
         2 to "daily_2",
         3 to "daily_3",
@@ -61,14 +65,33 @@ internal object DailyChallengeStore {
         )
     }
 
+    /** Returns today's persisted challenge session, if the player left it unfinished. */
+    fun activeSessionId(context: Context, day: String = today()): String? {
+        val prefs = context.getSharedPreferences(SESSION_PREFS, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_ACTIVE_SESSION_IDS, "")
+            .orEmpty()
+            .split(',')
+            .asSequence()
+            .filter(String::isNotBlank)
+            .firstOrNull { id ->
+                prefs.getString("session_${id}_$FIELD_DAILY_DAY", null) == day
+            }
+    }
+
     fun complete(
         context: Context,
         day: String,
         score: Int,
         total: Int = DAILY_CHALLENGE_SIZE
     ): DailyChallengeCompletion {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val existing = snapshot(context, day)
+        // A challenge only counts after all five daily questions have been answered.
+        // This also protects against a truncated queue after a data/update issue.
+        if (total < DAILY_CHALLENGE_SIZE) {
+            return DailyChallengeCompletion(false, 0, existing, emptySet())
+        }
+
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (existing.completedToday) {
             return DailyChallengeCompletion(false, 0, existing, emptySet())
         }
@@ -85,7 +108,7 @@ internal object DailyChallengeStore {
         val milestoneBonus = milestones.entries
             .filter { it.value in newBadges }
             .sumOf { milestoneBonusXp[it.key] ?: 0 }
-        val scoreBonus = if (score.coerceIn(0, total.coerceAtLeast(1)) == total) 5 else 0
+        val scoreBonus = if (score.coerceIn(0, total) == total) 5 else 0
         val bonusXp = 5 + milestoneBonus + scoreBonus
         val best = max(prefs.getInt(KEY_BEST_STREAK, 0), newStreak)
         val completedCount = prefs.getInt(KEY_COMPLETED_COUNT, 0).coerceAtLeast(0) + 1
@@ -96,7 +119,7 @@ internal object DailyChallengeStore {
             .putInt(KEY_BEST_STREAK, best)
             .putInt(KEY_COMPLETED_COUNT, completedCount)
             .putStringSet(KEY_BADGES, oldBadges + unlocked)
-            .putInt(KEY_LAST_SCORE, score.coerceIn(0, total.coerceAtLeast(1)))
+            .putInt(KEY_LAST_SCORE, score.coerceIn(0, total))
             .putInt(KEY_LAST_BONUS_XP, bonusXp)
             .commit()
 
@@ -106,6 +129,14 @@ internal object DailyChallengeStore {
             snapshot = snapshot(context, day),
             newBadges = newBadges
         )
+    }
+
+    fun badgeLabel(id: String): String = when (id) {
+        "daily_2" -> "2 jours"
+        "daily_3" -> "3 jours"
+        "daily_7" -> "7 jours"
+        "daily_30" -> "30 jours"
+        else -> id
     }
 
     internal fun nextStreak(previousStreak: Int, previousDay: String?, currentDay: String): Int {
