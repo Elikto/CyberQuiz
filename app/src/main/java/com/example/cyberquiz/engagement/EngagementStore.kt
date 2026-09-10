@@ -7,6 +7,7 @@ import com.example.cyberquiz.model.dailyMissionDefinitions
 import com.example.cyberquiz.model.dailyMissionProgress
 import com.example.cyberquiz.model.loginRewardForStreak
 import com.example.cyberquiz.model.newlyUnlockedAchievementIds
+import com.example.cyberquiz.social.AccountEconomyManager
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -59,6 +60,7 @@ object EngagementStore {
             .putInt(KEY_LOGIN_REWARD, reward)
             .putInt(KEY_COINS, coins)
             .commit()
+        AccountEconomyManager.request(context)
         return reward
     }
 
@@ -107,6 +109,7 @@ object EngagementStore {
             .putInt(KEY_COINS, coins)
             .putStringSet(KEY_UNLOCKED_ACHIEVEMENTS, updatedUnlocked)
             .commit()
+        if (newlyUnlocked.isNotEmpty()) AccountEconomyManager.request(context)
 
         return snapshotFromPrefs(context, metrics, baseline)
     }
@@ -156,6 +159,7 @@ object EngagementStore {
         if (!saved) return 0
 
         grantCoins(context, mission.definition.rewardCoins)
+        AccountEconomyManager.queueMissionClaim(context, missionId)
         return mission.definition.rewardCoins
     }
 
@@ -180,22 +184,37 @@ object EngagementStore {
         return prefs.edit().putInt(KEY_COINS, current - amount).commit()
     }
 
-    private fun purchaseKey(context: Context, storageKey: String, cost: Int, setKey: String): Boolean {
+    private fun purchaseKey(
+        context: Context,
+        storageKey: String,
+        cost: Int,
+        setKey: String,
+        kind: String
+    ): Boolean {
         val prefs = prefs(context)
         val purchased = prefs.getStringSet(setKey, emptySet())?.toSet().orEmpty()
         if (storageKey in purchased) return true
-        if (!spendCoins(context, cost)) return false
-        return prefs.edit().putStringSet(setKey, purchased + storageKey).commit()
+        val current = prefs.getInt(KEY_COINS, 0)
+        if (cost > 0 && current < cost) return false
+
+        // Keep balance + ownership in one SharedPreferences transaction. This avoids the
+        // previous edge case where a failed ownership write could consume coins alone.
+        val saved = prefs.edit()
+            .putInt(KEY_COINS, (current - cost.coerceAtLeast(0)).coerceAtLeast(0))
+            .putStringSet(setKey, purchased + storageKey)
+            .commit()
+        if (saved) AccountEconomyManager.queuePurchase(context, kind, storageKey)
+        return saved
     }
 
     fun purchaseFrame(context: Context, frameKey: String, cost: Int): Boolean =
-        purchaseKey(context, frameKey, cost, KEY_PURCHASED_FRAMES)
+        purchaseKey(context, frameKey, cost, KEY_PURCHASED_FRAMES, "frame")
 
     fun purchaseAvatar(context: Context, avatarKey: String, cost: Int): Boolean =
-        purchaseKey(context, avatarKey, cost, KEY_PURCHASED_AVATARS)
+        purchaseKey(context, avatarKey, cost, KEY_PURCHASED_AVATARS, "avatar")
 
     fun purchaseBanner(context: Context, bannerKey: String, cost: Int): Boolean =
-        purchaseKey(context, bannerKey, cost, KEY_PURCHASED_BANNERS)
+        purchaseKey(context, bannerKey, cost, KEY_PURCHASED_BANNERS, "banner")
 
     fun purchasedFrameKeys(context: Context): Set<String> =
         prefs(context).getStringSet(KEY_PURCHASED_FRAMES, emptySet())?.toSet().orEmpty()

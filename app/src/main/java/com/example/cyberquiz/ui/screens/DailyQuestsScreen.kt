@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,8 +48,10 @@ import androidx.compose.ui.unit.sp
 import com.example.cyberquiz.engagement.EngagementStore
 import com.example.cyberquiz.model.EngagementMetrics
 import com.example.cyberquiz.model.claimableMissionIds
+import com.example.cyberquiz.social.AccountEconomyManager
 import com.example.cyberquiz.ui.theme.CyberBackground
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val QuestText = Color(0xFFF5F7FF)
 private val QuestMuted = Color(0xFF96A7CD)
@@ -57,6 +60,7 @@ private val QuestCyan = Color(0xFF19F2E5)
 private val QuestOrange = Color(0xFFFFB84A)
 private val QuestGreen = Color(0xFF38E69A)
 private val QuestPurple = Color(0xFFD652FF)
+private val QuestRed = Color(0xFFFF667F)
 
 @Composable
 fun DailyQuestsScreen(
@@ -67,9 +71,17 @@ fun DailyQuestsScreen(
     BackHandler(onBack = onBack)
 
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var snapshot by remember(metrics) { mutableStateOf(EngagementStore.sync(context, metrics)) }
     var rewardAnimation by remember { mutableIntStateOf(0) }
+    var claimingMissionId by remember { mutableStateOf<String?>(null) }
+    var claimError by remember { mutableStateOf<String?>(null) }
     val claimable = claimableMissionIds(snapshot.missions, snapshot.claimedMissionIds)
+
+    LaunchedEffect(metrics) {
+        runCatching { AccountEconomyManager.syncCurrentSession(context) }
+            .onSuccess { if (it != null) snapshot = EngagementStore.snapshot(context, metrics) }
+    }
 
     LaunchedEffect(rewardAnimation) {
         if (rewardAnimation > 0) {
@@ -125,6 +137,19 @@ fun DailyQuestsScreen(
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
                     Text("◈ ${snapshot.coins}", color = Color(0xFFFFC86A), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                }
+            }
+
+            claimError?.let { message ->
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(QuestRed.copy(alpha = .10f), RoundedCornerShape(14.dp))
+                        .border(1.dp, QuestRed.copy(alpha = .55f), RoundedCornerShape(14.dp))
+                        .clickable { claimError = null }
+                        .padding(11.dp)
+                ) {
+                    Text(message, color = QuestRed, fontSize = 10.sp)
                 }
             }
 
@@ -186,6 +211,7 @@ fun DailyQuestsScreen(
                     CosmeticProgressBar(progress)
 
                     if (canCollect) {
+                        val collecting = claimingMissionId == mission.definition.id
                         Box(
                             Modifier
                                 .fillMaxWidth()
@@ -194,22 +220,26 @@ fun DailyQuestsScreen(
                                     RoundedCornerShape(12.dp)
                                 )
                                 .border(1.dp, QuestCyan.copy(alpha = .65f), RoundedCornerShape(12.dp))
-                                .clickable {
-                                    val gained = EngagementStore.claimMission(
-                                        context = context,
-                                        missionId = mission.definition.id,
-                                        metrics = metrics
-                                    )
-                                    if (gained > 0) {
-                                        snapshot = EngagementStore.snapshot(context, metrics)
-                                        rewardAnimation = gained
-                                        onCoinsChanged()
+                                .clickable(enabled = claimingMissionId == null) {
+                                    scope.launch {
+                                        claimingMissionId = mission.definition.id
+                                        claimError = null
+                                        runCatching {
+                                            AccountEconomyManager.claimMission(context, mission.definition.id)
+                                        }.onSuccess { gained ->
+                                            snapshot = EngagementStore.snapshot(context, metrics)
+                                            if (gained > 0) rewardAnimation = gained
+                                            onCoinsChanged()
+                                        }.onFailure { throwable ->
+                                            claimError = throwable.message ?: "Impossible de récolter la récompense. Réessaie avec une connexion Internet."
+                                        }
+                                        claimingMissionId = null
                                     }
                                 }
                                 .padding(vertical = 9.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("RÉCOLTER", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                            Text(if (collecting) "VALIDATION…" else "RÉCOLTER", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                         }
                     } else {
                         Text(

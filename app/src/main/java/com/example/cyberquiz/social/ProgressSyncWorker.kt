@@ -11,11 +11,11 @@ import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
 
 /**
- * Persistent safety net for account progress synchronization.
+ * Persistent safety net for account synchronization.
  *
- * Normal changes are synchronized quickly by [ProgressSyncManager]. This worker
- * only guarantees that a temporary network/process failure is retried later
- * without keeping the application process alive.
+ * Normal progress changes are synchronized quickly by [ProgressSyncManager]. This
+ * worker guarantees that both learning progress and the transactional economy are
+ * retried later after a temporary network/process failure.
  */
 internal class ProgressSyncWorker(
     appContext: Context,
@@ -25,6 +25,7 @@ internal class ProgressSyncWorker(
         if (SocialTokenStore.load(applicationContext).isNullOrBlank()) return Result.success()
         return try {
             ProgressSyncManager.syncCurrentSession(applicationContext)
+            AccountEconomyManager.syncCurrentSession(applicationContext)
             Result.success()
         } catch (error: SocialApiException) {
             if (error.statusCode == 401) Result.success() else Result.retry()

@@ -1,6 +1,7 @@
 package com.example.cyberquiz.engagement
 
 import android.content.Context
+import com.example.cyberquiz.social.AccountEconomyManager
 
 private const val MAX_REWARD_LEVEL = 30
 
@@ -39,6 +40,7 @@ object LevelRewardStore {
                 .putStringSet(KEY_PENDING_LEVELS, setOf(safeLevel.toString()))
                 .putStringSet(KEY_UNSEEN_POPUPS, setOf(safeLevel.toString()))
                 .commit()
+            AccountEconomyManager.request(context)
             return snapshot(context)
         }
 
@@ -94,6 +96,7 @@ object LevelRewardStore {
 
         val coins = levelCoinReward(safeLevel)
         EngagementStore.grantCoins(context, coins)
+        AccountEconomyManager.queueLevelClaim(context, safeLevel)
         return coins
     }
 

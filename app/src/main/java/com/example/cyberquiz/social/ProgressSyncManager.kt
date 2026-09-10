@@ -73,6 +73,9 @@ internal object ProgressSyncManager {
                     .registerOnSharedPreferenceChangeListener(listener)
             }
 
+            // Keep a legacy ownership backup in the progress snapshot for upgrades from
+            // older versions. AccountEconomyManager is the only authority that can apply
+            // ownership back to the device once the transactional economy is available.
             engagementListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
                 if (key in setOf(
                         KEY_UNLOCKED_ACHIEVEMENTS,
@@ -326,29 +329,11 @@ internal object ProgressSyncManager {
             historyStore.add(toLocalHistory(entry))
         }
 
-        val engagementPrefs = context.getSharedPreferences(ENGAGEMENT_PREFS, Context.MODE_PRIVATE)
-        engagementPrefs.edit()
-            .putStringSet(
-                KEY_UNLOCKED_ACHIEVEMENTS,
-                engagementPrefs.getStringSet(KEY_UNLOCKED_ACHIEVEMENTS, emptySet()).orEmpty() +
-                    snapshot.engagement.unlockedAchievementIds
-            )
-            .putStringSet(
-                KEY_PURCHASED_FRAMES,
-                engagementPrefs.getStringSet(KEY_PURCHASED_FRAMES, emptySet()).orEmpty() +
-                    snapshot.engagement.purchasedFrameKeys
-            )
-            .putStringSet(
-                KEY_PURCHASED_AVATARS,
-                engagementPrefs.getStringSet(KEY_PURCHASED_AVATARS, emptySet()).orEmpty() +
-                    snapshot.engagement.purchasedAvatarKeys
-            )
-            .putStringSet(
-                KEY_PURCHASED_BANNERS,
-                engagementPrefs.getStringSet(KEY_PURCHASED_BANNERS, emptySet()).orEmpty() +
-                    snapshot.engagement.purchasedBannerKeys
-            )
-            .apply()
+        // Deliberately do not apply snapshot.engagement here. The progress snapshot may
+        // contain legacy ownership from an older client and merges by set union. Applying
+        // it after a rejected server purchase could otherwise resurrect that purchase.
+        // AccountEconomyManager migrates this legacy ownership once and then applies the
+        // transactional server state as the sole local authority.
     }
 
     private fun toCloudHistory(entry: QuizHistoryEntry) = CloudHistoryEntry(
