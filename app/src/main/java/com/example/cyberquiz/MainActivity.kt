@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cyberquiz.engagement.DAILY_CHALLENGE_SIZE
+import com.example.cyberquiz.model.Category
 import com.example.cyberquiz.model.QuizSessionConfig
 import com.example.cyberquiz.model.QuizSessionMode
 import com.example.cyberquiz.social.SharedQuizViewModel
@@ -337,6 +338,17 @@ private fun CyberQuizApp(
                             QuizSessionConfig(
                                 mode = QuizSessionMode.DIFFICULTIES,
                                 categories = setOf(category),
+                                questionCount = questionCount
+                            )
+                        )
+                    }
+                },
+                onReviewToday = { questionCount ->
+                    if (questionCount > 0) {
+                        startConfigured(
+                            QuizSessionConfig(
+                                mode = QuizSessionMode.DIFFICULTIES,
+                                categories = Category.entries.map { it.label }.toSet(),
                                 questionCount = questionCount
                             )
                         )
