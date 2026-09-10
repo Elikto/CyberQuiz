@@ -41,6 +41,7 @@ class SharedQuizViewModel(app: Application) : AndroidViewModel(app) {
     private var token: String? = null
     private var roomId: String? = null
     private var currentRoom: SocialQuizRoom? = null
+    private var currentUserId: String? = null
     private var pollJob: Job? = null
 
     suspend fun prepareQuestionIds(count: Int = 10): List<Long> {
@@ -49,8 +50,9 @@ class SharedQuizViewModel(app: Application) : AndroidViewModel(app) {
         return all.shuffled().take(count.coerceAtLeast(1)).map { it.id }
     }
 
-    fun begin(room: SocialQuizRoom, sessionToken: String) {
+    fun begin(room: SocialQuizRoom, sessionToken: String, userId: String) {
         token = sessionToken
+        currentUserId = userId
         roomId = room.id
         currentRoom = room
         pollJob?.cancel()
@@ -119,6 +121,31 @@ class SharedQuizViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    fun rematch(onCreated: (SocialQuizRoom) -> Unit) {
+        val finished = _state.value as? SharedQuizState.Finished ?: return
+        val previous = finished.room ?: currentRoom ?: return
+        val activeToken = token ?: return
+        val me = currentUserId ?: return
+        _state.value = SharedQuizState.Loading
+        viewModelScope.launch {
+            runCatching {
+                val source = runCatching { SocialApiClient.room(activeToken, previous.id) }.getOrDefault(previous)
+                val invitees = source.rematchInviteeIds(me)
+                require(invitees.isNotEmpty()) { "Aucun adversaire disponible pour la revanche." }
+                val questionIds = prepareQuestionIds(source.questionIds.size)
+                require(questionIds.size == source.questionIds.size) { "Pas assez de questions pour la revanche." }
+                val created = SocialApiClient.createRoom(activeToken, invitees, questionIds, source.mode, source.categories)
+                if (created.isAsyncChallenge()) SocialApiClient.startRoom(activeToken, created.id) else created
+            }.onSuccess { created ->
+                currentRoom = created
+                roomId = created.id
+                onCreated(created)
+            }.onFailure { error ->
+                _state.value = SharedQuizState.Error(error.message ?: "Impossible de créer la revanche.")
+            }
+        }
+    }
+
     fun leaveRemoteRoom(onComplete: () -> Unit) {
         val activeToken = token
         val activeRoom = roomId
@@ -138,6 +165,7 @@ class SharedQuizViewModel(app: Application) : AndroidViewModel(app) {
         token = null
         roomId = null
         currentRoom = null
+        currentUserId = null
         _state.value = SharedQuizState.Idle
     }
 

@@ -28,6 +28,7 @@ _JWT_ISSUER = "cyberquiz-api"
 _JWT_AUDIENCE = "cyberquiz-app"
 _JWT_LIFETIME_DAYS = 30
 _ROOM_LIFETIME_HOURS = 2
+_ASYNC_ROOM_LIFETIME_HOURS = 72
 _ROOM_COUNTDOWN_SECONDS = 5
 _AUTH_RATE_LIMIT = 20
 _AUTH_RATE_WINDOW_SECONDS = 10 * 60
@@ -350,6 +351,10 @@ def _are_friends(cur, a: str, b: str) -> bool:
     return cur.fetchone() is not None
 
 
+def _is_async_mode(mode: str | None) -> bool:
+    return (mode or "").upper() == "ASYNC"
+
+
 def _new_unique_friend_code(cur) -> str:
     for _ in range(12):
         code = generate_friend_code()
@@ -621,11 +626,13 @@ def create_room(payload: RoomCreateRequest, user_id: str = Depends(_current_user
                 if invitee_id == user_id or not _are_friends(cur, user_id, invitee_id):
                     raise HTTPException(status_code=403, detail="Une invitation cible un joueur qui n'est pas ton ami")
             room_id = uuid4()
-            expires_at = datetime.now(timezone.utc) + timedelta(hours=_ROOM_LIFETIME_HOURS)
+            room_mode = payload.mode.upper()
+            lifetime_hours = _ASYNC_ROOM_LIFETIME_HOURS if _is_async_mode(room_mode) else _ROOM_LIFETIME_HOURS
+            expires_at = datetime.now(timezone.utc) + timedelta(hours=lifetime_hours)
             cur.execute("""
                 INSERT INTO cq_quiz_rooms(id, host_user_id, question_ids, mode, categories, expires_at)
                 VALUES (%s, %s, %s, %s, %s, %s)
-            """, (room_id, user_id, payload.questionIds, payload.mode.upper(), payload.categories, expires_at))
+            """, (room_id, user_id, payload.questionIds, room_mode, payload.categories, expires_at))
             cur.execute("INSERT INTO cq_quiz_room_members(room_id, user_id, ready) VALUES (%s, %s, TRUE)", (room_id, user_id))
             for invitee_id in payload.inviteeIds:
                 cur.execute("""
@@ -644,15 +651,16 @@ def list_room_invites(user_id: str = Depends(_current_user_id)) -> list[dict[str
     with _connect() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT i.id AS invite_id, i.room_id, i.created_at, u.id, u.nickname, u.avatar_key, u.level
+                SELECT i.id AS invite_id, i.room_id, i.created_at, r.mode, u.id, u.nickname, u.avatar_key, u.level
                 FROM cq_quiz_room_invites i
                 JOIN cq_quiz_rooms r ON r.id = i.room_id
                 JOIN cq_users u ON u.id = i.from_user_id
-                WHERE i.to_user_id = %s AND i.accepted = FALSE AND r.expires_at > %s AND r.status = 'lobby'
+                WHERE i.to_user_id = %s AND i.accepted = FALSE AND r.expires_at > %s
+                  AND (r.status = 'lobby' OR (r.mode = 'ASYNC' AND r.status = 'active'))
                 ORDER BY i.created_at DESC
             """, (user_id, now))
             rows = cur.fetchall()
-    return [{"id": str(row["invite_id"]), "roomId": str(row["room_id"]), "from": _public_user(row), "createdAt": row["created_at"].isoformat()} for row in rows]
+    return [{"id": str(row["invite_id"]), "roomId": str(row["room_id"]), "from": _public_user(row), "mode": row.get("mode") or "RANDOM", "createdAt": row["created_at"].isoformat()} for row in rows]
 
 
 @router.post("/quiz-invites/{invite_id}/accept")
@@ -665,16 +673,18 @@ def accept_room_invite(invite_id: str, user_id: str = Depends(_current_user_id))
     with _connect() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT i.*, r.status, r.expires_at FROM cq_quiz_room_invites i
+                SELECT i.*, r.status, r.expires_at, r.mode FROM cq_quiz_room_invites i
                 JOIN cq_quiz_rooms r ON r.id = i.room_id
                 WHERE i.id = %s AND i.to_user_id = %s AND i.accepted = FALSE
             """, (invite_uuid, user_id))
             invite = cur.fetchone()
             if invite is None:
                 raise HTTPException(status_code=404, detail="Invitation de partie introuvable")
-            if invite["expires_at"] <= datetime.now(timezone.utc) or invite["status"] != "lobby":
+            async_mode = _is_async_mode(invite.get("mode"))
+            allowed_status = invite["status"] == "lobby" or (async_mode and invite["status"] == "active")
+            if invite["expires_at"] <= datetime.now(timezone.utc) or not allowed_status:
                 raise HTTPException(status_code=409, detail="Cette invitation n'est plus disponible")
-            cur.execute("INSERT INTO cq_quiz_room_members(room_id, user_id, ready) VALUES (%s, %s, FALSE) ON CONFLICT DO NOTHING", (invite["room_id"], user_id))
+            cur.execute("INSERT INTO cq_quiz_room_members(room_id, user_id, ready) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING", (invite["room_id"], user_id, async_mode))
             cur.execute("UPDATE cq_quiz_room_invites SET accepted = TRUE WHERE id = %s", (invite_uuid,))
             room = _room_payload(cur, str(invite["room_id"]), user_id)
         conn.commit()
@@ -735,14 +745,18 @@ def start_room(room_id: str, user_id: str = Depends(_current_user_id)) -> dict[s
                 raise HTTPException(status_code=403, detail="Seul l'hôte peut lancer la partie")
             if room["status"] != "lobby":
                 return _room_payload(cur, room_uuid, user_id)
-            cur.execute("SELECT ready FROM cq_quiz_room_members WHERE room_id = %s", (room_uuid,))
-            readiness = [bool(row["ready"]) for row in cur.fetchall()]
-            if len(readiness) < 2:
-                raise HTTPException(status_code=409, detail="Il faut au moins deux joueurs")
-            if not all(readiness):
-                raise HTTPException(status_code=409, detail="Tous les joueurs doivent être prêts")
-            starts_at = datetime.now(timezone.utc) + timedelta(seconds=_ROOM_COUNTDOWN_SECONDS)
-            cur.execute("UPDATE cq_quiz_rooms SET status = 'countdown', starts_at = %s WHERE id = %s", (starts_at, room_uuid))
+            if _is_async_mode(room.get("mode")):
+                starts_at = datetime.now(timezone.utc)
+                cur.execute("UPDATE cq_quiz_rooms SET status = 'active', starts_at = %s WHERE id = %s", (starts_at, room_uuid))
+            else:
+                cur.execute("SELECT ready FROM cq_quiz_room_members WHERE room_id = %s", (room_uuid,))
+                readiness = [bool(row["ready"]) for row in cur.fetchall()]
+                if len(readiness) < 2:
+                    raise HTTPException(status_code=409, detail="Il faut au moins deux joueurs")
+                if not all(readiness):
+                    raise HTTPException(status_code=409, detail="Tous les joueurs doivent être prêts")
+                starts_at = datetime.now(timezone.utc) + timedelta(seconds=_ROOM_COUNTDOWN_SECONDS)
+                cur.execute("UPDATE cq_quiz_rooms SET status = 'countdown', starts_at = %s WHERE id = %s", (starts_at, room_uuid))
             result = _room_payload(cur, room_uuid, user_id)
         conn.commit()
     return result
@@ -766,9 +780,15 @@ def update_room_progress(room_id: str, payload: RoomProgressRequest, user_id: st
             if cur.fetchone() is None:
                 raise HTTPException(status_code=403, detail="Tu ne participes pas à cette partie")
             if payload.finished:
+                cur.execute("SELECT mode FROM cq_quiz_rooms WHERE id = %s", (room_uuid,))
+                room_row = cur.fetchone() or {}
                 cur.execute("SELECT BOOL_AND(finished) AS everybody_finished FROM cq_quiz_room_members WHERE room_id = %s", (room_uuid,))
                 done = cur.fetchone()
-                if done and done["everybody_finished"]:
+                pending_invites = 0
+                if _is_async_mode(room_row.get("mode")):
+                    cur.execute("SELECT COUNT(*)::INTEGER AS pending FROM cq_quiz_room_invites WHERE room_id = %s AND accepted = FALSE", (room_uuid,))
+                    pending_invites = int((cur.fetchone() or {}).get("pending") or 0)
+                if done and done["everybody_finished"] and pending_invites == 0:
                     cur.execute("UPDATE cq_quiz_rooms SET status = 'finished' WHERE id = %s", (room_uuid,))
             result = _room_payload(cur, room_uuid, user_id)
         conn.commit()

@@ -33,6 +33,16 @@ data class SquadDashboard(
     val recentMatches: List<SquadRecentMatch>
 )
 
+data class SquadHeadToHeadMatch(
+    val roomId: String, val playedAt: String?, val questionCount: Int,
+    val myCorrect: Int, val friendCorrect: Int, val outcome: String, val mode: String
+)
+
+data class SquadHeadToHead(
+    val friend: SocialUser, val played: Int, val wins: Int, val losses: Int, val draws: Int,
+    val myAccuracy: Int, val friendAccuracy: Int, val recentMatches: List<SquadHeadToHeadMatch>
+)
+
 internal object SquadDashboardApiClient {
     private val endpoint = BuildConfig.SOCIAL_API_URL.trimEnd('/') + "/squad/dashboard"
 
@@ -65,6 +75,29 @@ internal object SquadDashboardApiClient {
         } finally {
             connection.disconnect()
         }
+    }
+
+    suspend fun headToHead(token: String, friendId: String): SquadHeadToHead = withContext(Dispatchers.IO) {
+        val url = endpoint.removeSuffix("/dashboard") + "/h2h/" + friendId
+        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 8_000
+            readTimeout = 12_000
+            setRequestProperty("Accept", "application/json")
+            setRequestProperty("Authorization", "Bearer $token")
+            setRequestProperty("User-Agent", "CyberQuiz-Android/${BuildConfig.VERSION_NAME}")
+        }
+        try {
+            val status = connection.responseCode
+            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+            val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            if (status !in 200..299) {
+                val message = runCatching { JSONObject(text).optString("detail").takeIf { it.isNotBlank() } }.getOrNull()
+                    ?: "Le duel H2H est indisponible"
+                throw SocialApiException(status, message)
+            }
+            parseHeadToHead(JSONObject(text))
+        } finally { connection.disconnect() }
     }
 
     internal fun parseDashboard(json: JSONObject): SquadDashboard {
@@ -105,6 +138,34 @@ internal object SquadDashboardApiClient {
             accuracy = json.optInt("accuracy", 0).coerceIn(0, 100),
             friendLeaderboard = leaderboard,
             recentMatches = recent
+        )
+    }
+
+    internal fun parseHeadToHead(json: JSONObject): SquadHeadToHead {
+        val matchesJson = json.optJSONArray("recentMatches") ?: JSONArray()
+        val matches = buildList {
+            repeat(matchesJson.length()) { index ->
+                val item = matchesJson.getJSONObject(index)
+                add(SquadHeadToHeadMatch(
+                    roomId = item.getString("roomId"),
+                    playedAt = item.nullableString("playedAt"),
+                    questionCount = item.optInt("questionCount", 0).coerceAtLeast(0),
+                    myCorrect = item.optInt("myCorrect", 0).coerceAtLeast(0),
+                    friendCorrect = item.optInt("friendCorrect", 0).coerceAtLeast(0),
+                    outcome = item.optString("outcome", "draw"),
+                    mode = item.optString("mode", "RANDOM")
+                ))
+            }
+        }
+        return SquadHeadToHead(
+            friend = parseUser(json.getJSONObject("friend")),
+            played = json.optInt("played", 0).coerceAtLeast(0),
+            wins = json.optInt("wins", 0).coerceAtLeast(0),
+            losses = json.optInt("losses", 0).coerceAtLeast(0),
+            draws = json.optInt("draws", 0).coerceAtLeast(0),
+            myAccuracy = json.optInt("myAccuracy", 0).coerceIn(0, 100),
+            friendAccuracy = json.optInt("friendAccuracy", 0).coerceIn(0, 100),
+            recentMatches = matches
         )
     }
 

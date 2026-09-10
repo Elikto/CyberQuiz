@@ -28,6 +28,7 @@ data class SocialQuizInvite(
     val id: String,
     val roomId: String,
     val from: SocialUser,
+    val mode: String = "RANDOM",
     val createdAt: String? = null
 )
 
@@ -52,4 +53,6 @@ data class SocialQuizRoom(
 ) {
     fun currentMember(userId: String): SocialRoomMember? = members.firstOrNull { it.user.id == userId }
     fun allReady(): Boolean = members.size >= 2 && members.all { it.ready }
+    fun isAsyncChallenge(): Boolean = mode.equals("ASYNC", ignoreCase = true)
+    fun rematchInviteeIds(currentUserId: String): List<String> = members.map { it.user.id }.filter { it != currentUserId }.distinct()
 }

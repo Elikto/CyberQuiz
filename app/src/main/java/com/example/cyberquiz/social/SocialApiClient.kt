@@ -122,6 +122,7 @@ internal object SocialApiClient {
                         id = item.getString("id"),
                         roomId = item.getString("roomId"),
                         from = parseUser(item.getJSONObject("from")),
+                        mode = item.optString("mode", "RANDOM"),
                         createdAt = item.nullableString("createdAt")
                     )
                 )
