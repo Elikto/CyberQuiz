@@ -52,33 +52,44 @@ def squad_dashboard(
                     SELECT CASE WHEN f.user_a = %s THEN f.user_b ELSE f.user_a END AS friend_id
                     FROM cq_friendships f
                     WHERE f.user_a = %s OR f.user_b = %s
-                )
-                SELECT
-                    u.id, u.nickname, u.avatar_key, u.level,
-                    COUNT(DISTINCT r.id)::INTEGER AS played,
-                    COALESCE(SUM(fm.correct), 0)::INTEGER AS correct,
-                    COALESCE(SUM(fm.answered), 0)::INTEGER AS answered,
-                    COALESCE(SUM(
-                        CASE WHEN fm.correct = (
+                ),
+                shared_finished_matches AS (
+                    SELECT
+                        friend_member.user_id AS friend_id,
+                        r.id AS room_id,
+                        friend_member.correct,
+                        friend_member.answered,
+                        CASE WHEN friend_member.correct = (
                             SELECT MAX(other.correct)
                             FROM cq_quiz_room_members other
                             WHERE other.room_id = r.id AND other.finished = TRUE
-                        ) THEN 1 ELSE 0 END
-                    ), 0)::INTEGER AS wins
+                        ) THEN 1 ELSE 0 END AS won
+                    FROM cq_quiz_rooms r
+                    JOIN cq_quiz_room_members me
+                      ON me.room_id = r.id
+                     AND me.user_id = %s
+                     AND me.finished = TRUE
+                    JOIN cq_quiz_room_members friend_member
+                      ON friend_member.room_id = r.id
+                     AND friend_member.finished = TRUE
+                    WHERE r.status = 'finished'
+                      AND friend_member.user_id <> %s
+                )
+                SELECT
+                    u.id, u.nickname, u.avatar_key, u.level,
+                    COUNT(shared.room_id)::INTEGER AS played,
+                    COALESCE(SUM(shared.correct), 0)::INTEGER AS correct,
+                    COALESCE(SUM(shared.answered), 0)::INTEGER AS answered,
+                    COALESCE(SUM(shared.won), 0)::INTEGER AS wins
                 FROM friends f
                 JOIN cq_users u ON u.id = f.friend_id
-                LEFT JOIN cq_quiz_room_members fm
-                  ON fm.user_id = f.friend_id AND fm.finished = TRUE
-                LEFT JOIN cq_quiz_rooms r
-                  ON r.id = fm.room_id AND r.status = 'finished'
-                LEFT JOIN cq_quiz_room_members me
-                  ON me.room_id = r.id AND me.user_id = %s AND me.finished = TRUE
-                WHERE r.id IS NULL OR me.user_id IS NOT NULL
+                LEFT JOIN shared_finished_matches shared
+                  ON shared.friend_id = f.friend_id
                 GROUP BY u.id, u.nickname, u.avatar_key, u.level
                 ORDER BY wins DESC, played DESC, correct DESC, u.nickname ASC
                 LIMIT 100
                 """,
-                (user_id, user_id, user_id, user_id),
+                (user_id, user_id, user_id, user_id, user_id),
             )
             leaderboard_rows = cur.fetchall()
 
