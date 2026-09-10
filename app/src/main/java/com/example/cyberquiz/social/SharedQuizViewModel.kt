@@ -119,6 +119,19 @@ class SharedQuizViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    fun leaveRemoteRoom(onComplete: () -> Unit) {
+        val activeToken = token
+        val activeRoom = roomId
+        pollJob?.cancel()
+        viewModelScope.launch {
+            if (!activeToken.isNullOrBlank() && !activeRoom.isNullOrBlank()) {
+                runCatching { SocialLifecycleApiClient.leaveRoom(activeToken, activeRoom) }
+            }
+            reset()
+            onComplete()
+        }
+    }
+
     fun reset() {
         pollJob?.cancel()
         questions = emptyList()

@@ -61,8 +61,12 @@ internal fun SharedFriendQuizScreen(
     var confirmQuit by remember { mutableStateOf(false) }
 
     fun leave() {
-        viewModel.reset()
-        onBackToFriends()
+        if (state is SharedQuizState.Finished || state is SharedQuizState.Idle) {
+            viewModel.reset()
+            onBackToFriends()
+        } else {
+            viewModel.leaveRemoteRoom(onBackToFriends)
+        }
     }
 
     BackHandler {
@@ -208,7 +212,7 @@ internal fun SharedFriendQuizScreen(
                     Text("${current.score} / ${current.total}", color = SharedCyan, fontSize = 38.sp, fontWeight = FontWeight.Black)
                     Text("Ton score", color = SharedMuted, fontSize = 12.sp)
                 }
-                current.room?.members?.forEach { member ->
+                current.room?.members?.sortedByDescending { it.correct }?.forEachIndexed { index, member ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -216,6 +220,8 @@ internal fun SharedFriendQuizScreen(
                             .padding(13.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Text("${index + 1}", color = SharedPurple, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                        Spacer(Modifier.width(8.dp))
                         PlayerAvatarButton(
                             style = playerAvatarFromStorage(member.user.avatarKey),
                             onClick = {},
@@ -227,7 +233,7 @@ internal fun SharedFriendQuizScreen(
                         Spacer(Modifier.width(11.dp))
                         Column(Modifier.weight(1f)) {
                             Text(member.user.nickname, color = SharedText, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text("Niveau ${member.user.level}", color = SharedMuted, fontSize = 10.sp)
+                            Text(if (member.finished) "Terminé" else "Encore en jeu", color = SharedMuted, fontSize = 10.sp)
                         }
                         Text(
                             "${member.correct}/${member.answered}",
@@ -254,7 +260,7 @@ internal fun SharedFriendQuizScreen(
             onDismissRequest = { confirmQuit = false },
             containerColor = Color(0xFF0B1429),
             title = { Text("Quitter la partie ?", color = SharedText, fontWeight = FontWeight.Black) },
-            text = { Text("La partie continuera pour tes amis.", color = SharedMuted) },
+            text = { Text("Ton départ sera signalé au salon et la partie continuera pour tes amis.", color = SharedMuted) },
             confirmButton = {
                 TextButton(onClick = { confirmQuit = false; leave() }) {
                     Text("QUITTER", color = SharedRed, fontWeight = FontWeight.Black)
