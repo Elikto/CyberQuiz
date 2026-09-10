@@ -74,7 +74,7 @@ internal object AccountEconomyManager {
         val token = SocialTokenStore.load(appContext) ?: return null
         return mutex.withLock {
             val metrics = metrics(appContext)
-            var state = EconomyApiClient.sync(token, metrics, seed(appContext))
+            var state = EconomyApiClient.sync(token, metrics, migrationSeed(appContext, token))
             apply(appContext, state)
             state = drainPending(appContext, token, state)
             state
@@ -90,7 +90,7 @@ internal object AccountEconomyManager {
         }
         val before = EngagementStore.currentCoins(appContext)
         val state = mutex.withLock {
-            val synced = EconomyApiClient.sync(token, metrics, seed(appContext))
+            val synced = EconomyApiClient.sync(token, metrics, migrationSeed(appContext, token))
             apply(appContext, synced)
             val claimed = EconomyApiClient.claimMission(token, missionId, metrics, seed(appContext))
             apply(appContext, claimed)
@@ -109,7 +109,7 @@ internal object AccountEconomyManager {
         }
         val before = EngagementStore.currentCoins(appContext)
         val state = mutex.withLock {
-            val synced = EconomyApiClient.sync(token, metrics, seed(appContext))
+            val synced = EconomyApiClient.sync(token, metrics, migrationSeed(appContext, token))
             apply(appContext, synced)
             val claimed = EconomyApiClient.claimLevel(token, level, metrics, seed(appContext))
             apply(appContext, claimed)
@@ -137,7 +137,7 @@ internal object AccountEconomyManager {
         }
         val metrics = metrics(appContext)
         val state = mutex.withLock {
-            val synced = EconomyApiClient.sync(token, metrics, seed(appContext))
+            val synced = EconomyApiClient.sync(token, metrics, migrationSeed(appContext, token))
             apply(appContext, synced)
             val purchased = EconomyApiClient.purchase(token, kind, storageKey, metrics, seed(appContext))
             apply(appContext, purchased)
@@ -189,6 +189,19 @@ internal object AccountEconomyManager {
         )
     }
 
+    internal fun mergeLegacyOwnership(
+        local: EconomySeed,
+        legacy: CloudEngagementOwnership?
+    ): EconomySeed {
+        if (legacy == null) return local
+        return local.copy(
+            unlockedAchievementIds = local.unlockedAchievementIds + legacy.unlockedAchievementIds,
+            purchasedFrameKeys = local.purchasedFrameKeys + legacy.purchasedFrameKeys,
+            purchasedAvatarKeys = local.purchasedAvatarKeys + legacy.purchasedAvatarKeys,
+            purchasedBannerKeys = local.purchasedBannerKeys + legacy.purchasedBannerKeys
+        )
+    }
+
     fun apply(context: Context, state: EconomyState) {
         val appContext = context.applicationContext
         val engagement = appContext.getSharedPreferences(ENGAGEMENT_PREFS, Context.MODE_PRIVATE)
@@ -217,6 +230,12 @@ internal object AccountEconomyManager {
             .putStringSet(KEY_PENDING_LEVELS, encodeLevels(pending))
             .putStringSet(KEY_UNSEEN_POPUPS, encodeLevels(unseen))
             .commit()
+    }
+
+    private suspend fun migrationSeed(context: Context, token: String): EconomySeed {
+        val local = seed(context)
+        val legacy = runCatching { ProgressSyncApiClient.get(token).snapshot?.engagement }.getOrNull()
+        return mergeLegacyOwnership(local, legacy)
     }
 
     private suspend fun drainPending(
