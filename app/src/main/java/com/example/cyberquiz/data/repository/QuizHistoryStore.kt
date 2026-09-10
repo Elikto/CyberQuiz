@@ -48,6 +48,7 @@ class QuizHistoryStore(context: Context) {
         put("mode", entry.config.mode.name)
         put("categories", JSONArray(entry.config.categories.sorted()))
         put("questionCount", entry.config.questionCount)
+        put("timeLimitMinutes", entry.config.timeLimitMinutes)
         put("startedAt", entry.startedAt)
         put("endedAt", entry.endedAt)
         put("answered", entry.answered)
@@ -73,7 +74,8 @@ class QuizHistoryStore(context: Context) {
             config = QuizSessionConfig(
                 mode = mode,
                 categories = categories,
-                questionCount = json.optInt("questionCount", 10)
+                questionCount = json.optInt("questionCount", 10),
+                timeLimitMinutes = json.optInt("timeLimitMinutes", 0).coerceAtLeast(0)
             ),
             startedAt = json.optLong("startedAt", 0L),
             endedAt = json.optLong("endedAt", 0L),

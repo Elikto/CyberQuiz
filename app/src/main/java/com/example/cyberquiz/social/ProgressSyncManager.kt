@@ -337,6 +337,7 @@ internal object ProgressSyncManager {
         mode = entry.config.mode.name,
         categories = entry.config.categories.sorted(),
         questionCount = entry.config.questionCount,
+        timeLimitMinutes = entry.config.timeLimitMinutes,
         startedAt = entry.startedAt,
         endedAt = entry.endedAt,
         answered = entry.answered,
@@ -361,7 +362,8 @@ internal object ProgressSyncManager {
         config = QuizSessionConfig(
             mode = runCatching { QuizSessionMode.valueOf(entry.mode) }.getOrDefault(QuizSessionMode.RANDOM),
             categories = entry.categories.toSet(),
-            questionCount = entry.questionCount
+            questionCount = entry.questionCount,
+            timeLimitMinutes = entry.timeLimitMinutes
         ),
         startedAt = entry.startedAt,
         endedAt = entry.endedAt,

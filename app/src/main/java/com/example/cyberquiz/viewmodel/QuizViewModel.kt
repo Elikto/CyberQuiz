@@ -23,6 +23,7 @@ import com.example.cyberquiz.model.QuizHistoryEntry
 import com.example.cyberquiz.model.QuizHistoryQuestion
 import com.example.cyberquiz.model.QuizSessionConfig
 import com.example.cyberquiz.model.QuizSessionMode
+import com.example.cyberquiz.model.examDeadlineEpochMs
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -135,6 +136,12 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _restoredSelection = MutableStateFlow<Int?>(null)
     val restoredSelection: StateFlow<Int?> = _restoredSelection.asStateFlow()
+
+    private val _currentSessionConfig = MutableStateFlow<QuizSessionConfig?>(null)
+    val currentSessionConfig: StateFlow<QuizSessionConfig?> = _currentSessionConfig.asStateFlow()
+
+    private val _examDeadline = MutableStateFlow<Long?>(null)
+    val examDeadline: StateFlow<Long?> = _examDeadline.asStateFlow()
 
     private var currentQuizType = CYBERSECURITY
     private var currentCategory: String? = null
@@ -332,6 +339,10 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         configuredSessionRuntime = true
         configuredSessionId = nextSessionId()
         configuredSessionConfig = config
+        _currentSessionConfig.value = config
+        _examDeadline.value = if (config.timedExam) {
+            examDeadlineEpochMs(runStartedAt, config.timeLimitMinutes)
+        } else null
         dailyChallengeDay = dailyDay
         singleReviewQuestion = false
         selectQuizType(CYBERSECURITY)
@@ -359,6 +370,8 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         configuredSessionRuntime = true
         configuredSessionId = sessionId
         configuredSessionConfig = loadSessionConfig(sessionId)
+        val resumedConfig = configuredSessionConfig
+        _currentSessionConfig.value = resumedConfig
         dailyChallengeDay = sessionPrefs.getString(sessionKey(sessionId, FIELD_DAILY_DAY), null)
         singleReviewQuestion = false
         selectQuizType(CYBERSECURITY)
@@ -382,6 +395,9 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         runXpGained = sessionPrefs.getInt(sessionKey(sessionId, FIELD_XP_GAINED), 0)
         runStartedAt = sessionPrefs
             .getLong(sessionKey(sessionId, FIELD_STARTED_AT), System.currentTimeMillis())
+        _examDeadline.value = resumedConfig?.takeIf { it.timedExam }?.let {
+            examDeadlineEpochMs(runStartedAt, it.timeLimitMinutes)
+        }
         runReplayConfig = configuredSessionConfig
         runHistorySaved = false
         runHistoryQuestions.clear()
@@ -391,13 +407,21 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         _finishSummary.value = null
 
         _reviewMode.value = configuredSessionConfig?.mode == QuizSessionMode.DIFFICULTIES
-        _restoredSelection.value = sessionPendingSelected
+        _restoredSelection.value = if (resumedConfig?.exam == true) null else sessionPendingSelected
         _result.value = null
         _state.value = QuizUiState.Loading
         refreshActiveSessions()
 
         viewModelScope.launch {
             initialized.await()
+            if (isExamExpired()) {
+                finishConfiguredSession()
+                return@launch
+            }
+            if (resumedConfig?.exam == true && sessionPendingAnswer) {
+                advanceConfiguredSession()
+                return@launch
+            }
             val question = sessionCurrentQuestionId?.let { dao.questionById(it) }
             if (question == null) {
                 advanceConfiguredSession()
@@ -442,6 +466,12 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     fun answer(index: Int) {
         val current = (_state.value as? QuizUiState.Ready)?.question ?: return
         if (_result.value != null) return
+        val examMode = configuredSessionRuntime && configuredSessionConfig?.exam == true
+        if (examMode && isExamExpired()) {
+            finishConfiguredSession()
+            return
+        }
+        if (examMode) _state.value = QuizUiState.Loading
         val responseMs = if (questionPresentedAtElapsed > 0L) {
             (SystemClock.elapsedRealtime() - questionPresentedAtElapsed).coerceIn(0L, 120_000L)
         } else 0L
@@ -519,9 +549,6 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }
 
-            _restoredSelection.value = index
-            _result.value = AnswerResult(ok, gainedXp, current.explanation, current)
-
             if (configuredSessionRuntime) {
                 sessionAnswered += 1
                 sessionCurrentQuestionId = current.id
@@ -531,7 +558,32 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                 sessionPendingSelected = index
                 persistActiveSession()
             }
+
+            if (examMode) {
+                _restoredSelection.value = null
+                _result.value = null
+                if (isExamExpired()) {
+                    finishConfiguredSession()
+                } else {
+                    advanceConfiguredSession()
+                }
+            } else {
+                _restoredSelection.value = index
+                _result.value = AnswerResult(ok, gainedXp, current.explanation, current)
+            }
         }
+    }
+
+    fun finishExamOnTimeout(nowEpochMs: Long = System.currentTimeMillis()) {
+        if (_state.value !is QuizUiState.Ready) return
+        if (isExamExpired(nowEpochMs)) finishConfiguredSession()
+    }
+
+    private fun isExamExpired(nowEpochMs: Long = System.currentTimeMillis()): Boolean {
+        val config = configuredSessionConfig ?: return false
+        if (!configuredSessionRuntime || !config.timedExam) return false
+        val deadline = _examDeadline.value ?: return false
+        return nowEpochMs >= deadline
     }
 
     fun nextQuestion() {
@@ -623,6 +675,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                 QuizSessionMode.HARD -> question.difficulty.equals("HARD", ignoreCase = true)
                 QuizSessionMode.RANDOM -> true
                 QuizSessionMode.DIFFICULTIES -> true
+                QuizSessionMode.EXAM -> true
             }
             categoryMatches && difficultyMatches
         }
@@ -876,13 +929,15 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             .putString(KEY_LAST_MODE, config.mode.name)
             .putString(KEY_LAST_CATEGORIES, encodeCategories(config.categories))
             .putInt(KEY_LAST_COUNT, config.questionCount)
+            .putInt(KEY_LAST_TIME_LIMIT, config.timeLimitMinutes)
             .apply()
     }
 
     private fun loadLastSessionConfig(): QuizSessionConfig = QuizSessionConfig(
         mode = readMode(KEY_LAST_MODE, QuizSessionMode.RANDOM),
         categories = readCategories(KEY_LAST_CATEGORIES),
-        questionCount = sessionPrefs.getInt(KEY_LAST_COUNT, 10)
+        questionCount = sessionPrefs.getInt(KEY_LAST_COUNT, 10),
+        timeLimitMinutes = sessionPrefs.getInt(KEY_LAST_TIME_LIMIT, 0).coerceAtLeast(0)
     )
 
     private fun loadActiveSessionsWithLegacyMigration(): List<ActiveQuizSessionSummary> {
@@ -907,7 +962,8 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
     private fun loadSessionConfig(id: String): QuizSessionConfig = QuizSessionConfig(
         mode = readMode(sessionKey(id, FIELD_MODE), QuizSessionMode.RANDOM),
         categories = readCategories(sessionKey(id, FIELD_CATEGORIES)),
-        questionCount = sessionPrefs.getInt(sessionKey(id, FIELD_COUNT), 10)
+        questionCount = sessionPrefs.getInt(sessionKey(id, FIELD_COUNT), 10),
+        timeLimitMinutes = sessionPrefs.getInt(sessionKey(id, FIELD_TIME_LIMIT), 0).coerceAtLeast(0)
     )
 
     private fun loadSessionQueue(id: String): List<Long> = sessionPrefs
@@ -933,6 +989,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             .putString(sessionKey(id, FIELD_MODE), config.mode.name)
             .putString(sessionKey(id, FIELD_CATEGORIES), encodeCategories(config.categories))
             .putInt(sessionKey(id, FIELD_COUNT), config.questionCount)
+            .putInt(sessionKey(id, FIELD_TIME_LIMIT), config.timeLimitMinutes)
             .putString(sessionKey(id, FIELD_QUEUE), sessionQueue.joinToString(","))
             .putInt(sessionKey(id, FIELD_INDEX), sessionIndex)
             .putInt(sessionKey(id, FIELD_ANSWERED), sessionAnswered)
@@ -997,6 +1054,8 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         configuredSessionRuntime = false
         configuredSessionId = null
         configuredSessionConfig = null
+        _currentSessionConfig.value = null
+        _examDeadline.value = null
         dailyChallengeDay = null
         sessionQueue.clear()
         sessionIndex = 0
@@ -1015,6 +1074,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
             .remove(sessionKey(id, FIELD_MODE))
             .remove(sessionKey(id, FIELD_CATEGORIES))
             .remove(sessionKey(id, FIELD_COUNT))
+            .remove(sessionKey(id, FIELD_TIME_LIMIT))
             .remove(sessionKey(id, FIELD_QUEUE))
             .remove(sessionKey(id, FIELD_INDEX))
             .remove(sessionKey(id, FIELD_ANSWERED))
@@ -1071,6 +1131,7 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
                     ?: encodeCategories(Category.entries.map { it.label }.toSet())
             )
             .putInt(sessionKey(id, FIELD_COUNT), sessionPrefs.getInt(KEY_LEGACY_COUNT, 10))
+            .putInt(sessionKey(id, FIELD_TIME_LIMIT), 0)
             .putString(sessionKey(id, FIELD_QUEUE), sessionPrefs.getString(KEY_LEGACY_QUEUE, "") ?: "")
             .putInt(sessionKey(id, FIELD_INDEX), sessionPrefs.getInt(KEY_LEGACY_INDEX, 0))
             .putInt(sessionKey(id, FIELD_ANSWERED), sessionPrefs.getInt(KEY_LEGACY_ANSWERED, 0))
@@ -1133,11 +1194,13 @@ class QuizViewModel(app: Application) : AndroidViewModel(app) {
         private const val KEY_LAST_MODE = "last_mode"
         private const val KEY_LAST_CATEGORIES = "last_categories"
         private const val KEY_LAST_COUNT = "last_count"
+        private const val KEY_LAST_TIME_LIMIT = "last_time_limit"
         private const val KEY_ACTIVE_SESSION_IDS = "active_session_ids"
 
         private const val FIELD_MODE = "mode"
         private const val FIELD_CATEGORIES = "categories"
         private const val FIELD_COUNT = "count"
+        private const val FIELD_TIME_LIMIT = "time_limit"
         private const val FIELD_QUEUE = "queue"
         private const val FIELD_INDEX = "index"
         private const val FIELD_ANSWERED = "answered"

@@ -46,9 +46,12 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.cyberquiz.engagement.DAILY_CHALLENGE_SIZE
 import com.example.cyberquiz.engagement.DailyChallengeStore
 import com.example.cyberquiz.model.ActiveQuizSessionSummary
+import com.example.cyberquiz.model.DEFAULT_EXAM_TIME_LIMIT_MINUTES
+import com.example.cyberquiz.model.EXAM_TIME_LIMIT_OPTIONS
 import com.example.cyberquiz.model.Category
 import com.example.cyberquiz.model.QuizSessionConfig
 import com.example.cyberquiz.model.QuizSessionMode
+import com.example.cyberquiz.model.suggestedExamTimeLimitMinutes
 import com.example.cyberquiz.viewmodel.QuizViewModel
 
 private val SetupUxPurple = Color(0xFFD652FF)
@@ -61,6 +64,7 @@ private val SetupUxText = Color(0xFFF5F7FF)
 private val SetupUxMuted = Color(0xFF9FAED3)
 private val SetupUxPanel = Color(0xFF081226)
 private val SetupUxBorder = Color(0xFF284B7A)
+private val SetupUxExam = Color(0xFFFFD166)
 
 internal data class CategoryToggleResult(
     val selected: Set<String>,
@@ -99,6 +103,12 @@ fun QuizSetupScreenUx(
 
     var modeName by rememberSaveable { mutableStateOf(lastConfig.mode.name) }
     var questionCount by rememberSaveable { mutableStateOf(lastConfig.questionCount) }
+    var examTimeMinutes by rememberSaveable {
+        mutableStateOf(
+            lastConfig.timeLimitMinutes.takeIf { lastConfig.mode == QuizSessionMode.EXAM && it > 0 }
+                ?: DEFAULT_EXAM_TIME_LIMIT_MINUTES
+        )
+    }
     var selectedCategories by remember { mutableStateOf(defaultNewQuizCategories(allCategories)) }
     var categoriesExpanded by rememberSaveable { mutableStateOf(false) }
     var showQuizForm by rememberSaveable { mutableStateOf(false) }
@@ -110,13 +120,21 @@ fun QuizSetupScreenUx(
     val hasFreeSlot = activeSessions.size < QuizViewModel.MAX_ACTIVE_SESSIONS
     val activeReviewCount = reviewItems.count { !it.mastered && it.category in selectedCategories }
     val canStart = hasFreeSlot && selectedCategories.isNotEmpty() &&
-        (selectedMode != QuizSessionMode.DIFFICULTIES || activeReviewCount > 0)
+        (selectedMode != QuizSessionMode.DIFFICULTIES || activeReviewCount > 0) &&
+        (selectedMode != QuizSessionMode.EXAM || (questionCount > 0 && examTimeMinutes > 0))
     val dailySnapshot = DailyChallengeStore.snapshot(context)
     val activeDailySessionId = DailyChallengeStore.activeSessionId(context)
 
     LaunchedEffect(selectedMode, activeReviewCount) {
         if (selectedMode == QuizSessionMode.DIFFICULTIES && activeReviewCount > 0) {
             questionCount = minOf(5, activeReviewCount)
+        }
+    }
+
+    LaunchedEffect(selectedMode) {
+        if (selectedMode == QuizSessionMode.EXAM && questionCount == 0) {
+            questionCount = 20
+            examTimeMinutes = suggestedExamTimeLimitMinutes(questionCount)
         }
     }
 
@@ -252,6 +270,7 @@ fun QuizSetupScreenUx(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     ModeChip("ALÉATOIRE", QuizSessionMode.RANDOM, selectedMode, SetupUxPurple, Modifier.weight(1f)) { modeName = it.name }
                     ModeChip("MES DIFFICULTÉS", QuizSessionMode.DIFFICULTIES, selectedMode, SetupUxCyan, Modifier.weight(1f)) { modeName = it.name }
+                    ModeChip("EXAMEN", QuizSessionMode.EXAM, selectedMode, SetupUxExam, Modifier.weight(1f)) { modeName = it.name }
                 }
 
                 if (selectedMode == QuizSessionMode.DIFFICULTIES) {
@@ -263,6 +282,13 @@ fun QuizSetupScreenUx(
                             "Aucune révision n'est arrivée à échéance dans les catégories choisies."
                         },
                         if (activeReviewCount > 0) SetupUxCyan else SetupUxOrange
+                    )
+                }
+
+                if (selectedMode == QuizSessionMode.EXAM) {
+                    SetupUxInfo(
+                        "MODE EXAMEN · aucune correction pendant l’épreuve. Tes réponses sont enregistrées puis la question suivante s’affiche directement. Le score et les corrections apparaissent uniquement à la fin.",
+                        SetupUxExam
                     )
                 }
 
@@ -297,8 +323,20 @@ fun QuizSetupScreenUx(
                 Text("3 · NOMBRE DE QUESTIONS", color = SetupUxBlue, fontSize = 10.sp, fontWeight = FontWeight.Black)
                 QuestionCountSelectorUx(
                     selected = questionCount,
-                    onSelected = { questionCount = it }
+                    mode = selectedMode,
+                    onSelected = { value ->
+                        questionCount = value
+                        if (selectedMode == QuizSessionMode.EXAM) {
+                            examTimeMinutes = suggestedExamTimeLimitMinutes(value)
+                        }
+                    }
                 )
+
+                if (selectedMode == QuizSessionMode.EXAM) {
+                    Text("4 · TEMPS LIMITE", color = SetupUxBlue, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                    ExamTimeSelectorUx(selected = examTimeMinutes, onSelected = { examTimeMinutes = it })
+                    SetupUxInfo("Le chrono démarre au lancement et continue si tu quittes puis reprends l’examen.", SetupUxExam)
+                }
 
                 Box(
                     modifier = Modifier
@@ -323,14 +361,17 @@ fun QuizSetupScreenUx(
                                 QuizSessionConfig(
                                     mode = selectedMode,
                                     categories = selectedCategories,
-                                    questionCount = questionCount
+                                    questionCount = questionCount,
+                                    timeLimitMinutes = if (selectedMode == QuizSessionMode.EXAM) examTimeMinutes else 0
                                 )
                             )
                         },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        if (canStart) "LANCER LE QUIZ" else "CONFIGURATION INCOMPLÈTE",
+                        if (canStart) {
+                            if (selectedMode == QuizSessionMode.EXAM) "LANCER L’EXAMEN" else "LANCER LE QUIZ"
+                        } else "CONFIGURATION INCOMPLÈTE",
                         color = if (canStart) SetupUxText else SetupUxMuted,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Black,
@@ -788,9 +829,14 @@ private fun CategoryRowUx(text: String, selected: Boolean, accent: Color, onClic
 }
 
 @Composable
-private fun QuestionCountSelectorUx(selected: Int, onSelected: (Int) -> Unit) {
+private fun QuestionCountSelectorUx(
+    selected: Int,
+    mode: QuizSessionMode,
+    onSelected: (Int) -> Unit
+) {
+    val options = quizQuestionCountOptionsForMode(mode)
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        QUIZ_QUESTION_COUNT_OPTIONS.chunked(3).forEach { rowOptions ->
+        options.chunked(3).forEach { rowOptions ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 rowOptions.forEach { count ->
                     val active = selected == count
@@ -815,6 +861,30 @@ private fun QuestionCountSelectorUx(selected: Int, onSelected: (Int) -> Unit) {
                     }
                 }
                 repeat(3 - rowOptions.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExamTimeSelectorUx(selected: Int, onSelected: (Int) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        EXAM_TIME_LIMIT_OPTIONS.chunked(4).forEach { rowOptions ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                rowOptions.forEach { minutes ->
+                    val active = selected == minutes
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .background(if (active) SetupUxExam.copy(alpha = .14f) else Color(0xFF08152B), RoundedCornerShape(12.dp))
+                            .border(1.dp, if (active) SetupUxExam else SetupUxBorder, RoundedCornerShape(12.dp))
+                            .clickable { onSelected(minutes) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("$minutes MIN", color = if (active) SetupUxExam else SetupUxMuted, fontSize = 8.sp, fontWeight = FontWeight.Black)
+                    }
+                }
             }
         }
     }
@@ -875,6 +945,7 @@ private fun sessionDescriptionUx(config: QuizSessionConfig): String {
         QuizSessionMode.HARD -> "Difficile"
         QuizSessionMode.RANDOM -> "Aléatoire"
         QuizSessionMode.DIFFICULTIES -> "Mes difficultés"
+        QuizSessionMode.EXAM -> "Examen"
     }
     val categories = when (config.categories.size) {
         0 -> "Aucune catégorie"
@@ -883,5 +954,6 @@ private fun sessionDescriptionUx(config: QuizSessionConfig): String {
         else -> "${config.categories.size} catégories"
     }
     val count = if (config.infinite) "Infini" else "${config.questionCount} questions"
-    return "$mode · $categories · $count"
+    val time = if (config.exam && config.timeLimitMinutes > 0) " · ${config.timeLimitMinutes} min" else ""
+    return "$mode · $categories · $count$time"
 }

@@ -73,7 +73,8 @@ internal data class CloudHistoryEntry(
     val answered: Int,
     val correct: Int,
     val xpGained: Int,
-    val questions: List<CloudHistoryQuestion>
+    val questions: List<CloudHistoryQuestion>,
+    val timeLimitMinutes: Int = 0
 )
 
 internal data class CloudEngagementOwnership(
