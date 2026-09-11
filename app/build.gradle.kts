@@ -40,6 +40,24 @@ android {
         buildConfigField("String", "SOCIAL_API_URL", quotedBuildConfigValue(cyberSocialApiUrl))
     }
 
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+
+    testOptions {
+        managedDevices {
+            localDevices {
+                create("pixel2api30") {
+                    device = "Pixel 2"
+                    apiLevel = 30
+                    systemImageSource = "aosp-atd"
+                    require64Bit = true
+                    testedAbi = "x86_64"
+                }
+            }
+        }
+    }
+
     val updateSigningConfig = if (
         !updateKeystorePath.isNullOrBlank() &&
         !updateKeystorePassword.isNullOrBlank() &&
@@ -115,6 +133,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.room.testing)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

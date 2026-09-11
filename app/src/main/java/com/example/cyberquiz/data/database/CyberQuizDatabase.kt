@@ -109,19 +109,21 @@ abstract class CyberQuizDatabase : RoomDatabase() {
             }
         }
 
+        val ALL_MIGRATIONS: Array<Migration> = arrayOf(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+            MIGRATION_5_6
+        )
+
         fun get(context: Context): CyberQuizDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context,
                 CyberQuizDatabase::class.java,
                 "cyberquiz.db"
             )
-                .addMigrations(
-                    MIGRATION_1_2,
-                    MIGRATION_2_3,
-                    MIGRATION_3_4,
-                    MIGRATION_4_5,
-                    MIGRATION_5_6
-                )
+                .addMigrations(*ALL_MIGRATIONS)
                 .build()
                 .also { INSTANCE = it }
         }
